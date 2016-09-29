@@ -1,0 +1,3 @@
+[submodule "color-py"]
+	path = color-py
+	url = https://github.com/ProjectDelos/color-py.git
