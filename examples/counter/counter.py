@@ -26,6 +26,7 @@ class Counter:
     self._client.append(self._dagid,"",0,Colors(numcolors=1, mycolors=[3]),None)
   
   def count(self):
+    self._client.snapshot(self._dagid)
     retnode = self._client.get_next(self._dagid)
     incdec = []
     reset = []
