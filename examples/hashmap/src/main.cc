@@ -9,7 +9,7 @@ extern "C" {
 }
 
 void run_YCSB() {
-        HashMap map;
+        HashMap *map = new HashMap;
         std::string line;
 
         std::vector<std::pair<uint32_t, uint32_t> > dataset;
@@ -31,7 +31,7 @@ void run_YCSB() {
         }
         std::cout << "Inserting dataset of size " << dataset.size() << "..." << std::endl;
         for (size_t i=0; i<dataset.size(); ++i) {
-                map.put(dataset[i].first, dataset[i].second); 
+                map->put(dataset[i].first, dataset[i].second); 
                 std::cout << "Inserted " << i << std::endl;
         }
         std::cout << "Done" << std::endl;
@@ -51,10 +51,10 @@ void run_YCSB() {
 
                 if (line.find("READ FUZZYLOG ") == 0) {
                         std::cout << "Read " << key << std::endl;
-                        map.get(k);
+                        map->get(k);
                 } else if (line.find("UPDATE FUZZYLOG ") == 0) {
                         std::cout << "Update " << key << std::endl;
-                        map.put(k, rand());
+                        map->put(k, rand());
                 }
         }
         std::cout << "Done with workload" << std::endl;
