@@ -1,9 +1,9 @@
 #include "hashmap.h"
 #include <iostream>
 
-static const char *server_ip = "127.0.0.1:9990";
+//static const char *server_ip = "127.0.0.1:9990";
 // FIXME: for experiment, use the below server
-//static const char *server_ip = "52.15.156.76:9990";
+static const char *server_ip = "52.15.156.76:9990";
 
 static char out[DELOS_MAX_DATA_SIZE];
 
@@ -11,6 +11,12 @@ HashMap::HashMap() {
         fuzzylog_clients = (DAGHandle**)(malloc(sizeof(DAGHandle*) * PARTITION_COUNT));
         for (size_t i = 0; i < PARTITION_COUNT; ++i) {
                 fuzzylog_clients[i] = NULL;
+        }
+
+        // init locks
+        locks.reserve(PARTITION_COUNT);
+        for (size_t i = 0; i < PARTITION_COUNT; ++ i) {
+                locks.push_back(new std::mutex);
         }
 }
 
@@ -26,17 +32,23 @@ uint32_t HashMap::get(uint32_t key) {
         uint64_t data;
         uint32_t val;
         size_t size = 0;
+        uint32_t partition_num;
+
+        partition_num = key % PARTITION_COUNT;
+        
+        // acquire lock
+        locks[partition_num]->lock();
 
         // make color
         color.numcolors = 1;
         color.mycolors = new ColorID[0]; 
-        color.mycolors[0] = key % PARTITION_COUNT;
+        color.mycolors[0] = partition_num;
 
         // connect and get handler
-        DAGHandle* dag = fuzzylog_clients[key % PARTITION_COUNT];
+        DAGHandle* dag = fuzzylog_clients[partition_num];
         if (dag == NULL) {
                 dag = new_dag_handle_for_single_server(server_ip, &color);
-                fuzzylog_clients[key % PARTITION_COUNT] = dag;
+                fuzzylog_clients[partition_num] = dag;
         }
 
         // snapshot, get_next
@@ -51,49 +63,70 @@ uint32_t HashMap::get(uint32_t key) {
         // check if no entry
         if (val == 0) {
                 // FIXME: instead, throw exception?
+                locks[partition_num]->unlock();
                 return 0;
         }
 
         // cache the value
         cache[key] = val;        
 
+        // release lock 
+        locks[partition_num]->unlock();
+
         return val;
 }
 
 
 void HashMap::put(uint32_t key, uint32_t value) {
-        // make color
         struct colors color;
+        uint32_t partition_num;
+
+        partition_num = key % PARTITION_COUNT;
+
+        // acquire lock
+        locks[partition_num]->lock();
+
+        // make color
         color.numcolors = 1;
         color.mycolors = new ColorID[0]; 
-        color.mycolors[0] = key % PARTITION_COUNT;
+        color.mycolors[0] = partition_num;
         
         // connect and get handler
-        DAGHandle* dag = fuzzylog_clients[key % PARTITION_COUNT];
+        DAGHandle* dag = fuzzylog_clients[partition_num];
         if (dag == NULL) {
                 dag = new_dag_handle_for_single_server(server_ip, &color);
-                fuzzylog_clients[key % PARTITION_COUNT] = dag;
+                fuzzylog_clients[partition_num] = dag;
         }
 
         // append
         uint64_t data = ((uint64_t)key << 32) | value;
         
         append(dag, (char *)&data, sizeof(data), &color, NULL);
+
+        // release lock
+        locks[partition_num]->unlock();
 }
 
 
 void HashMap::remove(uint32_t key) {
-        // make color
         struct colors color;
+        uint32_t partition_num;
+
+        partition_num = key % PARTITION_COUNT;
+
+        // acquire lock
+        locks[partition_num]->lock();
+
+        // make color
         color.numcolors = 1;
         color.mycolors = new ColorID[0]; 
-        color.mycolors[0] = key % PARTITION_COUNT;
+        color.mycolors[0] = partition_num;
         
         // connect and get handler
-        DAGHandle* dag = fuzzylog_clients[key % PARTITION_COUNT];
+        DAGHandle* dag = fuzzylog_clients[partition_num];
         if (dag == NULL) {
                 dag = new_dag_handle_for_single_server(server_ip, &color);
-                fuzzylog_clients[key % PARTITION_COUNT] = dag;
+                fuzzylog_clients[partition_num] = dag;
         }
 
         // append
@@ -102,4 +135,7 @@ void HashMap::remove(uint32_t key) {
 
         // remove cache
         cache.erase(key);
+
+        // release lock
+        locks[partition_num]->unlock();
 }

@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include <unordered_map>
+#include <mutex>
+#include <vector>
 
 extern "C" {
         #include "fuzzy_log.h"
@@ -14,6 +16,8 @@ class HashMap {
 private:
         std::unordered_map<uint32_t, uint32_t> cache;  
         DAGHandle** fuzzylog_clients;
+        std::vector<std::mutex*> locks;
+        
 public:
         HashMap();
         ~HashMap();

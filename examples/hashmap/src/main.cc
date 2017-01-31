@@ -2,63 +2,56 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
-#include "hashmap.h"
+#include "worker.h"
 
 extern "C" {
         #include "fuzzy_log.h"
 }
 
+#define NUM_WORKERS 8
+
+using namespace std;
+
 void run_YCSB() {
-        HashMap *map = new HashMap;
-        std::string line;
+        uint32_t i, record_count, operation_count, operation_per_worker, remainder;
+        HashMap *map;
+        Table *table;
+        workload_generator *workload_gen;
+        Txn** txns;
+        vector<Worker*> workers;
 
-        std::vector<std::pair<uint32_t, uint32_t> > dataset;
+        // Parameter
+        record_count = 10000;
+        operation_count = 10000;
 
-        // 1. Load
-        std::cout << "Parsing dataset..." << std::endl;
-        std::ifstream infile("transactions_load_fz.txt"); 
-        while (std::getline(infile, line)) {
-                if (line.find("INSERT FUZZYLOG ") == 0) {
-                        std::istringstream iss(line);
-                        std::string dummy, key, value; 
-                        if (!(iss >> dummy >> dummy >> key)) break;
+        // Fuzzymap
+        map = new HashMap;
 
-                        key   = key.substr(14, std::string::npos); 
-                        value = line.substr(line.find("field0") + 7, 4); 
-                        uint32_t k = std::stoi(key);
-                        dataset.push_back(std::make_pair(k, rand()));
-                }
+        // Generate table 
+        table = new Table(record_count);
+        table->populate(map);
+               
+        // TODO: Generate update workloads
+        // distribution : uniform
+        workload_gen = new workload_generator(table, operation_count);
+        txns = workload_gen->Gen();
+        
+        // TODO: Worker threads
+        // TODO: Assign workloads to worker threads
+        operation_per_worker = operation_count / NUM_WORKERS; 
+        remainder = operation_count % NUM_WORKERS;
+
+        workers.reserve(NUM_WORKERS);
+        for (i = 0; i < NUM_WORKERS; ++i) {
+                if (i == NUM_WORKERS - 1)
+                        workers.push_back(new Worker(map, txns + i * operation_per_worker, operation_per_worker + remainder));
+                else
+                        workers.push_back(new Worker(map, txns + i * operation_per_worker, operation_per_worker));
         }
-        std::cout << "Inserting dataset of size " << dataset.size() << "..." << std::endl;
-        for (size_t i=0; i<dataset.size(); ++i) {
-                map->put(dataset[i].first, dataset[i].second); 
-                std::cout << "Inserted " << i << std::endl;
-        }
-        std::cout << "Done" << std::endl;
-       
 
-        // 2. Run
-        std::cout << "Parsing workload..." << std::endl;
-        std::ifstream infile_w("transactions_run_fz.txt"); 
-        while (std::getline(infile_w, line)) {
-                if (line.find("READ FUZZYLOG ") != 0 && line.find("UPDATE FUZZYLOG") != 0) continue;
-                std::istringstream iss(line);
-                std::string dummy, key; 
-                if (!(iss >> dummy >> dummy >> key)) break;
-
-                key   = key.substr(14, std::string::npos); 
-                uint32_t k = std::stoi(key);
-
-                if (line.find("READ FUZZYLOG ") == 0) {
-                        std::cout << "Read " << key << std::endl;
-                        map->get(k);
-                } else if (line.find("UPDATE FUZZYLOG ") == 0) {
-                        std::cout << "Update " << key << std::endl;
-                        map->put(k, rand());
-                }
-        }
-        std::cout << "Done with workload" << std::endl;
-       
+        for (i = 0; i < NUM_WORKERS; ++i)
+                workers[i]->run();
+ 
 }
 
 int main() {
