@@ -6,15 +6,11 @@
 #include <iostream>
 
 class Runnable {
-private:
-        void rand_init();
 protected:
         pthread_t               m_thread;
-        struct random_data*     m_rand_state;
 public:
-        Runnable();
+        Runnable() {}
         virtual void run() = 0;
-        virtual int get_random();
 };
 
 class Worker : public Runnable {
@@ -30,6 +26,7 @@ public:
         }
         virtual void run();
         static void* bootstrap(void *arg);
+        pthread_t* get_pthread_id();
 };
 
 #endif          // WORKER_H_

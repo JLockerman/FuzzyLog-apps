@@ -25,8 +25,6 @@ public:
         }
         virtual bool Run(HashMap *map);
         virtual uint32_t num_writes();
-        uint32_t get_random_key();
-        uint32_t get_random_value();
 };
 
 class Table {

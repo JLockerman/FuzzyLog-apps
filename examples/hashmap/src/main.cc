@@ -2,64 +2,82 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
+#include <chrono>
 #include "worker.h"
 
 extern "C" {
         #include "fuzzy_log.h"
 }
 
-#define NUM_WORKERS 8
-
 using namespace std;
+using ns = chrono::nanoseconds;
+using get_time = chrono::system_clock;
 
-void run_YCSB() {
-        uint32_t i, record_count, operation_count, operation_per_worker, remainder;
+void run_YCSB(uint32_t record_count, uint32_t operation_count, uint32_t num_workers, uint32_t partition_count) {
+        uint32_t i, operation_per_worker, remainder;
         HashMap *map;
         Table *table;
         workload_generator *workload_gen;
         Txn** txns;
         vector<Worker*> workers;
 
-        // Parameter
-        record_count = 10000;
-        operation_count = 10000;
 
         // Fuzzymap
-        map = new HashMap;
+        map = new HashMap(partition_count);
 
-        // Generate table 
+        // Populate table 
         table = new Table(record_count);
+        cout << "Populating table with " << record_count << " records ..." << endl;
         table->populate(map);
+        cout << "Done." << endl;
                
-        // TODO: Generate update workloads
+        // Generate update workloads
         // distribution : uniform
         workload_gen = new workload_generator(table, operation_count);
         txns = workload_gen->Gen();
         
-        // TODO: Worker threads
-        // TODO: Assign workloads to worker threads
-        operation_per_worker = operation_count / NUM_WORKERS; 
-        remainder = operation_count % NUM_WORKERS;
+        // Assign workloads to worker threads
+        operation_per_worker = operation_count / num_workers; 
+        remainder = operation_count % num_workers;
 
-        workers.reserve(NUM_WORKERS);
-        for (i = 0; i < NUM_WORKERS; ++i) {
-                if (i == NUM_WORKERS - 1)
+        workers.reserve(num_workers);
+        for (i = 0; i < num_workers; ++i) {
+                if (i == num_workers - 1)
                         workers.push_back(new Worker(map, txns + i * operation_per_worker, operation_per_worker + remainder));
                 else
                         workers.push_back(new Worker(map, txns + i * operation_per_worker, operation_per_worker));
         }
 
-        for (i = 0; i < NUM_WORKERS; ++i)
+        auto start = get_time::now(); //use auto keyword to minimize typing strokes :)
+
+        // Run workers
+        for (i = 0; i < num_workers; ++i)
                 workers[i]->run();
  
+        for (i = 0; i < num_workers; ++i)
+                pthread_join(*workers[i]->get_pthread_id(), NULL);
+
+        auto end = get_time::now();
+        chrono::duration<double> diff = end - start;
+        cout << record_count << "\t" << operation_count << "\t" << num_workers << "\t" << partition_count << "\t" << diff.count() << endl;
 }
 
-int main() {
+int main(int argc, char** argv) {
         // FIXME: only necessary for local test
 	start_fuzzy_log_server_thread("0.0.0.0:9990");
         
-        // Parse workload file from YCSB
-        run_YCSB();        
+        if (argc != 5) {
+                cout << "Usage: ./build/hashmap record_count operation_count num_workers partition_count" << endl;
+                return 0;
+        }
+
+        uint32_t record_count, operation_count, num_workers, partition_count;
+        record_count = atoi(argv[1]);
+        operation_count = atoi(argv[2]);
+        num_workers = atoi(argv[3]);
+        partition_count = atoi(argv[4]);
+        // run YCSB
+        run_YCSB(record_count, operation_count, num_workers, partition_count); 
 
 //      HashMap map;
 //      map.put(10, 15);

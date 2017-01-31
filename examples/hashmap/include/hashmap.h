@@ -10,16 +10,15 @@ extern "C" {
         #include "fuzzy_log.h"
 }
 
-#define PARTITION_COUNT 4
-
 class HashMap {
 private:
+        uint32_t partition_count;
         std::unordered_map<uint32_t, uint32_t> cache;  
         DAGHandle** fuzzylog_clients;
         std::vector<std::mutex*> locks;
         
 public:
-        HashMap();
+        HashMap(uint32_t partition_count);
         ~HashMap();
 
         uint32_t get(uint32_t key);

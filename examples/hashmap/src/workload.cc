@@ -8,15 +8,10 @@ bool ycsb_insert::Run(HashMap *map) {
         assert(map != NULL);
        
         for (i = 0; i < write_count; ++i) {
-                // FIXME 
                 // key = (start, end)
                 // TODO: check multi-partition key
-                //key = get_random_key();
-                // value = rand
-                //value = get_random_value();
-                key = 0;
-                value = 0;
-                //std::cout << key << ", " << value << std::endl;
+                key = rand() % (end - start);
+                value = rand();
                 map->put(key, value);
         }
         return true;
@@ -24,20 +19,6 @@ bool ycsb_insert::Run(HashMap *map) {
 
 uint32_t ycsb_insert::num_writes() {
         return this->write_count;
-}
-
-uint32_t ycsb_insert::get_random_key() {
-        std::random_device rd;
-        std::mt19937 rng(rd());
-        std::uniform_int_distribution<int> uni(start, end);
-        return (uint32_t)uni(rng);
-}
-
-uint32_t ycsb_insert::get_random_value() {
-        std::random_device rd;
-        std::mt19937 rng(rd());
-        std::uniform_int_distribution<int> uni(0x00000000, 0xffffffff);
-        return (uint32_t)uni(rng);
 }
 
 void Table::populate(HashMap *map) {

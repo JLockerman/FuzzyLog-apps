@@ -7,21 +7,23 @@ static const char *server_ip = "52.15.156.76:9990";
 
 static char out[DELOS_MAX_DATA_SIZE];
 
-HashMap::HashMap() {
-        fuzzylog_clients = (DAGHandle**)(malloc(sizeof(DAGHandle*) * PARTITION_COUNT));
-        for (size_t i = 0; i < PARTITION_COUNT; ++i) {
+HashMap::HashMap(uint32_t partition_count) {
+        this->partition_count = partition_count;
+
+        fuzzylog_clients = (DAGHandle**)(malloc(sizeof(DAGHandle*) * partition_count));
+        for (size_t i = 0; i < partition_count; ++i) {
                 fuzzylog_clients[i] = NULL;
         }
 
         // init locks
-        locks.reserve(PARTITION_COUNT);
-        for (size_t i = 0; i < PARTITION_COUNT; ++ i) {
+        locks.reserve(partition_count);
+        for (size_t i = 0; i < partition_count; ++ i) {
                 locks.push_back(new std::mutex);
         }
 }
 
 HashMap::~HashMap() {
-        for (size_t i = 0; i < PARTITION_COUNT; ++i) {
+        for (size_t i = 0; i < partition_count; ++i) {
                 close_dag_handle(fuzzylog_clients[i]);
         }
         delete[] fuzzylog_clients;
@@ -34,7 +36,7 @@ uint32_t HashMap::get(uint32_t key) {
         size_t size = 0;
         uint32_t partition_num;
 
-        partition_num = key % PARTITION_COUNT;
+        partition_num = key % partition_count;
         
         // acquire lock
         locks[partition_num]->lock();
@@ -81,7 +83,7 @@ void HashMap::put(uint32_t key, uint32_t value) {
         struct colors color;
         uint32_t partition_num;
 
-        partition_num = key % PARTITION_COUNT;
+        partition_num = key % partition_count;
 
         // acquire lock
         locks[partition_num]->lock();
@@ -112,7 +114,7 @@ void HashMap::remove(uint32_t key) {
         struct colors color;
         uint32_t partition_num;
 
-        partition_num = key % PARTITION_COUNT;
+        partition_num = key % partition_count;
 
         // acquire lock
         locks[partition_num]->lock();

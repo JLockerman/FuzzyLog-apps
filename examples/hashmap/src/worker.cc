@@ -1,38 +1,25 @@
 #include <worker.h>
 #include <cstring>
-
-#define PRNG_BUFSZ 32
-void Runnable::rand_init() {
-        char *random_buf;
-
-        m_rand_state = (struct random_data*)malloc(sizeof(struct random_data));
-        memset(m_rand_state, 0x0, sizeof(struct random_data));
-        random_buf = (char*)malloc(PRNG_BUFSZ);
-        memset(random_buf, 0x0, PRNG_BUFSZ);
-        initstate_r(random(), random_buf, PRNG_BUFSZ, m_rand_state);
-}
-
-Runnable::Runnable() {
-        rand_init();
-}
-
-int Runnable::get_random() {
-        int ret;
-        random_r(m_rand_state, &ret);
-        return ret;
-}
+#include <cassert>
 
 void Worker::run() {
-        pthread_create(&m_thread, NULL, bootstrap, this);
+        int err;
+        err = pthread_create(&m_thread, NULL, bootstrap, this);
+        assert(err == 0);
 }
 
 void* Worker::bootstrap(void *arg) {
-        uint32_t i;
+        uint32_t i, num_txns;
         Worker *worker = (Worker*)arg;
+        num_txns = worker->num_txns;
 
         // run txn
-        for (i = 0; i < worker->num_txns; ++i) {
+        for (i = 0; i < num_txns; ++i) {
                 worker->txns[i]->Run(worker->map);
         }
         return NULL;
+}
+
+pthread_t* Worker::get_pthread_id() {
+        return &m_thread;
 }
