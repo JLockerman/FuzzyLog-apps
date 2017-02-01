@@ -27,9 +27,9 @@ void run_YCSB(uint32_t record_count, uint32_t operation_count, uint32_t num_work
 
         // Populate table 
         table = new Table(record_count);
-        cout << "Populating table with " << record_count << " records ..." << endl;
-        table->populate(map);
-        cout << "Done." << endl;
+   //   cout << "Populating table with " << record_count << " records ..." << endl;
+   //   table->populate(map);
+   //   cout << "Done." << endl;
                
         // Generate update workloads
         // distribution : uniform
@@ -59,7 +59,8 @@ void run_YCSB(uint32_t record_count, uint32_t operation_count, uint32_t num_work
 
         auto end = get_time::now();
         chrono::duration<double> diff = end - start;
-        cout << record_count << "\t" << operation_count << "\t" << num_workers << "\t" << partition_count << "\t" << diff.count() << endl;
+        cout << num_workers << " " << partition_count << " " << diff.count() << " " << operation_count / diff.count() << endl;
+        //cout << record_count << " " << operation_count << " " << num_workers << " " << partition_count << " " << diff.count() << endl;
 }
 
 int main(int argc, char** argv) {

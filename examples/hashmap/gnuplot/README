@@ -1,0 +1,21 @@
+How to generate gnuplot graphs (eps format)
+
+Preparation:
+1. eps_gen.sh and synthetic_workload_latency.gnu should be in the same directory.
+
+2. Input data file should have extension ".data".
+
+3. Each row of the input file should have the format (seq# breakdown_latency_1 breakdown_latency_2 ...)
+
+4. The script only uses breakdown_latency_1 and breakdown_latency_2
+
+5. The script only uses the first 100 rows for now for plotting.
+
+6. Place all .data file you want to generate graphs from in the same directory.
+
+Running:
+
+  ./eps_gen.sh <input dir> <output dir>
+
+  - input dir: dir where the .data files are at.
+  - output dir: dir where the .eps file will be generated.
