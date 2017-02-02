@@ -14,8 +14,8 @@ class HashMap {
 private:
         uint32_t partition_count;
         std::unordered_map<uint32_t, uint32_t> cache;  
-        DAGHandle** fuzzylog_clients;
-        std::vector<std::mutex*> locks;
+        DAGHandle* fzlog_client;
+        std::mutex fzlog_lock;
         
 public:
         HashMap(uint32_t partition_count);
