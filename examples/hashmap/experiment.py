@@ -6,7 +6,7 @@ import os.path
 import threading
 
 
-fmt_cmd = "build/hashmap {0} {1} >> {2}"
+fmt_cmd = "build/hashmap {0} {1} {2} >> {3}"
 outfile = "gnuplot/sample.data"
 
 OPERATION_COUNT = 10000
@@ -22,7 +22,8 @@ class MapClient(threading.Thread):
         run_client(self.operation_count, self.color)
 
 def run_client(op_cnt, color):
-    cmd = fmt_cmd.format(op_cnt, color, "tmp{0}.txt".format(color))
+    # single
+    cmd = fmt_cmd.format(op_cnt, color, color, "tmp{0}.txt".format(color))
     os.system(cmd)
 
 def experiment(num_clients):

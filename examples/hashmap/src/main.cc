@@ -17,7 +17,7 @@ using ns = chrono::nanoseconds;
 using get_time = chrono::system_clock;
 
 
-void run_YCSB(uint32_t operation_count, uint32_t num_workers, struct colors* color) {
+void run_YCSB(uint32_t operation_count, uint32_t num_workers, struct colors* color_single, struct colors* color_multi) {
         uint32_t i, operation_per_worker, remainder;
         HashMap *map;
         Table *table;
@@ -26,7 +26,7 @@ void run_YCSB(uint32_t operation_count, uint32_t num_workers, struct colors* col
         vector<Worker*> workers;
 
         // Fuzzymap
-        map = new HashMap(color);
+        map = new HashMap(color_single, color_multi);
 
         // Populate table 
         uint32_t record_count = 100000;
@@ -72,24 +72,35 @@ int main(int argc, char** argv) {
         // FIXME: only necessary for local test
 	//start_fuzzy_log_server_thread("0.0.0.0:9990");
         
-        if (argc != 3) {
-                cout << "Usage: ./build/hashmap operation_count color" << endl;
+        if (argc != 4) {
+                cout << "Usage: ./build/hashmap operation_count color_fist color_second" << endl;
                 return 0;
         }
 
-        struct colors* color;
+        struct colors* color_single, *color_multi;
         uint32_t operation_count;
-        uint32_t color_param;
+        uint32_t color_first, color_second;
         operation_count = atoi(argv[1]);
-        color_param = atoi(argv[2]);
+        color_first = atoi(argv[2]);
+        color_second = atoi(argv[3]);
         
         // make color
-        color = (struct colors*)malloc(sizeof(struct colors));
-        color->numcolors = 1;
-        color->mycolors = new ColorID[0];
-        color->mycolors[0] = color_param; 
+        color_single = (struct colors*)malloc(sizeof(struct colors));
+        color_single->numcolors = 1;
+        color_single->mycolors = new ColorID[0];
+        color_single->mycolors[0] = color_first; 
+        color_multi = NULL;
 
-        run_YCSB(operation_count, 1 /*FIXME: one worker*/, color); 
+
+        if (color_first != color_second) {
+                color_multi = (struct colors*)malloc(sizeof(struct colors));
+                color_multi->numcolors = 2;
+                color_multi->mycolors = new ColorID[2];
+                color_multi->mycolors[0] = color_first; 
+                color_multi->mycolors[1] = color_second; 
+        }
+
+        run_YCSB(operation_count, 1 /*FIXME: one worker*/, color_single, color_multi); 
         
 //      HashMap map;
 //      map.put(10, 15);
