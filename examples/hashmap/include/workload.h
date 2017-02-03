@@ -9,23 +9,36 @@ class Txn {
 public:
         Txn() {}
         virtual bool Run(HashMap *map) = 0;
-        virtual uint32_t num_writes() = 0;
 };
 
-class ycsb_insert : public Txn {
+class ycsb_single_insert : public Txn {
 private:
         uint32_t start;
         uint32_t end;
-        uint32_t write_count;
+        struct colors* color;
 public:
-        ycsb_insert(uint32_t start, uint32_t end, uint32_t write_count) {
+        ycsb_single_insert(uint32_t start, uint32_t end, struct colors* color) {
                 this->start = start;
                 this->end = end;
-                this->write_count = write_count;
+                this->color = color;
         }
         virtual bool Run(HashMap *map);
-        virtual uint32_t num_writes();
 };
+
+class ycsb_multi_insert : public Txn {
+private:
+        uint32_t start;
+        uint32_t end;
+        vector<struct colors*>* colors;
+public:
+        ycsb_multi_insert(uint32_t start, uint32_t end, vector<struct colors*>* colors) {
+                this->start = start;
+                this->end = end;
+                this->colors = colors;
+        }
+        virtual bool Run(HashMap *map);
+};
+
 
 class Table {
 private:
@@ -41,13 +54,18 @@ public:
 class workload_generator {
 private:
         Table *table;
-        uint32_t operation_count;
+        vector<uint32_t>* color_of_interest;
+        uint32_t single_operation_count;
+        uint32_t multi_operation_count;
 public:
-        workload_generator(Table *table, uint32_t operation_count) {
+        workload_generator(Table *table, vector<uint32_t>* color_of_interest, uint32_t single_operation_count, uint32_t multi_operation_count) {
                 this->table = table;
-                this->operation_count = operation_count;
+                this->color_of_interest = color_of_interest;
+                this->multi_operation_count = multi_operation_count;
+                this->single_operation_count = single_operation_count;
         }
         Txn** Gen();
+        void colors_to_struct(vector<struct colors*>* out);
 };
 
 #endif            // WORKLOAD_H_ 

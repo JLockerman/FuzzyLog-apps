@@ -14,23 +14,19 @@ using namespace std;
 
 class HashMap {
 private:
-        struct colors* color_single;
-        struct colors* color_multi;
+        struct colors* color;
         unordered_map<uint32_t, uint32_t> cache;  
         DAGHandle* fzlog_client;
         mutex fzlog_lock;
         
 public:
-        HashMap(struct colors* color_single, struct colors* color_multi);
+        HashMap(vector<uint32_t>* color_of_interest);
         ~HashMap();
 
-        uint32_t get(uint32_t key);
-        void put(uint32_t key, uint32_t value);
-        void multiput(vector<uint32_t> keys, vector<uint32_t> values);
-        void remove(uint32_t key);
-
-        // helper
-        void get_color_by_idx(uint32_t idx, struct colors* out);
+        uint32_t get(uint32_t key, struct colors* op_color);
+        void put(uint32_t key, uint32_t value, struct colors* op_color);
+        void multiput(vector<uint32_t>* keys, vector<uint32_t>* values, vector<struct colors*>* op_colors);
+        void remove(uint32_t key, struct colors* op_color);
 };
 
 #endif            // HASHMAP_H_

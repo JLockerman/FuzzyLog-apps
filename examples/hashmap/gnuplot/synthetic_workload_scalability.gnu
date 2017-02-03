@@ -25,7 +25,7 @@ set key
 #set key box
 
 # X LABEL AND TICS
-set xlabel "Number of colors"
+set xlabel "Number of clients"
 set xtics nomirror
 set xrange[row_start:row_end]
 #set xtics nomirror out rotate by -40 ("16KB" 0, "256KB" 4, "4MB" 8, "64MB" 12, "1GB" 16, "16GB" 20, "256GB" 24)
@@ -45,5 +45,5 @@ set yrange[0:]
 set output file_out
 
 # ACTUAL PLOTTING
-plot file_in every ::row_start::row_end using 1:($2) title '8 workers'
+plot file_in every ::row_start::row_end using 1:($2) title ''
 

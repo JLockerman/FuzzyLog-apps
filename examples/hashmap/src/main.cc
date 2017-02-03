@@ -17,16 +17,18 @@ using ns = chrono::nanoseconds;
 using get_time = chrono::system_clock;
 
 
-void run_YCSB(uint32_t operation_count, uint32_t num_workers, struct colors* color_single, struct colors* color_multi) {
-        uint32_t i, operation_per_worker, remainder;
+void run_YCSB(vector<uint32_t> *colors, uint32_t single_operation_count, uint32_t multi_operation_count) {
+        uint32_t i, total_operation_count, operation_per_worker, remainder;
         HashMap *map;
         Table *table;
         workload_generator *workload_gen;
         Txn** txns;
         vector<Worker*> workers;
+        uint32_t num_workers;
+        num_workers = 1;        // FIXME
 
         // Fuzzymap
-        map = new HashMap(color_single, color_multi);
+        map = new HashMap(colors);
 
         // Populate table 
         uint32_t record_count = 100000;
@@ -37,12 +39,13 @@ void run_YCSB(uint32_t operation_count, uint32_t num_workers, struct colors* col
                
         // Generate update workloads
         // distribution : uniform
-        workload_gen = new workload_generator(table, operation_count);
+        workload_gen = new workload_generator(table, colors, single_operation_count, multi_operation_count);
         txns = workload_gen->Gen();
         
         // Assign workloads to worker threads
-        operation_per_worker = operation_count / num_workers; 
-        remainder = operation_count % num_workers;
+        total_operation_count = single_operation_count + multi_operation_count;
+        operation_per_worker = total_operation_count / num_workers; 
+        remainder = total_operation_count % num_workers;
 
         workers.reserve(num_workers);
         for (i = 0; i < num_workers; ++i) {
@@ -65,42 +68,29 @@ void run_YCSB(uint32_t operation_count, uint32_t num_workers, struct colors* col
         chrono::duration<double> diff = end - start;
 
         // print
-        cout << diff.count() << " " << operation_count / diff.count() << endl;
+        cout << diff.count() << " " << total_operation_count / diff.count() << endl;
 }
 
 int main(int argc, char** argv) {
         // FIXME: only necessary for local test
 	//start_fuzzy_log_server_thread("0.0.0.0:9990");
         
-        if (argc != 4) {
-                cout << "Usage: ./build/hashmap operation_count color_fist color_second" << endl;
+        if (argc != 5) {
+                cout << "Usage: ./build/hashmap color_fist color_second single_operation_count multi_operation_count" << endl;
                 return 0;
         }
 
-        struct colors* color_single, *color_multi;
-        uint32_t operation_count;
-        uint32_t color_first, color_second;
-        operation_count = atoi(argv[1]);
-        color_first = atoi(argv[2]);
-        color_second = atoi(argv[3]);
-        
-        // make color
-        color_single = (struct colors*)malloc(sizeof(struct colors));
-        color_single->numcolors = 1;
-        color_single->mycolors = new ColorID[0];
-        color_single->mycolors[0] = color_first; 
-        color_multi = NULL;
+        vector<uint32_t> colors;
+        uint32_t single_operation_count, multi_operation_count;
 
+        colors.reserve(2);
+        colors.push_back(atoi(argv[1]));
+        colors.push_back(atoi(argv[2]));
 
-        if (color_first != color_second) {
-                color_multi = (struct colors*)malloc(sizeof(struct colors));
-                color_multi->numcolors = 2;
-                color_multi->mycolors = new ColorID[2];
-                color_multi->mycolors[0] = color_first; 
-                color_multi->mycolors[1] = color_second; 
-        }
+        single_operation_count = atoi(argv[3]);
+        multi_operation_count = atoi(argv[4]);
 
-        run_YCSB(operation_count, 1 /*FIXME: one worker*/, color_single, color_multi); 
+        run_YCSB(&colors, single_operation_count, multi_operation_count); 
         
 //      HashMap map;
 //      map.put(10, 15);

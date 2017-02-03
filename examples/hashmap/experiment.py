@@ -6,31 +6,33 @@ import os.path
 import threading
 
 
-fmt_cmd = "build/hashmap {0} {1} {2} >> {3}"
-outfile = "gnuplot/sample.data"
+fmt_cmd = "build/hashmap {0} {1} {2} {3} >> {4}"
+outfile_scalability = "gnuplot/scalability.data"
+outfile_multi = "gnuplot/multi.data"
 
 OPERATION_COUNT = 10000
-NUM_CLIENTS = 6
+NUM_CLIENTS = 16
 
 class MapClient(threading.Thread):
-    def __init__(self, operation_count, color):
+    def __init__(self, operation_count, colors, percent_of_multi_operation):
         threading.Thread.__init__(self)
         self.operation_count = operation_count
-        self.color = color
+        self.colors = colors 
+        self.percent_of_multi_operation = percent_of_multi_operation
 
     def run(self):
-        run_client(self.operation_count, self.color)
+        multi_operation_count = int(self.operation_count * self.percent_of_multi_operation)
+        single_operation_count = self.operation_count - multi_operation_count 
+        # run
+        cmd = fmt_cmd.format(self.colors[0], self.colors[1], single_operation_count, multi_operation_count, "tmp{0}.txt".format(self.colors[0]))
+        os.system(cmd)
 
-def run_client(op_cnt, color):
-    # single
-    cmd = fmt_cmd.format(op_cnt, color, color, "tmp{0}.txt".format(color))
-    os.system(cmd)
 
-def experiment(num_clients):
+def measure_throughput(clients):
     # execute
     threads = []
-    for color in range(num_clients):
-        thread = MapClient(OPERATION_COUNT, color)
+    for operation_cnt, colors, percent_of_multi_operation in clients:
+        thread = MapClient(operation_cnt, colors, percent_of_multi_operation)  # only single color operation
         thread.start()
         threads.append(thread)
 
@@ -39,8 +41,8 @@ def experiment(num_clients):
 
     # read output
     summary = []
-    for color in range(num_clients):
-        tmpfile = "tmp{0}.txt".format(color)
+    for o, c, p in clients:
+        tmpfile = "tmp{0}.txt".format(c[0])
         with open(tmpfile) as f:
             content = f.readlines()
         content = [x.strip() for x in content]
@@ -50,26 +52,54 @@ def experiment(num_clients):
     throughput = sum([float(data.split()[1]) for data in summary])  
 
     # remove tmp files
-    for color in range(num_clients):
-        os.system("rm tmp{0}.txt".format(color)) 
+    for o, c, p in clients:
+        os.system("rm tmp{0}.txt".format(c[0])) 
     
     return throughput
 
-def main():
-    os.system("rm {0}".format(outfile))
-    os.system("touch {0}".format(outfile))
+
+def plot_scalability():
+    os.system("rm {0}".format(outfile_scalability))
+    os.system("touch {0}".format(outfile_scalability))
 
     results = []
-    for i in range(16):
-        num_client = i + 1
-        throughput = experiment(num_client)
+    for num_client in range(NUM_CLIENTS):
+        num_client += 1
+        clients = [(OPERATION_COUNT, (i, i), 0.0) for i in range(num_client)]
+        throughput = measure_throughput(clients)
         results.append((num_client, throughput))
 
-    with open(outfile, "w") as f:
+    with open(outfile_scalability, "w") as f:
         for num_client, throughput in results:
             f.write("{0} {1}\n".format(num_client, throughput))
     os.chdir("gnuplot")
-    os.system("./eps_gen.sh . .")
+    os.system("./eps_gen_scalability.sh")
+
+
+def plot_multi_operation():
+    os.system("rm {0}".format(outfile_multi))
+    os.system("touch {0}".format(outfile_multi))
+
+    NUM_CLIENTS_FOR_MULTI = 2
+
+    results = []
+    for percent in range(0, 110, 10):
+        clients = []
+        clients.append((OPERATION_COUNT, (0, 1), percent/100.0))
+        clients.append((OPERATION_COUNT, (1, 0), percent/100.0))
+        throughput = measure_throughput(clients)
+        results.append((percent, throughput))
+
+    with open(outfile_multi, "w") as f:
+        for percent, throughput in results:
+            f.write("{0} {1}\n".format(percent, throughput))
+    os.chdir("gnuplot")
+    os.system("./eps_gen_multi.sh")
+
+
+def main():
+    #plot_scalability()
+    plot_multi_operation()
 
 
 if __name__ == "__main__":

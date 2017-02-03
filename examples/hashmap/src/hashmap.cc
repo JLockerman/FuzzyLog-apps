@@ -8,21 +8,28 @@ static const char *server_ip = "52.15.156.76:9990";
 
 static char out[DELOS_MAX_DATA_SIZE];
 
-HashMap::HashMap(struct colors* color_single, struct colors* color_multi) {
-        this->color_single = color_single;
-        this->color_multi = color_multi;
+HashMap::HashMap(vector<uint32_t> *color_of_interest) {
+        uint32_t i;
+        struct colors* color;
+        
+        // initialize color
+        color = (struct colors*)malloc(sizeof(struct colors));
+        color->numcolors = color_of_interest->size();
+        color->mycolors  = new ColorID[color->numcolors];
+        for (i = 0; i < color->numcolors; ++i) {
+                color->mycolors[i] = color_of_interest->at(i);
+        }
+        this->color = color;
 
-        if (color_multi != NULL)
-                fzlog_client = new_dag_handle_for_single_server(server_ip, color_multi);
-        else
-                fzlog_client = new_dag_handle_for_single_server(server_ip, color_single);
+        // connect to Fuzzylog
+        fzlog_client = new_dag_handle_for_single_server(server_ip, this->color);
 }
 
 HashMap::~HashMap() {
         close_dag_handle(fzlog_client);
 }
 
-uint32_t HashMap::get(uint32_t key) {
+uint32_t HashMap::get(uint32_t key, struct colors* op_color) {
         uint64_t data;
         uint32_t val;
         size_t size = 0;
@@ -32,8 +39,8 @@ uint32_t HashMap::get(uint32_t key) {
 
         // snapshot, get_next
         snapshot(fzlog_client);
-        while ((get_next(fzlog_client, out, &size, color_single), 1)) {
-                if (color_single->numcolors == 0) break;
+        while ((get_next(fzlog_client, out, &size, op_color), 1)) {
+                if (op_color->numcolors == 0) break;
                 data = *(uint64_t *)out; 
                 if ((uint32_t)(data >> 32) != key) continue;
                 val = (uint32_t)(data & 0xFFFFFFFF); 
@@ -56,58 +63,47 @@ uint32_t HashMap::get(uint32_t key) {
 }
 
 
-void HashMap::put(uint32_t key, uint32_t value) {
+void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color) {
         // acquire lock
         fzlog_lock.lock();
 
         // append
         uint64_t data = ((uint64_t)key << 32) | value;
-        append(fzlog_client, (char *)&data, sizeof(data), color_single, NULL);
+        append(fzlog_client, (char *)&data, sizeof(data), op_color, NULL);
 
         // release lock
         fzlog_lock.unlock();
 }
 
-void HashMap::multiput(vector<uint32_t> keys, vector<uint32_t> values) {
-        assert(color_multi != NULL);
-        assert(color_multi->numcolors == keys.size());
-        assert(color_multi->numcolors == values.size());
+void HashMap::multiput(vector<uint32_t>* keys, vector<uint32_t>* values, vector<struct colors*>* op_colors) {
+        assert(op_colors->size() == keys->size());
+        assert(op_colors->size() == values->size());
 
         uint32_t i, key, value;
 
         // acquire lock
         fzlog_lock.lock();
 
-        for (i = 0; i < keys.size(); ++i) {
-                key = keys[i];
-                value = values[i];
+        for (i = 0; i < keys->size(); ++i) {
+                key = keys->at(i);
+                value = values->at(i);
                 // append
                 uint64_t data = ((uint64_t)key << 32) | value;
                 // get color
-                struct colors color;
-                get_color_by_idx(i, &color); 
-                append(fzlog_client, (char *)&data, sizeof(data), &color, NULL);
+                append(fzlog_client, (char *)&data, sizeof(data), op_colors->at(i), NULL);
         }
 
         // release lock
         fzlog_lock.unlock();
 }
 
-void HashMap::get_color_by_idx(uint32_t idx, struct colors* out) {
-        assert(color_multi != NULL);
-
-        out->numcolors = 1;
-        out->mycolors = new ColorID[0];
-        out->mycolors[0] = color_multi->mycolors[idx];          
-}
-
-void HashMap::remove(uint32_t key) {
+void HashMap::remove(uint32_t key, struct colors* op_color) {
         // acquire lock
         fzlog_lock.lock();
 
         // append
         uint64_t data = (uint64_t)key << 32;
-        append(fzlog_client, (char *)&data, sizeof(data), color_single, NULL);
+        append(fzlog_client, (char *)&data, sizeof(data), op_color, NULL);
 
         // remove cache
         cache.erase(key);
