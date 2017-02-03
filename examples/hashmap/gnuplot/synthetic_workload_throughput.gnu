@@ -45,5 +45,5 @@ set yrange[0:]
 set output file_out
 
 # ACTUAL PLOTTING
-plot file_in every ::row_start::row_end using 2:($4) title '8 workers'
+plot file_in every ::row_start::row_end using 1:($2) title '8 workers'
 

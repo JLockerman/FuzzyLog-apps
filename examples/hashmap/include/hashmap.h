@@ -12,13 +12,13 @@ extern "C" {
 
 class HashMap {
 private:
-        uint32_t partition_count;
+        struct colors* color;
         std::unordered_map<uint32_t, uint32_t> cache;  
         DAGHandle* fzlog_client;
         std::mutex fzlog_lock;
         
 public:
-        HashMap(uint32_t partition_count);
+        HashMap(struct colors* color);
         ~HashMap();
 
         uint32_t get(uint32_t key);
