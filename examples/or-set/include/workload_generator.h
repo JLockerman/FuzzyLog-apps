@@ -1,5 +1,4 @@
-#ifndef		WORKLOAD_GENERATOR_H_
-#define 	WORKLOAD_GENERATOR_H_
+#pragma once 
 
 #include <cstdint>
 #include <cstdlib>
@@ -11,5 +10,3 @@ public:
 	workload_generator(uint64_t range); 	
 	uint64_t gen_next();
 };
-
-#endif 		// WORKLOAD_GENERATOR_H_ 

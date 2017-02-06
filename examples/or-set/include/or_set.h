@@ -1,5 +1,4 @@
-#ifndef 	OR_SET_H_
-#define		OR_SET_H_
+#pragma once 
 
 #include <set>
 #include <cstdint>
@@ -31,5 +30,3 @@ public:
 	void add(uint64_t e);
 	void remove(uint64_t e);
 };
-
-#endif 		// OR_SET_H_
