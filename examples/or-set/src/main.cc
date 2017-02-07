@@ -7,6 +7,23 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <sstream>
+#include <iostream>
+#include <fstream> 
+
+void write_output(config cfg, const std::vector<uint64_t> &results)
+{
+	std::stringstream filename;
+	std::ofstream result_file;	
+	
+	filename << cfg.server_id << ".txt";
+	
+	result_file.open(filename.str(), std::ios::app | std::ios::out);
+	for (auto v : results) {
+		result_file << v << "\n";
+	}
+	result_file.close();
+}
 
 void gen_input(uint64_t range, uint64_t num_inputs, std::vector<uint64_t> &output)
 {
@@ -17,15 +34,17 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<uint64_t> &outpu
 		output.push_back(gen.gen_next());
 }
 
-uint64_t measure_fn(worker *w, uint64_t duration)
+void measure_fn(worker *w, uint64_t duration, std::vector<uint64_t> &results)
 {
 	uint64_t start_iters, end_iters;
 	
-	start_iters = w->num_iterations();
-	std::this_thread::sleep_for(std::chrono::seconds(duration));
-	end_iters = w->num_iterations();	
-	
-	return end_iters - start_iters;
+	end_iters = w->num_iterations();
+	for (auto i = 0; i < duration; ++i) {
+		start_iters = end_iters; 
+		std::this_thread::sleep_for(std::chrono::seconds(1));	
+		end_iters = w->num_iterations();	
+		results.push_back(end_iters - start_iters);
+	}
 }
 
 void worker_fn(config cfg, std::atomic_bool &flag, worker **w,
@@ -42,9 +61,8 @@ void worker_fn(config cfg, std::atomic_bool &flag, worker **w,
 		(*w)->run_expt(to_insert);	
 }
 
-uint64_t do_experiment(config cfg)
+void do_experiment(config cfg, std::vector<uint64_t> &results)
 {
-	uint64_t iterations;
 	worker *w = NULL;
 	std::atomic_bool flag;
 	std::mutex m;
@@ -59,24 +77,20 @@ uint64_t do_experiment(config cfg)
 	lk.unlock();
 	
 	std::this_thread::sleep_for(std::chrono::seconds(5));
- 	iterations = measure_fn(w, cfg.expt_duration);	
+ 	measure_fn(w, cfg.expt_duration, results);	
 	flag = false;
 	worker_thread.join();
 	delete(w);
-	
-	return iterations;
 }
 
 int main(int argc, char **argv) 
 {
+	std::vector<uint64_t> results;
 	config_parser cfg_prser;			
-	uint64_t iterations;
 	config cfg = cfg_prser.get_config(argc, argv);
 
-	iterations = do_experiment(cfg);	
+	do_experiment(cfg, results);	
+	write_output(cfg, results);
 	std::cerr << "Done experiment!\n";
-	std::cerr << "Throughput: " << ((double)iterations) / ((double)cfg.expt_duration) << "\n";
-
 	return 0;
 }
-
