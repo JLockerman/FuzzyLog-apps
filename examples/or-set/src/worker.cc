@@ -1,15 +1,15 @@
 #include <worker.h>
 
-worker::worker(std::string log_addr, uint8_t proc_id)
+worker::worker(config cfg) // std::string log_addr, uint8_t proc_id)
 {
-	_log_addr = log_addr;
+	_log_addr = cfg.log_addr;
 	_color = (struct colors*)malloc(sizeof(struct colors));
         _color->numcolors = 1;
         _color->mycolors = new ColorID[0];
         _color->mycolors[0] = 0; 
 	_log_client = new_dag_handle_for_single_server(_log_addr.c_str(), _color);
-	_proc_id = proc_id;
-	_or_set = new or_set(_log_client, _color, _proc_id);
+	_proc_id = cfg.server_id;
+	_or_set = new or_set(_log_client, _color, cfg.server_id, cfg.sync_duration);
 	_iterations = 0;
 }
 

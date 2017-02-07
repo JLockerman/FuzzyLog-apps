@@ -4,6 +4,7 @@
 #include <or_set.h>
 #include <string>
 #include <vector>
+#include <config.h>
 
 extern "C" {
 	#include <fuzzy_log.h>
@@ -19,7 +20,7 @@ private:
 	uint8_t 			_proc_id;
 
 public:
-	worker(std::string log_addr, uint8_t proc_id);
+	worker(config cfg);
 	uint64_t num_iterations();
 	void run_expt(const std::vector<uint64_t> &keys);
 };

@@ -35,7 +35,7 @@ void worker_fn(config cfg, std::atomic_bool &flag, worker **w,
 	std::vector<uint64_t> to_insert;
 	
 	gen_input(cfg.expt_range, cfg.expt_range, to_insert); 
-	*w = new worker(cfg.log_addr, cfg.server_id);
+	*w = new worker(cfg);
 	cv.notify_one();	
 	
 	while (flag == true)  	
