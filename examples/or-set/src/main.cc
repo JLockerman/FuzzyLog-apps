@@ -13,12 +13,8 @@
 
 void write_output(config cfg, const std::vector<uint64_t> &results)
 {
-	std::stringstream filename;
 	std::ofstream result_file;	
-	
-	filename << cfg.server_id << ".txt";
-	
-	result_file.open(filename.str(), std::ios::app | std::ios::out);
+	result_file.open(std::to_string(cfg.server_id) + ".txt" , std::ios::app | std::ios::out);
 	for (auto v : results) {
 		result_file << v << "\n";
 	}
@@ -91,6 +87,5 @@ int main(int argc, char **argv)
 
 	do_experiment(cfg, results);	
 	write_output(cfg, results);
-	std::cerr << "Done experiment!\n";
 	return 0;
 }
