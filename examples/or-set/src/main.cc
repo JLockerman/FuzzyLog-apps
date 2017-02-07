@@ -55,7 +55,7 @@ uint64_t do_experiment(config cfg)
 				  std::ref(cv)); 
 
 	std::unique_lock<std::mutex> lk(m);
-	cv.wait(lk, [w] { return w != NULL; }); 	
+	cv.wait(lk, [&w] { return w != NULL; }); 	
 	lk.unlock();
 	
 	std::this_thread::sleep_for(std::chrono::seconds(5));

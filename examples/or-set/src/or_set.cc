@@ -1,5 +1,6 @@
 #include <or_set.h>
 #include <cassert>
+#include <iostream>
 
 or_set::or_set(DAGHandle *handle, struct colors *color, uint8_t proc_id)
 {
@@ -96,7 +97,7 @@ bool or_set::lookup(uint64_t e)
 
 void or_set::add(uint64_t e)
 {
-	uint64_t guid;
+	uint64_t guid = gen_guid();
 	_state[e].insert(guid);
 	
 	send_add(e, guid);	
