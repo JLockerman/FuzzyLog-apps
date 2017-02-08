@@ -1,4 +1,4 @@
-CFLAGS=-O2 -Wall -Wextra -std=c++11 -Wno-sign-compare
+CFLAGS=-O3 -Wall -Wextra -std=c++11 -Wno-sign-compare
 CC=g++
 
 DELOS_LIB=$(DELOS_RUST_LOC)/examples/c_linking/target/release $(DELOS_RUST_LOC)/src/*
