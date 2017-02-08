@@ -56,7 +56,12 @@ def expt_results(client_range, sync_duration):
 	local_file.close()
 
 def main():
-	os.chdir('..')
+
+	if os.getenv('DELOS_ORSET_LOC') == None:
+		print 'The DELOS_ORSET_LOC environment variable must point to the top level of the or-set example directory'	
+		sys.exit()
+	
+	os.chdir(os.getenv('DELOS_ORSET_LOC'))
 	client_range = [1,4,8,12,16]	
 	sync_duration = [500, 300000000]
 	
