@@ -36,7 +36,10 @@ void or_set::get_remote_updates()
 	uint64_t *uint_buf;
 	
 	snapshot(_log_client);
-        while (get_next(_log_client, _buf, &buf_sz, &c) == 1) {
+	while (true) {
+		auto gn_ret = get_next(_log_client, _buf, &buf_sz, &c);
+		assert(gn_ret == 0);		
+
 		if (c.numcolors == 0)
 			break;
 		
