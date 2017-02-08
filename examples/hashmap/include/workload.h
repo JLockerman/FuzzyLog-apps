@@ -11,34 +11,19 @@ public:
         virtual bool Run(HashMap *map) = 0;
 };
 
-class ycsb_single_insert : public Txn {
+class ycsb_insert : public Txn {
 private:
         uint32_t start;
         uint32_t end;
         struct colors* color;
 public:
-        ycsb_single_insert(uint32_t start, uint32_t end, struct colors* color) {
+        ycsb_insert(uint32_t start, uint32_t end, struct colors* color) {
                 this->start = start;
                 this->end = end;
                 this->color = color;
         }
         virtual bool Run(HashMap *map);
 };
-
-class ycsb_multi_insert : public Txn {
-private:
-        uint32_t start;
-        uint32_t end;
-        vector<struct colors*>* colors;
-public:
-        ycsb_multi_insert(uint32_t start, uint32_t end, vector<struct colors*>* colors) {
-                this->start = start;
-                this->end = end;
-                this->colors = colors;
-        }
-        virtual bool Run(HashMap *map);
-};
-
 
 class Table {
 private:

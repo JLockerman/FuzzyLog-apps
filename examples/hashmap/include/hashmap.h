@@ -25,7 +25,6 @@ public:
 
         uint32_t get(uint32_t key, struct colors* op_color);
         void put(uint32_t key, uint32_t value, struct colors* op_color);
-        void multiput(vector<uint32_t>* keys, vector<uint32_t>* values, vector<struct colors*>* op_colors);
         void remove(uint32_t key, struct colors* op_color);
 };
 

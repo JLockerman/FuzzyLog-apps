@@ -3,7 +3,7 @@
 #include <random>
 #include <iostream>
 
-bool ycsb_single_insert::Run(HashMap *map) {
+bool ycsb_insert::Run(HashMap *map) {
         uint32_t key, value;
         assert(map != NULL);
        
@@ -12,27 +12,6 @@ bool ycsb_single_insert::Run(HashMap *map) {
         value = rand();
 
         map->put(key, value, color);
-
-        return true;
-}
-
-bool ycsb_multi_insert::Run(HashMap *map) {
-        uint32_t i, num_insert, key, value;
-        vector<uint32_t> keys, values;
-        assert(map != NULL);
-       
-        num_insert = colors->size();
-
-        keys.reserve(num_insert);
-        values.reserve(num_insert);
-
-        for (i = 0; i < num_insert; ++i) { 
-                key = rand() % (end - start);
-                value = rand();
-                keys.push_back(key);
-                values.push_back(value);
-        }
-        map->multiput(&keys, &values, colors);
 
         return true;
 }
@@ -60,11 +39,21 @@ Txn** workload_generator::Gen() {
 
         // make colors for each operation
         struct colors* single_color; 
-        vector<struct colors*>* multi_color;
-        multi_color = new vector<struct colors*>();
+        struct colors* multi_color;
 
-        colors_to_struct(multi_color);
-        single_color = multi_color->at(0);
+        // create single color
+        single_color = (struct colors*)malloc(sizeof(struct colors));
+        single_color->numcolors = 1;
+        single_color->mycolors = new ColorID[0];
+        single_color->mycolors[0] = this->color_of_interest->at(0);
+
+        // create multi color
+        multi_color = (struct colors*)malloc(sizeof(struct colors));
+        multi_color->numcolors = this->color_of_interest->size();
+        multi_color->mycolors = new ColorID[multi_color->numcolors];
+        for (i = 0; i < multi_color->numcolors; ++i)
+                multi_color->mycolors[i] = this->color_of_interest->at(i);
+
 
         Txn **txns = (Txn**)malloc(sizeof(Txn*) * total_operation_count);
         i = 0;
@@ -74,13 +63,13 @@ Txn** workload_generator::Gen() {
 
                 if (p < percent_of_single && single_operation_count > 0) {
                         // create single color operation
-                        txns[i] = new ycsb_single_insert(0, table->num_records(), single_color);
+                        txns[i] = new ycsb_insert(0, table->num_records(), single_color);
                         single_operation_count--;
                         i++;
                         
                 } else if (p >= percent_of_single && multi_operation_count > 0) {
                         // create multi color operation
-                        txns[i] = new ycsb_multi_insert(0, table->num_records(), multi_color);
+                        txns[i] = new ycsb_insert(0, table->num_records(), multi_color);
                         multi_operation_count--;
                         i++;
                 }

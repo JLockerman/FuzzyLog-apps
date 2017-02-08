@@ -62,7 +62,6 @@ uint32_t HashMap::get(uint32_t key, struct colors* op_color) {
         return val;
 }
 
-
 void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color) {
         // acquire lock
         fzlog_lock.lock();
@@ -70,28 +69,6 @@ void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color) {
         // append
         uint64_t data = ((uint64_t)key << 32) | value;
         append(fzlog_client, (char *)&data, sizeof(data), op_color, NULL);
-
-        // release lock
-        fzlog_lock.unlock();
-}
-
-void HashMap::multiput(vector<uint32_t>* keys, vector<uint32_t>* values, vector<struct colors*>* op_colors) {
-        assert(op_colors->size() == keys->size());
-        assert(op_colors->size() == values->size());
-
-        uint32_t i, key, value;
-
-        // acquire lock
-        fzlog_lock.lock();
-
-        for (i = 0; i < keys->size(); ++i) {
-                key = keys->at(i);
-                value = values->at(i);
-                // append
-                uint64_t data = ((uint64_t)key << 32) | value;
-                // get color
-                append(fzlog_client, (char *)&data, sizeof(data), op_colors->at(i), NULL);
-        }
 
         // release lock
         fzlog_lock.unlock();
