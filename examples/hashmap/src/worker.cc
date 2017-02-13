@@ -9,14 +9,21 @@ void Worker::run() {
 }
 
 void* Worker::bootstrap(void *arg) {
-        uint32_t i, num_txns;
+        uint32_t i;
         Worker *worker = (Worker*)arg;
-        num_txns = worker->num_txns;
 
-        // run txn
-        for (i = 0; i < num_txns; ++i) {
-                worker->txns[i]->Run(worker->map);
+        if (ASYNC_WRITE) {
+                for (i = 0; i < worker->m_num_txns; ++i) {
+                        worker->m_txns[i]->AsyncRun(worker->m_map);
+                }
+                worker->m_map->wait_all();
+
+        } else {
+                for (i = 0; i < worker->m_num_txns; ++i) {
+                        worker->m_txns[i]->Run(worker->m_map);
+                }
         }
+        
         return NULL;
 }
 

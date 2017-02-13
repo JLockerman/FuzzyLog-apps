@@ -1,10 +1,11 @@
 CFLAGS=-O2 -Wall -Wextra -std=c++0x -Wno-sign-compare
+CFLAGS+=-DASYNC_WRITE=1
 CC=g++
 
 DELOS_LIB=$(DELOS_RUST_LOC)/examples/c_linking/target/release $(DELOS_RUST_LOC)/src/*
 LIB_DIRS=./libs/lib/ $(DELOS_LIB)
 LIBPATH=$(foreach d, $(LIB_DIRS), -L$d)
-LIBS=-pthread -lc_link -ldl -lrt
+LIBS=-pthread -lc_link -ldl -lrt -lcityhash
 INC_DIRS=include libs/include
 INCLUDE=$(foreach d, $(INC_DIRS), -I$d)
 

@@ -11,7 +11,7 @@ outfile_scalability = "gnuplot/scalability.data"
 outfile_multi = "gnuplot/multi.data"
 
 OPERATION_COUNT = 10000
-NUM_CLIENTS = 16
+NUM_CLIENTS = 8
 
 class MapClient(threading.Thread):
     def __init__(self, operation_count, colors, percent_of_multi_operation):
@@ -98,8 +98,8 @@ def plot_multi_operation():
 
 
 def main():
-    #plot_scalability()
-    plot_multi_operation()
+    plot_scalability()
+    #plot_multi_operation()
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@
 
 class Runnable {
 protected:
-        pthread_t               m_thread;
+        pthread_t                       m_thread;
 public:
         Runnable() {}
         virtual void run() = 0;
@@ -15,14 +15,14 @@ public:
 
 class Worker : public Runnable {
 public:
-        HashMap *map;
-        Txn** txns;
-        uint32_t num_txns;
+        HashMap*                        m_map;
+        Txn**                           m_txns;
+        uint32_t                        m_num_txns;
 public:
         Worker(HashMap *map, Txn** txns, uint32_t num_txns): Runnable() {
-                this->map = map;
-                this->txns = txns;
-                this->num_txns = num_txns;
+                this->m_map = map;
+                this->m_txns = txns;
+                this->m_num_txns = num_txns;
         }
         virtual void run();
         static void* bootstrap(void *arg);

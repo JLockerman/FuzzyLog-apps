@@ -69,6 +69,10 @@ void run_YCSB(vector<uint32_t> *colors, uint32_t single_operation_count, uint32_
 
         // print
         cout << diff.count() << " " << total_operation_count / diff.count() << endl;
+
+        delete map;
+        delete table;
+        delete workload_gen;
 }
 
 int main(int argc, char** argv) {
