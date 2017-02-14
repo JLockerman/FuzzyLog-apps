@@ -1,6 +1,6 @@
 #include <worker.h>
 
-worker::worker(config cfg) // std::string log_addr, uint8_t proc_id)
+worker::worker(config cfg) 
 {
 	_log_addr = cfg.log_addr;
 	_color = (struct colors*)malloc(sizeof(struct colors));
