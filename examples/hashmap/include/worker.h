@@ -24,6 +24,7 @@ public:
                 this->m_txns = txns;
                 this->m_num_txns = num_txns;
         }
+        ~Worker();
         virtual void run();
         static void* bootstrap(void *arg);
         pthread_t* get_pthread_id();

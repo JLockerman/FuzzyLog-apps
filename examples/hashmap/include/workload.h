@@ -8,6 +8,7 @@ using namespace std;
 class Txn {
 public:
         Txn() {}
+        virtual ~Txn(){}
         virtual void Run(HashMap *map) = 0;
         virtual void AsyncRun(HashMap *map) = 0;
 };
@@ -23,6 +24,7 @@ public:
                 this->m_end = end;
                 this->m_color = color;
         }
+        ~ycsb_insert(){}
         virtual void Run(HashMap *map);
         virtual void AsyncRun(HashMap *map);
 };

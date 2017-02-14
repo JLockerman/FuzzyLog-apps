@@ -2,6 +2,14 @@
 #include <cstring>
 #include <cassert>
 
+Worker::~Worker() {
+        for (size_t i = 0; i < m_num_txns; i++) {
+                ycsb_insert* txn = (ycsb_insert*)m_txns[i];
+                delete txn;
+        }
+        delete m_txns;
+}
+
 void Worker::run() {
         int err;
         err = pthread_create(&m_thread, NULL, bootstrap, this);
