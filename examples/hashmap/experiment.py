@@ -4,6 +4,7 @@ import os
 import sys
 import os.path
 import threading
+import numpy
 
 
 fmt_cmd = "build/hashmap {0} {1} {2} {3} >> {4}"
@@ -12,6 +13,7 @@ outfile_multi = "gnuplot/multi.data"
 
 OPERATION_COUNT = 10000
 NUM_CLIENTS = 8
+REPEAT_COUNT = 5
 
 class MapClient(threading.Thread):
     def __init__(self, operation_count, colors, percent_of_multi_operation):
@@ -66,12 +68,18 @@ def plot_scalability():
     for num_client in range(NUM_CLIENTS):
         num_client += 1
         clients = [(OPERATION_COUNT, (i, i), 0.0) for i in range(num_client)]
-        throughput = measure_throughput(clients)
-        results.append((num_client, throughput))
+
+        # Repeat N times to compute 
+        throughputs = []
+        for i in range(REPEAT_COUNT):
+                throughput = measure_throughput(clients)
+                throughputs.append(throughput)
+        
+        results.append((num_client, numpy.mean(throughputs), numpy.std(throughputs)))
 
     with open(outfile_scalability, "w") as f:
-        for num_client, throughput in results:
-            f.write("{0} {1}\n".format(num_client, throughput))
+        for num_client, mean_throughput, std_throughput in results:
+            f.write("{0} {1} {2}\n".format(num_client, mean_throughput, std_throughput))
     os.chdir("gnuplot")
     os.system("./eps_gen_scalability.sh")
 
