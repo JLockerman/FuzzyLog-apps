@@ -13,15 +13,12 @@ def readfile(filename):
 	return results[10:110]
 
 def postprocess_results(vals):
-    sample_mean = sum(vals) / float(len(vals))
-    dev = 0
-    for v in vals:
-        dev += (sample_mean - v) * (sample_mean - v)
-    s = math.sqrt(dev / float(len(vals)))
-    conf_min = sample_mean - 1.96 * s
-    conf_max = sample_mean + 1.96 * s
-    return [sample_mean/float(1000), conf_min/float(1000), conf_max/float(1000)]
-
+	vals.sort()
+	median_idx = len(vals)/2
+	low_idx = int(len(vals)*0.05)
+	high_idx = int(len(vals)*0.95)
+	return [vals[median_idx]/float(1000), vals[low_idx]/float(1000), vals[high_idx]/float(1000)]
+	
 def single_expt(num_clients, sync_duration):
 	result_dir = exp.get_resultdir_name(num_clients, sync_duration)
 	result_files = os.listdir(result_dir)	
@@ -56,9 +53,14 @@ def expt_results(client_range, sync_duration):
 	local_file.close()
 
 def main():
-	os.chdir('..')
+
+	if os.getenv('DELOS_ORSET_LOC') == None:
+		print 'The DELOS_ORSET_LOC environment variable must point to the top level of the or-set example directory'	
+		sys.exit()
+	
+	os.chdir(os.getenv('DELOS_ORSET_LOC'))
 	client_range = [1,4,8,12,16]	
-	sync_duration = [500, 300000000]
+	sync_duration = [500000, 300000000]
 	
 	for s in sync_duration:
 		expt_results(client_range, s)	

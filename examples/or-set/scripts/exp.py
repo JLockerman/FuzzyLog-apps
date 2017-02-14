@@ -3,10 +3,19 @@
 import os
 import subprocess
 import time
+import sys
 
 def main():
+	if os.getenv('DELOS_RUST_LOC') == None:
+		print 'The DELOS_RUST_LOC environment variable must point to the top level of the delos-rust repo'
+		sys.exit()
+	if os.getenv('DELOS_ORSET_LOC') == None:
+		print 'The DELOS_ORSET_LOC environment variable must point to the top level of the or-set example directory'	
+		sys.exit()
+	
+	os.chdir(os.getenv('DELOS_ORSET_LOC'))
 	clients = [1,4,8,12,16,20,24,28,32]
-	sync_duration = [1000, 300000000]	
+	sync_duration = [500000, 300000000]	
 	for c in clients:
 		for s in sync_duration:
 			single_expt(c, s)				
@@ -25,7 +34,7 @@ def init_fuzzy_log():
 	
 # Start clients.
 def init_clients(num_clients, sync_duration):
-	args = ['./build/or-set', '--log_addr', '127.0.0.1:3333', '--expt_duration', '10', '--expt_range', '1000', '--server_id']
+	args = ['./build/or-set', '--log_addr', '127.0.0.1:3333', '--expt_duration', '120', '--expt_range', '1000', '--server_id']
 	client_procs = []
 	for i in range(0, num_clients):
 		client_args = list(args)
@@ -48,6 +57,7 @@ def mv_results(num_clients, sync_duration):
 
 # Single experiment. 
 def single_expt(num_clients, sync_duration):
+	os.system('rm *.txt')
 	log_proc = init_fuzzy_log()
 	client_procs = init_clients(num_clients, sync_duration)
 	for c in client_procs:

@@ -36,21 +36,30 @@ void or_set::get_remote_updates()
 	uint64_t *uint_buf;
 	
 	snapshot(_log_client);
-        while (get_next(_log_client, _buf, &buf_sz, &c) == 1) {
+	while (true) {
+		auto gn_ret = get_next(_log_client, _buf, &buf_sz, &c);
+		assert(gn_ret == 0);		
+	
 		if (c.numcolors == 0)
 			break;
 		
 		uint_buf = reinterpret_cast<uint64_t*>(_buf);
 		auto opcode = uint_buf[0];			
+	
 		if (get_proc_id(opcode) == _proc_id)
 			continue;
 
 		switch (get_opcode(opcode)) {
 		case ADD: 
 			remote_add(_buf, buf_sz);
+			break;
 		case REMOVE:	
 			remote_remove(_buf, buf_sz);
+			break;
 		default:
+			/* XXX Debugging log playback issue. */
+			std::cerr << std::showbase << std::hex;
+			std::cerr << opcode << "\n";	
 			assert(false);
 		}
         }
@@ -76,13 +85,13 @@ uint64_t or_set::gen_guid()
 
 void or_set::serialize_add(uint64_t e, uint64_t guid, char **buf, size_t *sz)
 {
-	auto rbuf = (char*)malloc(sizeof(uint64_t)*3);
+	auto rbuf = static_cast<uint64_t*>(malloc(sizeof(uint64_t)*3));
 		
 	rbuf[0] = make_opcode(ADD);
 	rbuf[1] = e;
 	rbuf[2] = guid;
 	
-	*buf = rbuf;
+	*buf = reinterpret_cast<char*>(rbuf);
 	*sz = sizeof(uint64_t)*3;
 	return;		
 }
@@ -100,7 +109,7 @@ void or_set::serialize_remove(uint64_t e, const std::set<uint64_t> &guid_set, ch
 {
 	assert(guid_set.size() > 0);
 	
-	auto rbuf = (uint64_t*)malloc(sizeof(uint64_t)*2 + sizeof(uint64_t)*guid_set.size());
+	auto rbuf = static_cast<uint64_t*>(malloc(sizeof(uint64_t)*2 + sizeof(uint64_t)*guid_set.size()));
 	rbuf[0] = make_opcode(REMOVE);
 	rbuf[1] = e;
 
@@ -110,7 +119,7 @@ void or_set::serialize_remove(uint64_t e, const std::set<uint64_t> &guid_set, ch
 		i += 1;
 	}	
 
-	*buf = (char*)rbuf;
+	*buf = reinterpret_cast<char*>(rbuf);
 	*sz = sizeof(uint64_t)*(2 + guid_set.size());
 }
 

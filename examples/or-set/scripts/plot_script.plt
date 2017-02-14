@@ -27,7 +27,7 @@ set yrange [0:250]
 
 set xlabel 'Number of clients' font ",36" offset 0,-2.5
 plot "d300000000.txt" title "No anti-entropy" with errorlines ps 4 lt 6 lc rgb "#5C3C1B" linewidth 10, \
- "d500.txt" title "500 {/Symbol m}s" with errorlines ps 4 lt 3 lc rgb "#FF345C" linewidth 10 
+ "d500000.txt" title "500 ms" with errorlines ps 4 lt 3 lc rgb "#FF345C" linewidth 10 
 
 
 
@@ -39,6 +39,6 @@ set xrange [0:17]
 unset label 1
 set label 1 "(b) Per-client throughput" at 5,32 font ",33"
 plot "d300000000_local.txt" title "No anti-entropy" with errorlines ps 4 lt 6 lc rgb "#5C3C1B" linewidth 10, \
- "d500_local.txt" title "500 {/Symbol m}s" with errorlines ps 4 lt 3 lc rgb "#FF345C" linewidth 10 
+ "d500000_local.txt" title "500 ms" with errorlines ps 4 lt 3 lc rgb "#FF345C" linewidth 10 
 
 
