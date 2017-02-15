@@ -53,6 +53,7 @@ public:
         HashMap(vector<uint32_t>* color_of_interest);
         ~HashMap();
 
+        // Synchronous operations
         uint32_t get(uint32_t key, struct colors* op_color);
         void put(uint32_t key, uint32_t value, struct colors* op_color);
         void remove(uint32_t key, struct colors* op_color);

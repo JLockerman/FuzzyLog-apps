@@ -17,10 +17,16 @@ using ns = chrono::nanoseconds;
 using get_time = chrono::system_clock;
 
 
+void write_output(uint32_t client_id, double result) {
+        std::ofstream result_file; 
+        result_file.open("result/" + std::to_string(client_id) + ".txt", std::ios::app | std::ios::out);
+        result_file << result << "\n"; 
+        result_file.close();        
+}
+
 void run_YCSB(vector<uint32_t> *colors, uint32_t single_operation_count, uint32_t multi_operation_count) {
         uint32_t i, total_operation_count, operation_per_worker, remainder;
         HashMap *map;
-        Table *table;
         workload_generator *workload_gen;
         Txn** txns;
         vector<Worker*> workers;
@@ -30,16 +36,11 @@ void run_YCSB(vector<uint32_t> *colors, uint32_t single_operation_count, uint32_
         // Fuzzymap
         map = new HashMap(colors);
 
-        // Populate table 
-        uint32_t record_count = 100000;
-        table = new Table(record_count);
-   //   cout << "Populating table with " << record_count << " records ..." << endl;
-   //   table->populate(map);
-   //   cout << "Done." << endl;
+        uint32_t range = 100000;
                
         // Generate update workloads
         // distribution : uniform
-        workload_gen = new workload_generator(table, colors, single_operation_count, multi_operation_count);
+        workload_gen = new workload_generator(range, colors, single_operation_count, multi_operation_count);
         txns = workload_gen->Gen();
         
         // Assign workloads to worker threads
@@ -67,20 +68,16 @@ void run_YCSB(vector<uint32_t> *colors, uint32_t single_operation_count, uint32_
         auto end = get_time::now();
         chrono::duration<double> diff = end - start;
 
-        // print
-        cout << diff.count() << " " << total_operation_count / diff.count() << endl;
+        write_output(colors->at(0), total_operation_count / diff.count());
 
         delete map;
-        delete table;
         delete workload_gen;
 }
 
+
 int main(int argc, char** argv) {
-        // FIXME: only necessary for local test
-	//start_fuzzy_log_server_thread("0.0.0.0:9990");
-        
         if (argc != 5) {
-                cout << "Usage: ./build/hashmap color_fist color_second single_operation_count multi_operation_count" << endl;
+                cout << "Usage: ./build/hashmap <local_color> <remote_color> <single_append_op_count> <multi_append_op_count>" << endl;
                 return 0;
         }
 
@@ -96,21 +93,5 @@ int main(int argc, char** argv) {
 
         run_YCSB(&colors, single_operation_count, multi_operation_count); 
         
-//      HashMap map;
-//      map.put(10, 15);
-//      map.put(10, 16);
-//      map.put(10, 12);
-
-//      map.put(100, 5);
-//      map.remove(100);
-//      map.put(100, 7);
-
-//      
-//      uint32_t val10 = map.get(10);
-//      std::cout << "Output for key 10 : " << val10 << std::endl;
-
-//      uint32_t val100 = map.get(100);
-//      std::cout << "Output for key 100: " << val100 << std::endl;
-
         return 0;
 }

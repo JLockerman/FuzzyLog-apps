@@ -25,10 +25,6 @@ void ycsb_insert::AsyncRun(HashMap *map) {
         map->async_put(key, value, m_color);
 }
 
-uint32_t Table::num_records() const {
-        return this->record_count;
-}
-
 Txn** workload_generator::Gen() {
         uint32_t i;
         uint32_t total_operation_count;
@@ -65,13 +61,13 @@ Txn** workload_generator::Gen() {
 
                 if (p < percent_of_single && m_single_operation_count > 0) {
                         // create single color operation
-                        txns[i] = new ycsb_insert(0, m_table->num_records(), single_color);
+                        txns[i] = new ycsb_insert(0, m_range, single_color);
                         m_single_operation_count--;
                         i++;
                         
                 } else if (p >= percent_of_single && m_multi_operation_count > 0) {
                         // create multi color operation
-                        txns[i] = new ycsb_insert(0, m_table->num_records(), multi_color);
+                        txns[i] = new ycsb_insert(0, m_range, multi_color);
                         m_multi_operation_count--;
                         i++;
                 }
