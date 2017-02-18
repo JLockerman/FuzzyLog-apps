@@ -5,6 +5,8 @@
 #include <workload.h>
 #include <iostream>
 
+#define WINDOW_SIZE 32
+
 class Runnable {
 protected:
         pthread_t                       m_thread;
