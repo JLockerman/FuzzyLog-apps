@@ -10,7 +10,7 @@ from fabric.api import run
 
 
 # Command to Fuzzymap
-fmt_cmd = "build/hashmap {0} {1} {2} {3}"
+fmt_cmd = "../build/hashmap {0} {1} {2} {3}"
 tmp_result_dir = 'result'
 
 def main():
@@ -18,11 +18,11 @@ def main():
 
 def do_scalability_experiment():
     results = test_single_append([1, 2, 4, 8, 16, 32], 100)
-    write_output(results, 'gnuplot/single_append.txt')
+    write_output(results, 'single_append.txt')
 
 def do_multiappend_experiment():
     results = test_multiappend([0, 20, 40, 60, 80, 100], 100)
-    write_output(results, 'gnuplot/multiappend.txt')
+    write_output(results, 'multiappend.txt')
 
 def write_output(results, filename):
     with open(filename, 'w') as f:
@@ -195,25 +195,6 @@ def run_multi_append_clients(clients):
 
     for t in threads:
         t.join()
-
-  #     def plot_multi_operation():
-  #         os.system("rm {0}".format(outfile_multi))
-  #         os.system("touch {0}".format(outfile_multi))
-
-  #         NUM_CLIENTS_FOR_MULTI = 2
-
-  #         results = []
-  #         for percent in range(0, 110, 10):
-  #             clients = []
-  #             clients.append((OPERATION_COUNT, (0, 1), percent/100.0))
-  #             clients.append((OPERATION_COUNT, (1, 0), percent/100.0))
-  #             throughput = single_expt(clients)
-  #             results.append((percent, throughput))
-
-  #         with open(outfile_multi, "w") as f:
-  #             for percent, throughput in results:
-  #                 f.write("{0} {1}\n".format(percent, throughput))
-
 
 if __name__ == "__main__":
     main()
