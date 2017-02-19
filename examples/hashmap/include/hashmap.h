@@ -66,7 +66,7 @@ public:
         void async_put(uint32_t key, uint32_t value, struct colors* op_color);
         void wait_for_any_put();
         void wait_for_all();
-        void write_output_for_latency();
+        void write_output_for_latency(const char* filename);
 };
 
 #endif            // HASHMAP_H_

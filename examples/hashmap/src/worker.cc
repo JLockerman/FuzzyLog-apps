@@ -31,15 +31,16 @@ void* Worker::bootstrap(void *arg) {
                         worker->m_txns[i]->AsyncRun(map);
                 }
                 map->wait_for_all();
-                        
-                // print latencies
-                worker->m_map->write_output_for_latency();
-
+                // Write latency output 
+                worker->m_map->write_output_for_latency("scripts/latency_async.txt");
         } else {
                 for (i = 0; i < worker->m_num_txns; ++i) {
                         worker->m_txns[i]->Run(worker->m_map);
                 }
+                // Write latency output 
+                worker->m_map->write_output_for_latency("scripts/latency_sync.txt");
         }
+
         
         return NULL;
 }

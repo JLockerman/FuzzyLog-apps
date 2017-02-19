@@ -62,7 +62,12 @@ uint32_t HashMap::get(uint32_t key, struct colors* op_color) {
 
 void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color) {
         uint64_t data = ((uint64_t)key << 32) | value;
+        // For latency measurement 
+        auto start_time = chrono::system_clock::now();
         append(m_fuzzylog_client, (char *)&data, sizeof(data), op_color, NULL);
+        auto end_time = chrono::system_clock::now();
+        auto latency = end_time - start_time; 
+        m_latencies.push_back(latency);
 }
 
 void HashMap::remove(uint32_t key, struct colors* op_color) {
@@ -109,9 +114,9 @@ void HashMap::wait_for_all() {
         }
 }
 
-void HashMap::write_output_for_latency() {
+void HashMap::write_output_for_latency(const char* filename) {
         std::ofstream result_file; 
-        result_file.open("scripts/latency.txt", std::ios::out);
+        result_file.open(filename, std::ios::out);
         for (auto l : m_latencies) {
                 result_file << l.count() << "\n"; 
         }
