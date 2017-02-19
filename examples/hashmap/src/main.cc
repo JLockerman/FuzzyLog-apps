@@ -56,7 +56,7 @@ void run_YCSB(vector<uint32_t> *colors, uint32_t single_operation_count, uint32_
                         workers.push_back(new Worker(map, txns + i * operation_per_worker, operation_per_worker));
         }
 
-        auto start = get_time::now(); //use auto keyword to minimize typing strokes :)
+        auto start = get_time::now();
 
         // Run workers
         for (i = 0; i < num_workers; ++i)
@@ -65,11 +65,17 @@ void run_YCSB(vector<uint32_t> *colors, uint32_t single_operation_count, uint32_
         for (i = 0; i < num_workers; ++i)
                 pthread_join(*workers[i]->get_pthread_id(), NULL);
 
+
+        // Measure duration 
         auto end = get_time::now();
         chrono::duration<double> diff = end - start;
 
+        // Write to output file
         write_output(colors->at(0), total_operation_count / diff.count());
-
+        
+        // Free
+        for (i = 0; i < num_workers; ++i)
+                delete workers[i];
         delete map;
         delete workload_gen;
 }

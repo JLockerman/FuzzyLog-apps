@@ -19,19 +19,21 @@ void Worker::run() {
 void* Worker::bootstrap(void *arg) {
         uint32_t i;
         Worker *worker = (Worker*)arg;
+        HashMap *map = worker->m_map;
 
         if (ASYNC_WRITE) {
-                // Windowing
-                uint32_t total_executed = 0;
-                while (total_executed < worker->m_num_txns) {
-                        uint32_t executed = 0;
-                        for (i = total_executed; i < total_executed + WINDOW_SIZE && i < worker->m_num_txns; ++i) {
-                                worker->m_txns[i]->AsyncRun(worker->m_map);
-                                executed++;
-                        }
-                        total_executed += executed;
-                        worker->m_map->wait_all();
+                // Send requests
+                for (i = 0; i < WINDOW_SIZE; i++) {
+                        worker->m_txns[i]->AsyncRun(map);
                 }
+                for (i = WINDOW_SIZE; i < worker->m_num_txns; i++) {
+                        map->wait_for_any_put();
+                        worker->m_txns[i]->AsyncRun(map);
+                }
+                map->wait_for_all();
+                        
+                // print latencies
+                worker->m_map->write_output_for_latency();
 
         } else {
                 for (i = 0; i < worker->m_num_txns; ++i) {

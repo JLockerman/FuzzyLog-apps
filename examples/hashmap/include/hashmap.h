@@ -5,6 +5,9 @@
 #include <unordered_map>
 #include <mutex>
 #include <vector>
+#include <chrono>
+#include <atomic>
+#include <condition_variable>
 #include <city.h>
 
 extern "C" {
@@ -46,9 +49,10 @@ private:
         DAGHandle*                              m_fuzzylog_client;
         mutex                                   m_fuzzylog_mutex;
        
-        // Map for tracking asynchronous operations
-        unordered_map<new_write_id, uint32_t>   m_promises;
-        static mutex                            m_promises_mtx;
+        // Map for tracking latencies
+        unordered_map<new_write_id, chrono::time_point<chrono::system_clock>>   m_start_time_map;
+        static mutex                                                            m_start_time_map_mtx;
+        vector<std::chrono::duration<double>>                                   m_latencies;
 public:
         HashMap(vector<uint32_t>* color_of_interest);
         ~HashMap();
@@ -60,7 +64,9 @@ public:
 
         // Asynchronous operations
         void async_put(uint32_t key, uint32_t value, struct colors* op_color);
-        void wait_all();
+        void wait_for_any_put();
+        void wait_for_all();
+        void write_output_for_latency();
 };
 
 #endif            // HASHMAP_H_
