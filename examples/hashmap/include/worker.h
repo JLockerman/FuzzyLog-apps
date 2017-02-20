@@ -1,11 +1,8 @@
-#ifndef         WORKER_H_
-#define         WORKER_H_
+#pragma once
 
 #include <pthread.h>
 #include <workload.h>
 #include <iostream>
-
-#define WINDOW_SIZE 32
 
 class Runnable {
 protected:
@@ -20,16 +17,18 @@ public:
         HashMap*                        m_map;
         Txn**                           m_txns;
         uint32_t                        m_num_txns;
+        bool                            m_async;
+        uint32_t                        m_window_size;
 public:
-        Worker(HashMap *map, Txn** txns, uint32_t num_txns): Runnable() {
+        Worker(HashMap *map, Txn** txns, uint32_t num_txns, bool async, uint32_t window_size): Runnable() {
                 this->m_map = map;
                 this->m_txns = txns;
                 this->m_num_txns = num_txns;
+                this->m_async = async;
+                this->m_window_size = window_size;
         }
         ~Worker();
         virtual void run();
         static void* bootstrap(void *arg);
         pthread_t* get_pthread_id();
 };
-
-#endif          // WORKER_H_

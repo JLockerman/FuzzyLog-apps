@@ -1,5 +1,4 @@
-CFLAGS=-O2 -Wall -Wextra -std=c++0x -Wno-sign-compare
-CFLAGS+=-DASYNC_WRITE=1
+CFLAGS=-O2 -Wall -Wextra -std=c++11 -Wno-sign-compare
 CC=g++
 
 DELOS_LIB=$(DELOS_RUST_LOC)/examples/c_linking/target/release $(DELOS_RUST_LOC)/src/*
@@ -13,7 +12,7 @@ build/%.o: src/%.cc
 	@mkdir -p build
 	@$(CC) -c -o $@ $< $(INCLUDE) $(LIBPATH) $(CFLAGS) $(LIBS)
 
-OBJECTS = build/workload.o build/hashmap.o build/worker.o build/main.o
+OBJECTS = build/workload.o build/worker.o build/hashmap.o build/main.o
 
 build/hashmap: $(OBJECTS)
 	$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)

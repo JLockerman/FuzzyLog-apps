@@ -1,5 +1,4 @@
-#ifndef           HASHMAP_H_
-#define           HASHMAP_H_
+#pragma once
 
 #include <stdint.h>
 #include <unordered_map>
@@ -14,7 +13,6 @@ extern "C" {
         #include "fuzzy_log.h"
 }
 
-using namespace std;
 
 // Extended version of the original write_id to be used as key in std::unordered_map
 typedef struct new_write_id {
@@ -44,17 +42,17 @@ namespace std {
 class HashMap {
 
 private:
-        struct colors*                          m_color;
-        unordered_map<uint32_t, uint32_t>       m_cache;  
-        DAGHandle*                              m_fuzzylog_client;
-        mutex                                   m_fuzzylog_mutex;
+        std::vector<std::string>*                       m_log_addr;
+        std::unordered_map<uint32_t, uint32_t>          m_cache;  
+        DAGHandle*                                      m_fuzzylog_client;
+        std::mutex                                      m_fuzzylog_mutex;
        
         // Map for tracking latencies
-        unordered_map<new_write_id, chrono::time_point<chrono::system_clock>>   m_start_time_map;
-        static mutex                                                            m_start_time_map_mtx;
-        vector<std::chrono::duration<double>>                                   m_latencies;
+        std::unordered_map<new_write_id, std::chrono::time_point<std::chrono::system_clock>>   m_start_time_map;
+        static std::mutex                                                                      m_start_time_map_mtx;
+        std::vector<std::chrono::duration<double>>                                             m_latencies;
 public:
-        HashMap(vector<uint32_t>* color_of_interest);
+        HashMap(std::vector<std::string>* log_addr);
         ~HashMap();
 
         // Synchronous operations
@@ -68,5 +66,3 @@ public:
         void wait_for_all();
         void write_output_for_latency(const char* filename);
 };
-
-#endif            // HASHMAP_H_

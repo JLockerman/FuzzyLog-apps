@@ -1,7 +1,7 @@
-#ifndef           WORKLOAD_H_ 
-#define           WORKLOAD_H_ 
+#pragma once
 
 #include <hashmap.h>
+#include <config.h>
 
 using namespace std;
 
@@ -32,17 +32,11 @@ public:
 class workload_generator {
 private:
         uint32_t                                m_range;
-        vector<uint32_t>*                       m_color_of_interest;
-        uint32_t                                m_single_operation_count;
-        uint32_t                                m_multi_operation_count;
+        vector<workload_config>*                m_workload;
 public:
-        workload_generator(uint32_t range, vector<uint32_t>* color_of_interest, uint32_t single_operation_count, uint32_t multi_operation_count) {
+        workload_generator(uint32_t range, vector<workload_config>* workload) {
                 this->m_range = range;
-                this->m_color_of_interest = color_of_interest;
-                this->m_multi_operation_count = multi_operation_count;
-                this->m_single_operation_count = single_operation_count;
+                this->m_workload = workload;
         }
         Txn** Gen();
 };
-
-#endif            // WORKLOAD_H_ 

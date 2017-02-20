@@ -27,49 +27,39 @@ void ycsb_insert::AsyncRun(HashMap *map) {
 
 Txn** workload_generator::Gen() {
         uint32_t i;
-        uint32_t total_operation_count;
-        double percent_of_single;
-        double p;
+        uint32_t total_op_count;
+        double r;
 
         // percent of single operations
-        total_operation_count = this->m_single_operation_count + this->m_multi_operation_count;
-        percent_of_single = (double)this->m_single_operation_count / total_operation_count;
+        total_op_count = 0;
+        for (auto w : *m_workload) {
+                total_op_count += w.op_count;
+        }
+        Txn **txns = (Txn**)malloc(sizeof(Txn*) * total_op_count);
 
-        // make colors for each operation
-        struct colors* single_color; 
-        struct colors* multi_color;
+        // make transactions
+        vector<double> proportions;
+        vector<uint32_t> allocations;
+        uint32_t n = 0;
+        for (auto w : *m_workload) {
+                n += w.op_count; 
+                double p = (double)n / total_op_count;
+                proportions.push_back(p);
+                allocations.push_back(w.op_count);
+        }
 
-        // create single color
-        single_color = (struct colors*)malloc(sizeof(struct colors));
-        single_color->numcolors = 1;
-        single_color->mycolors = new ColorID[0];
-        single_color->mycolors[0] = this->m_color_of_interest->at(0);
-
-        // create multi color
-        multi_color = (struct colors*)malloc(sizeof(struct colors));
-        multi_color->numcolors = this->m_color_of_interest->size();
-        multi_color->mycolors = new ColorID[multi_color->numcolors];
-        for (i = 0; i < multi_color->numcolors; ++i)
-                multi_color->mycolors[i] = this->m_color_of_interest->at(i);
-
-
-        Txn **txns = (Txn**)malloc(sizeof(Txn*) * total_operation_count);
         i = 0;
-        while (this->m_single_operation_count > 0 || this->m_multi_operation_count > 0) {
+        while (i < total_op_count) {
                 // dice
-                p = ((double) rand() / (RAND_MAX));
+                r = ((double) rand() / (RAND_MAX));
 
-                if (p < percent_of_single && m_single_operation_count > 0) {
-                        // create single color operation
-                        txns[i] = new ycsb_insert(0, m_range, single_color);
-                        m_single_operation_count--;
-                        i++;
-                        
-                } else if (p >= percent_of_single && m_multi_operation_count > 0) {
-                        // create multi color operation
-                        txns[i] = new ycsb_insert(0, m_range, multi_color);
-                        m_multi_operation_count--;
-                        i++;
+                for (auto j = 0; j < proportions.size(); j++) {
+                        if (proportions[j] > r && allocations[j] > 0) { 
+                                txns[i] = new ycsb_insert(0, m_range, &(*m_workload)[j].color);
+                                allocations[j] = allocations[j] - 1;
+                                i++;
+                                break;
+                        }
                 }
         }
 

@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/file.h>
-#include "worker.h"
+#include <worker.h>
 
 extern "C" {
         #include "fuzzy_log.h"
@@ -24,80 +24,51 @@ void write_output(uint32_t client_id, double result) {
         result_file.close();        
 }
 
-void run_YCSB(vector<uint32_t> *colors, uint32_t single_operation_count, uint32_t multi_operation_count) {
-        uint32_t i, total_operation_count, operation_per_worker, remainder;
+void do_experiment(config cfg) {
+        uint32_t total_op_count;
         HashMap *map;
         workload_generator *workload_gen;
         Txn** txns;
-        vector<Worker*> workers;
-        uint32_t num_workers;
-        num_workers = 1;        // FIXME
+        Worker* worker;
 
         // Fuzzymap
-        map = new HashMap(colors);
+        map = new HashMap(&cfg.log_addr);
 
-        uint32_t range = 100000;
-               
-        // Generate update workloads
-        // distribution : uniform
-        workload_gen = new workload_generator(range, colors, single_operation_count, multi_operation_count);
+        // Generate append workloads: uniform distribution
+        workload_gen = new workload_generator(cfg.expt_range, &cfg.workload);
         txns = workload_gen->Gen();
         
-        // Assign workloads to worker threads
-        total_operation_count = single_operation_count + multi_operation_count;
-        operation_per_worker = total_operation_count / num_workers; 
-        remainder = total_operation_count % num_workers;
-
-        workers.reserve(num_workers);
-        for (i = 0; i < num_workers; ++i) {
-                if (i == num_workers - 1)
-                        workers.push_back(new Worker(map, txns + i * operation_per_worker, operation_per_worker + remainder));
-                else
-                        workers.push_back(new Worker(map, txns + i * operation_per_worker, operation_per_worker));
+        // One worker thread
+        total_op_count = 0;
+        for (auto w : cfg.workload) { 
+                total_op_count = w.op_count; 
         }
-
-        auto start = get_time::now();
+        worker = new Worker(map, txns, total_op_count, cfg.async, cfg.window_size);
 
         // Run workers
-        for (i = 0; i < num_workers; ++i)
-                workers[i]->run();
- 
-        for (i = 0; i < num_workers; ++i)
-                pthread_join(*workers[i]->get_pthread_id(), NULL);
-
-
-        // Measure duration 
+        auto start = get_time::now();
+        worker->run();
+        pthread_join(*worker->get_pthread_id(), NULL);
         auto end = get_time::now();
+        // Measure duration 
         chrono::duration<double> diff = end - start;
 
         // Write to output file
-        write_output(colors->at(0), total_operation_count / diff.count());
+        cout << total_op_count / diff.count() << endl;
+        write_output(cfg.client_id, total_op_count / diff.count());
         
         // Free
-        for (i = 0; i < num_workers; ++i)
-                delete workers[i];
+        delete worker;
         delete map;
         delete workload_gen;
 }
 
-
 int main(int argc, char** argv) {
-        if (argc != 5) {
-                cout << "Usage: ./build/hashmap <local_color> <remote_color> <single_append_op_count> <multi_append_op_count>" << endl;
-                return 0;
-        }
 
-        vector<uint32_t> colors;
-        uint32_t single_operation_count, multi_operation_count;
+        config_parser cfg_parser;
+        config cfg = cfg_parser.get_config(argc, argv);
 
-        colors.reserve(2);
-        colors.push_back(atoi(argv[1]));
-        colors.push_back(atoi(argv[2]));
+        do_experiment(cfg);
 
-        single_operation_count = atoi(argv[3]);
-        multi_operation_count = atoi(argv[4]);
-
-        run_YCSB(&colors, single_operation_count, multi_operation_count); 
-        
         return 0;
 }

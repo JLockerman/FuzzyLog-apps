@@ -21,14 +21,21 @@ void* Worker::bootstrap(void *arg) {
         Worker *worker = (Worker*)arg;
         HashMap *map = worker->m_map;
 
-        if (ASYNC_WRITE) {
+        if (worker->m_async) {
                 // Send requests
-                for (i = 0; i < WINDOW_SIZE; i++) {
-                        worker->m_txns[i]->AsyncRun(map);
-                }
-                for (i = WINDOW_SIZE; i < worker->m_num_txns; i++) {
-                        map->wait_for_any_put();
-                        worker->m_txns[i]->AsyncRun(map);
+                if (worker->m_num_txns < worker->m_window_size) {
+                        for (i = 0; i < worker->m_num_txns; i++) {
+                                worker->m_txns[i]->AsyncRun(map);
+                        }
+                } else {
+                        // Windowing
+                        for (i = 0; i < worker->m_window_size; i++) {
+                                worker->m_txns[i]->AsyncRun(map);
+                        }
+                        for (i = worker->m_window_size; i < worker->m_num_txns; i++) {
+                                map->wait_for_any_put();
+                                worker->m_txns[i]->AsyncRun(map);
+                        }
                 }
                 map->wait_for_all();
                 // Write latency output 
@@ -40,7 +47,6 @@ void* Worker::bootstrap(void *arg) {
                 // Write latency output 
                 worker->m_map->write_output_for_latency("scripts/latency_sync.txt");
         }
-
         
         return NULL;
 }
