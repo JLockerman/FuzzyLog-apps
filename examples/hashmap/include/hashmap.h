@@ -55,6 +55,8 @@ public:
         HashMap(std::vector<std::string>* log_addr);
         ~HashMap();
 
+        void init_fuzzylog_client(std::vector<std::string>* log_addr);
+
         // Synchronous operations
         uint32_t get(uint32_t key, struct colors* op_color);
         void put(uint32_t key, uint32_t value, struct colors* op_color);

@@ -7,6 +7,10 @@
 static char out[DELOS_MAX_DATA_SIZE];
 
 HashMap::HashMap(std::vector<std::string>* log_addr) {
+        init_fuzzylog_client(log_addr);        
+}
+
+void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
         // FIXME: using temp snapshot color 
         struct colors color; 
         color.numcolors = 1;

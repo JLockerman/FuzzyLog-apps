@@ -89,6 +89,11 @@ private:
 		        std::cerr << "--" << long_options[WORKLOAD].name << "\n";
 			exit(-1);
 		}
+
+                if (_arg_map.count(ASYNC) == 0 && _arg_map.count(WINDOW_SIZE) > 0) {
+                        std::cerr << "Error. --" << long_options[WINDOW_SIZE].name << " should be set with --" << long_options[ASYNC].name << " turned on\n";
+                        exit(-1);
+                }
 		
                 // log_addr
                 ret.log_addr = split(std::string(_arg_map[LOG_ADDR]), ',');
