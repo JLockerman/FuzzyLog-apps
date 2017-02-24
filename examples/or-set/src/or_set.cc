@@ -37,8 +37,7 @@ void or_set::get_remote_updates()
 	
 	snapshot(_log_client);
 	while (true) {
-		auto gn_ret = get_next(_log_client, _buf, &buf_sz, &c);
-		assert(gn_ret == 0);		
+		get_next(_log_client, _buf, &buf_sz, &c);
 	
 		if (c.numcolors == 0)
 			break;
@@ -85,13 +84,19 @@ uint64_t or_set::gen_guid()
 
 void or_set::serialize_add(uint64_t e, uint64_t guid, char **buf, size_t *sz)
 {
-	auto rbuf = static_cast<uint64_t*>(malloc(sizeof(uint64_t)*3));
-		
+	uint64_t *rbuf;
+
+	if (*buf == NULL) {
+		rbuf = static_cast<uint64_t*>(malloc(sizeof(uint64_t)*3));
+		*buf = reinterpret_cast<char*>(rbuf);
+	} else {
+		rbuf = reinterpret_cast<uint64_t*>(*buf);
+	}
+
 	rbuf[0] = make_opcode(ADD);
 	rbuf[1] = e;
 	rbuf[2] = guid;
 	
-	*buf = reinterpret_cast<char*>(rbuf);
 	*sz = sizeof(uint64_t)*3;
 	return;		
 }
@@ -101,16 +106,33 @@ void or_set::send_add(uint64_t e, uint64_t guid)
 	char *buf;
 	size_t sz;
 	
+	buf = NULL;	
 	serialize_add(e, guid, &buf, &sz);
 	append(_log_client, buf, sz, _color, NULL);
 }
+
+write_id or_set::send_add_async(uint64_t e, uint64_t guid, char *buf)
+{
+	size_t sz;
+	serialize_add(e, guid, &buf, &sz);	
+	return async_append(_log_client, buf, sz, _color, NULL);
+}
+
 
 void or_set::serialize_remove(uint64_t e, const std::set<uint64_t> &guid_set, char **buf, size_t *sz)
 {
 	assert(guid_set.size() > 0);
 	
-	auto rbuf = static_cast<uint64_t*>(malloc(sizeof(uint64_t)*2 + sizeof(uint64_t)*guid_set.size()));
+	uint64_t *rbuf;	
+
+	if (*buf == NULL) {
+		rbuf = static_cast<uint64_t*>(malloc(sizeof(uint64_t)*2 + sizeof(uint64_t)*guid_set.size()));
+		*buf = reinterpret_cast<char*>(rbuf);
+	} else {
+		rbuf = reinterpret_cast<uint64_t*>(*buf);		
+	}	
 	rbuf[0] = make_opcode(REMOVE);
+
 	rbuf[1] = e;
 
 	auto i = 2;
@@ -119,7 +141,6 @@ void or_set::serialize_remove(uint64_t e, const std::set<uint64_t> &guid_set, ch
 		i += 1;
 	}	
 
-	*buf = reinterpret_cast<char*>(rbuf);
 	*sz = sizeof(uint64_t)*(2 + guid_set.size());
 }
 
@@ -128,8 +149,18 @@ void or_set::send_remove(uint64_t e, const std::set<uint64_t> &guid_set)
 	char *buf;
 	size_t sz;
 	
+	buf = NULL;	
 	serialize_remove(e, guid_set, &buf, &sz);
 	append(_log_client, buf, sz, _color, NULL);
+}
+
+write_id or_set::send_remove_async(uint64_t e, const std::set<uint64_t> &guid_set, char *buf)
+{
+	assert(buf != NULL);
+	size_t sz;
+	
+	serialize_remove(e, guid_set, &buf, &sz);
+	return async_append(_log_client, buf, sz, _color, NULL);
 }
 
 void or_set::do_add(uint64_t e, uint64_t guid)
@@ -214,5 +245,25 @@ void or_set::remove(uint64_t e)
 		auto guid_set = _state[e];
 		do_remove(e, guid_set);
 		send_remove(e, guid_set);
+	}
+}
+
+write_id or_set::async_add(uint64_t e, char *buf)
+{
+	{
+		std::lock_guard<std::mutex> lck(_instance_mutex);
+		auto guid = gen_guid();
+		do_add(e, guid);	
+		return send_add_async(e, guid, buf);
+	}	
+}
+
+write_id or_set::async_remove(uint64_t e, char *buf)
+{
+	{
+		std::lock_guard<std::mutex> lck(_instance_mutex);
+		auto guid_set = _state[e];
+		do_remove(e, guid_set);
+		return send_remove_async(e, guid_set, buf);
 	}
 }

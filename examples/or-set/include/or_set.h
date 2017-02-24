@@ -12,13 +12,16 @@ extern "C" {
 }
 
 class or_set {
-private:
-	
+public:
 	/* Opcodes for fuzzy log entries */
 	typedef enum {
 		ADD = 0,
 		REMOVE = 1,
+		READ = 2,
 	} log_opcode;
+		
+
+private:
 	
 	struct colors 						*_color;
 	DAGHandle 						*_log_client;
@@ -47,7 +50,9 @@ private:
 	/* Send local add/remove info to the fuzzy log. */
 	void send_add(uint64_t e, uint64_t guid);
 	void send_remove(uint64_t e, const std::set<uint64_t> &guid_set);
-	
+	write_id send_add_async(uint64_t e, uint64_t guid, char *buf);
+	write_id send_remove_async(uint64_t e, const std::set<uint64_t> &guid_set, char *buf);
+
 	/* Receive and process remote add/remove info from the fuzzy log. */	
 	void remote_remove(char *buf, size_t sz);
 	void remote_add(char *buf, size_t sz);
@@ -61,7 +66,9 @@ private:
 	void check_remotes();
 
 public:
-	
+
+
+
 	/* 
 	 * handle is created by the caller. 
 	 * 
@@ -83,4 +90,7 @@ public:
 	
 	/* Remove e from the or-set */
 	void remove(uint64_t e);
+	
+	write_id async_add(uint64_t e, char *buf);
+	write_id async_remove(uint64_t e, char *buf);
 };
