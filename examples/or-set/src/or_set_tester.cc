@@ -36,7 +36,7 @@ void or_set_tester::issue_request(tester_request *rq)
 	_request_map[w_id] = or_rq;
 }
 
-void or_set_tester::wait_request(std::set<tester_request*> &done_set) 
+void or_set_tester::wait_requests(std::set<tester_request*> &done_set) 
 {
 	while (true) {
 		auto w_id = try_wait_for_any_append(_fuzzylog);

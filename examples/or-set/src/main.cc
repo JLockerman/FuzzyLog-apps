@@ -1,4 +1,5 @@
 #include <or_set.h>
+#include <or_set_tester.h>
 #include <chrono>
 #include <worker.h>
 #include <workload_generator.h>
@@ -21,15 +22,22 @@ void write_output(config cfg, const std::vector<uint64_t> &results)
 	result_file.close();
 }
 
-void gen_input(uint64_t range, uint64_t num_inputs, std::vector<uint64_t> &output)
+void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*> &output)
 {
 	workload_generator gen(range);
 	uint64_t i;
 	
-	for (i = 0; i < num_inputs; ++i) 
-		output.push_back(gen.gen_next());
+	for (i = 0; i < num_inputs; ++i) {
+		auto rq = static_cast<or_set_rq*>(malloc(sizeof(or_set_rq))); 
+		rq->_key = gen.gen_next();
+		rq->_opcode = or_set::log_opcode::ADD;
+		
+		auto temp = reinterpret_cast<tester_request*>(rq);
+		output.push_back(temp);
+	} 
 }
 
+/*
 void measure_fn(worker *w, uint64_t duration, std::vector<uint64_t> &results)
 {
 	uint64_t start_iters, end_iters;
@@ -78,6 +86,23 @@ void do_experiment(config cfg, std::vector<uint64_t> &results)
 	worker_thread.join();
 	delete(w);
 }
+*/
+
+void do_experiment(config cfg)
+{
+	struct colors c;
+	c.numcolors = 1;
+	c.mycolors = new ColorID[0];
+	c.mycolors[0] = cfg.server_id;
+	auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
+	auto orset = new or_set(handle, &c, cfg.server_id, cfg.sync_duration);	
+
+	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
+	std::vector<tester_request*> inputs;	
+	
+	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 
+	tester->run(inputs);		
+}
 
 int main(int argc, char **argv) 
 {
@@ -85,7 +110,6 @@ int main(int argc, char **argv)
 	config_parser cfg_prser;			
 	config cfg = cfg_prser.get_config(argc, argv);
 
-	do_experiment(cfg, results);	
-	write_output(cfg, results);
+	do_experiment(cfg);	
 	return 0;
 }

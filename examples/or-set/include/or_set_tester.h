@@ -41,7 +41,7 @@ private:
 	
 protected:
 	void issue_request(tester_request *rq);
-	void wait_request(std::set<tester_request*> &done_set); 
+	void wait_requests(std::set<tester_request*> &done_set); 
 
 public:
 	or_set_tester(uint32_t window_sz, or_set *set, DAGHandle *fuzzylog);
