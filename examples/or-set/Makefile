@@ -1,11 +1,12 @@
-CFLAGS=-O3 -Wall -Wextra -std=c++11 -Wno-sign-compare
+CFLAGS=-O3 -Wall -Wextra -std=c++14 -Wno-sign-compare
 CC=g++
 
 DELOS_LIB=$(DELOS_RUST_LOC)/examples/c_linking/target/release $(DELOS_RUST_LOC)/src/*
+DELOS_INC=$(DELOS_RUST_LOC)/examples/c_linking
 LIB_DIRS=./libs/lib/ $(DELOS_LIB)
 LIBPATH=$(foreach d, $(LIB_DIRS), -L$d)
 LIBS=-pthread -lc_link -ldl -lrt
-INC_DIRS=include $(DELOS_APPS_LOC)/common
+INC_DIRS=include $(DELOS_APPS_LOC)/common $(DELOS_RUST_LOC)/examples/c_linking
 INCLUDE=$(foreach d, $(INC_DIRS), -I$d)
 SRC=src
 SOURCES:=$(wildcard $(SRC)/*.cc $(SRC)/*.c)
