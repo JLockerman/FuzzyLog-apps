@@ -73,7 +73,7 @@ private:
 		    _arg_map.count(SERVER_ID) == 0 || 
 		    _arg_map.count(SYNC_DURATION) == 0 ||
 		    _arg_map.count(NUM_RQS) == 0 ||
-		    _arg_map.count(WINDOW_SZ)) {
+		    _arg_map.count(WINDOW_SZ) == 0) {
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_DURATION].name << "\n";

@@ -1,5 +1,6 @@
 #include <tester.h>
 #include <fuzzy_log.h>
+#include <iostream>
 
 async_tester::async_tester(uint32_t window_sz)
 {
@@ -11,13 +12,12 @@ uint32_t async_tester::try_get_pending()
 	std::set<tester_request*> done_rqs;
 	
 	done_rqs.clear();
-	do {
-		wait_requests(done_rqs);
-	} while (done_rqs.size() == 0);
+	wait_requests(done_rqs);
 	
 	auto end_time = std::chrono::system_clock::now();
 	for (auto rq : done_rqs) 
 		rq->_end_time = end_time;
+//	std::cerr << "Done requests: " << done_rqs.size() << "\n";
 	return done_rqs.size();
 }
 
@@ -38,5 +38,6 @@ std::chrono::milliseconds async_tester::run(std::vector<tester_request*> request
 		num_pending -= try_get_pending();
 	}	
 	auto end_time = std::chrono::system_clock::now();
+	std::cerr << "Done!\n";
 	return std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time); 
 }

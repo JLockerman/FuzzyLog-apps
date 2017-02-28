@@ -95,6 +95,7 @@ void do_experiment(config cfg)
 	c.mycolors = new ColorID[0];
 	c.mycolors[0] = cfg.server_id;
 	auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
+	std::cerr << "Created handle!\n";
 	auto orset = new or_set(handle, &c, cfg.server_id, cfg.sync_duration);	
 
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);

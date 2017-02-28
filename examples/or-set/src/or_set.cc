@@ -115,6 +115,8 @@ write_id or_set::send_add_async(uint64_t e, uint64_t guid, char *buf)
 {
 	size_t sz;
 	serialize_add(e, guid, &buf, &sz);	
+//	std::cerr << "Serialized request!\n";
+//	std::cerr << "Request size: " << sz << "\n";
 	return async_append(_log_client, buf, sz, _color, NULL);
 }
 

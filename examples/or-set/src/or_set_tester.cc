@@ -1,4 +1,5 @@
 #include <or_set_tester.h>
+#include <iostream>
 #include <cassert>
 
 or_set_tester::or_set_tester(uint32_t window_sz, or_set *set, DAGHandle *fuzzylog)
@@ -20,6 +21,7 @@ void or_set_tester::issue_request(tester_request *rq)
 	auto fuzzy_buf = _freelist;
 	_freelist = fuzzy_buf->_next;	
 
+//	std::cerr << "Issuing request!\n";
 	switch (or_rq->_opcode) {
 	case or_set::log_opcode::ADD:
 		w_id = _or_set->async_add(or_rq->_key, fuzzy_buf->_buf);
@@ -30,7 +32,6 @@ void or_set_tester::issue_request(tester_request *rq)
 	default:
 		assert(false);
 	}
-	
 	assert(_request_map.count(w_id) == 0);
 	or_rq->_buffer = fuzzy_buf;
 	_request_map[w_id] = or_rq;
@@ -38,8 +39,13 @@ void or_set_tester::issue_request(tester_request *rq)
 
 void or_set_tester::wait_requests(std::set<tester_request*> &done_set) 
 {
+	
 	while (true) {
+//		std::cerr << "In iter loop!\n";
 		auto w_id = try_wait_for_any_append(_fuzzylog);
+//		std::cerr << "wait returned\n";
+//		std::cerr << w_id.p1 << " " << w_id.p2 << "\n";
+//		std::cerr << wid_equality{}(w_id, WRITE_ID_NIL) << "\n";
 		if (wid_equality{}(w_id, WRITE_ID_NIL))
 			break;
 
