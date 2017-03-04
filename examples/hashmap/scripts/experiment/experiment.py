@@ -10,18 +10,29 @@ from fabric.api import run
 
 
 # Command to Fuzzymap
-fmt_cmd = "../build/hashmap {0} {1} {2} {3}"
+async_test_cmd = "../build/hashmap --log_addr={0} --expt_range={1} --client_id={2} --workload={3} --async --window_size={4}"
+sync_test_cmd = "../build/hashmap --log_addr={0} --expt_range={1} --client_id={2} --workload={3}"
 tmp_result_dir = 'result'
 
-def main():
-    do_scalability_experiment()
+SERVER1 = '52.15.156.76:9990'
+SERVER2 = '52.14.1.7:9990'
+SERVER3 = '52.14.27.81:9990'
 
-def do_scalability_experiment():
-    results = test_single_append([1, 2, 4, 8, 16, 32], 100)
+LOG_ADDR = SERVER1 + "," + SERVER2 + "," + SERVER3
+EXPT_RANGE = 10000
+OP_COUNT = 1000
+
+def main():
+    do_scalability_experiment(True, 32)
+    #do_multiappend_experiment(True, 32)
+
+def do_scalability_experiment(async, window_size):
+    results = test_single_append([1, 2, 4, 8, 16, 32], 100, async, window_size)
     write_output(results, 'single_append.txt')
 
-def do_multiappend_experiment():
-    results = test_multiappend([0, 20, 40, 60, 80, 100], 100)
+def do_multiappend_experiment(async, window_size):
+    results = test_multiappend([20], 1, async, window_size)
+    #results = test_multiappend([0, 20, 40, 60, 80, 100], 100, async, window_size)
     write_output(results, 'multiappend.txt')
 
 def write_output(results, filename):
@@ -43,12 +54,12 @@ def postprocess_results(vals):
 
 
 # Run single append test (with all stat)
-def test_single_append(num_clients, sample):
+def test_single_append(num_clients, sample, async, window_size):
     summary = {}
     for num_client in num_clients:
         s = [] 
         for i in range(sample):
-            results = measure_single_append(num_client)
+            results = measure_single_append(num_client, async, window_size)
             print 'Num client: {0}, Run {1}'.format(num_client, i)
             val = calculate_metric(results)
             logging('single_append', num_client, i, val)
@@ -57,12 +68,17 @@ def test_single_append(num_clients, sample):
     return summary
 
 # Run multiappend test (with all stat)
-def test_multiappend(multiappend_percents, sample):
+def test_multiappend(multiappend_percents, sample, async, window_size):
     summary = {}
     for multiappend_percent in multiappend_percents:
         s = [] 
         for i in range(sample):
-            results = measure_multiappend(multiappend_percent)
+            multi_op_count = int(OP_COUNT * multiappend_percent / 100.0) 
+            single_op_count = OP_COUNT - multi_op_count 
+            workload_client1 = "0={s},0:1={m}".format(s=single_op_count, m=multi_op_count)
+            workload_client2 = "1={s},0:1={m}".format(s=single_op_count, m=multi_op_count)
+
+            results = measure_multiappend(workload_client1, workload_client2, async, window_size)
             print 'Multiappend percent: {0}, Run {1}'.format(multiappend_percent, i)
             val = calculate_metric(results)
             logging('multi_append', multiappend_percent, i, val)
@@ -72,17 +88,17 @@ def test_multiappend(multiappend_percents, sample):
 
 
 # Run single append test (by number of clients)
-def measure_single_append(num_client):
+def measure_single_append(*args):
     preprocess()
-    run_single_append_test(num_client)
+    run_single_put_test(*args)
     results = gather_raw_data(tmp_result_dir)
     postprocess()
     return results
 
 # Run multiappend test
-def measure_multiappend(percent):
+def measure_multiappend(*args):
     preprocess()
-    run_multiappend_test(percent)
+    run_multi_put_test(*args)
     results = gather_raw_data(tmp_result_dir)
     postprocess()
     return results
@@ -108,16 +124,19 @@ def make_result_directory(dirname):
     os.mkdir(dirname)
 
 # Run single append test 
-def run_single_append_test(num_client):   
-    clients = [(10000, i) for i in range(num_client)]
-    run_single_append_clients(clients)
+def run_single_put_test(num_client, async, window_size):   
+    clients = []
+    for i in range(num_client):
+        workload = "{color}={op_count}".format(color=i, op_count=OP_COUNT)
+        clients.append((LOG_ADDR, EXPT_RANGE, i, workload, async, window_size))
+    run_clients(clients)
 
 # Run multiappend test
-def run_multiappend_test(multiappend_percent):
+def run_multi_put_test(workload_client1, workload_client2, async, window_size):
     clients = []
-    clients.append((10000, 0, 1, multiappend_percent)) 
-    clients.append((10000, 1, 0, multiappend_percent))
-    run_multi_append_clients(clients)
+    clients.append((LOG_ADDR, EXPT_RANGE, 0, workload_client1, async, window_size)) 
+    clients.append((LOG_ADDR, EXPT_RANGE, 1, workload_client2, async, window_size))
+    run_clients(clients)
 
 # Gather all data from a given directory
 def gather_raw_data(dirname):
@@ -150,46 +169,28 @@ def logging(*args):
         f.write(line + "\n") 
 
 # Client threads
-class SingleAppendClient(threading.Thread):
-    def __init__(self, op_count, append_color):
+class FuzzyMapClient(threading.Thread):
+    def __init__(self, log_addr, expt_range, client_id, workload, async, window_size):
         threading.Thread.__init__(self)
-        self._op_count= op_count
-        self._append_color = append_color
-
+        self._log_addr = log_addr
+        self._expt_range = expt_range
+        self._client_id = client_id
+        self._workload = workload
+        self._async = async
+        self._window_size = window_size 
+         
     def run(self):
-        cmd = fmt_cmd.format(self._append_color, self._append_color, self._op_count, 0)
-        os.system(cmd)
-
-class MultiAppendClient(threading.Thread):
-    def __init__(self, op_count, local_color, remote_color, remote_percent): 
-        threading.Thread.__init__(self) 
-        self._op_count = op_count
-        self._local_color = local_color
-        self._remote_color = remote_color
-        self._remote_percent = remote_percent
-
-    def run(self):
-        multi_op_count = int(self._op_count * self._remote_percent / 100.0)
-        single_op_count = self._op_count - multi_op_count 
-        cmd = fmt_cmd.format(self._local_color, self._remote_color, single_op_count, multi_op_count)
+        if self._async:
+                cmd = async_test_cmd.format(self._log_addr, self._expt_range, self._client_id, self._workload, self._window_size)
+        else:
+                cmd = sync_test_cmd.format(self._log_addr, self._expt_range, self._client_id, self._workload)
         os.system(cmd)
 
 # Run single append clients 
-def run_single_append_clients(clients):
+def run_clients(clients):
     threads = []
-    for op_cnt, color in clients:
-        thread = SingleAppendClient(op_cnt, color)  # only single color operation
-        thread.start()
-        threads.append(thread)
-
-    for t in threads:
-        t.join()
-
-# Run single append clients 
-def run_multi_append_clients(clients):
-    threads = []
-    for op_cnt, local_color, remote_color, remote_percent in clients:
-        thread = MultiAppendClient(op_cnt, local_color, remote_color, remote_percent)  # only single color operation
+    for c in clients:
+        thread = FuzzyMapClient(*c)
         thread.start()
         threads.append(thread)
 

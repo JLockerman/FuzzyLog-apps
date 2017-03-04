@@ -51,7 +51,7 @@ set label 1 "(a) 2K async appends (window size = 32)" at 4,790 font ",30"
 
 
 # plot
-plot for [COL=2:2] "latency_async.data" using COL:xticlabels(1) fillcolor rgb "#FF0000"
+plot for [COL=2:2] "../latency_async.txt.out" using COL:xticlabels(1) fillcolor rgb "#FF0000"
 
 
 
@@ -67,4 +67,4 @@ set yrange[0:2000]
 unset label 1
 set label 1 "(b) 2K sync appends" at 6,2250 font ",30"
 
-plot for [COL=2:2] "latency_sync.data" using COL:xticlabels(1) fillcolor rgb "#FF235C"
+plot for [COL=2:2] "../latency_sync.txt.out" using COL:xticlabels(1) fillcolor rgb "#FF235C"

@@ -96,12 +96,18 @@ void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color) {
         m_start_time_map[nwid] = start_time;
 }
 
-void HashMap::wait_for_any_put() {
+void HashMap::flush_completed_puts() {
+        // Flush completed requests best-effort
+        flush_completed_appends(m_fuzzylog_client);
+}
+
+new_write_id HashMap::wait_for_any_put() {
         // Wait for any append to completed
         write_id wid = wait_for_any_append(m_fuzzylog_client);
-        // TODO: handle NIL (returned if there is no pending append)
         new_write_id nwid;
         nwid.id = wid; 
+
+        if (nwid == NEW_WRITE_ID_NIL) return nwid;      // no more pending appends 
 
         // Measure latency
         auto searched = m_start_time_map.find(nwid);
@@ -110,20 +116,10 @@ void HashMap::wait_for_any_put() {
         auto latency = end_time - searched->second;
         m_latencies.push_back(latency);
         m_start_time_map.erase(nwid);
+        
+        return nwid;
 }
 
-void HashMap::wait_for_all() {
-        while (true) {
-                if (m_start_time_map.size() == 0) break;
-                wait_for_any_put();
-        }
-}
-
-void HashMap::write_output_for_latency(const char* filename) {
-        std::ofstream result_file; 
-        result_file.open(filename, std::ios::out);
-        for (auto l : m_latencies) {
-                result_file << l.count() << "\n"; 
-        }
-        result_file.close();        
+void HashMap::wait_for_all_puts() {
+        wait_for_all_appends(m_fuzzylog_client);
 }

@@ -42,15 +42,13 @@ namespace std {
 class HashMap {
 
 private:
-        std::vector<std::string>*                       m_log_addr;
         std::unordered_map<uint32_t, uint32_t>          m_cache;  
         DAGHandle*                                      m_fuzzylog_client;
-        std::mutex                                      m_fuzzylog_mutex;
        
         // Map for tracking latencies
         std::unordered_map<new_write_id, std::chrono::time_point<std::chrono::system_clock>>   m_start_time_map;
-        static std::mutex                                                                      m_start_time_map_mtx;
         std::vector<std::chrono::duration<double>>                                             m_latencies;
+
 public:
         HashMap(std::vector<std::string>* log_addr);
         ~HashMap();
@@ -64,7 +62,7 @@ public:
 
         // Asynchronous operations
         void async_put(uint32_t key, uint32_t value, struct colors* op_color);
-        void wait_for_any_put();
-        void wait_for_all();
-        void write_output_for_latency(const char* filename);
+        void flush_completed_puts();
+        new_write_id wait_for_any_put();
+        void wait_for_all_puts();
 };
