@@ -1,6 +1,11 @@
 # EC2
-REGION = 'us-east-2'
-KEYFILE = '~/.ssh/juno.pem'
+US_EAST_2 = 'us-east-2'
+AP_NORTHEAST_1 = 'ap-northeast-1'
+REGIONS = [US_EAST_2, AP_NORTHEAST_1]
+KEYFILE = {
+        US_EAST_2: '~/.ssh/juno.pem',
+        AP_NORTHEAST_1: '~/.ssh/juno-asia.pem'
+}
 
 # Fuzzylog
 FUZZYLOG_PORT = 9990

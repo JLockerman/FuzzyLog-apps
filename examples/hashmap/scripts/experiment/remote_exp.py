@@ -11,72 +11,8 @@ import subprocess
 import time
 
 import settings
+from ec2_helper import *
 
-# Returns a list of running instances. 
-def get_running_instances(region):
-	ec2 = boto.ec2.connect_to_region(region)
-	reservations = ec2.get_all_reservations()
-	running = []
-	for r in reservations:
-		for i in r.instances:
-			if i.state == 'running':
-				running.append(i)
-	return running	
-
-# Returns a list of stopped instance ids.
-def get_stopped_instances(region):
-	ec2 = boto.ec2.connect_to_region(region)	
-	reservations = ec2.get_all_reservations()	
-	stopped = []
-	for r in reservations:
-		for i in r.instances:
-			if i.state == 'stopped':
-				stopped.append(i.id)
-	return stopped
-
-# Start a list of stopped instances.
-def start_instances(region, instance_ids):
-	ec2 = boto.ec2.connect_to_region(region)
-	instances = ec2.start_instances(instance_ids=instance_ids)
-	
-	started = True
-	while True:
-		for i in instances:
-			i.update()
-			if i.state != 'running':
-				started = False	
-		if started == False:
-			started = True
-			time.sleep(5)
-		else:
-			break
-	return instances
-
-# Launch an EC2 instance. 
-def launch_instance(region, image_id, instance_type, subnet_id, security_group):
-	ec2 = boto.ec2.connect_to_region(region)
-
-	reservation = ec2.run_instances(image_id=image_id, min_count=1, max_count=1, 
-		          	      instance_type=instance_type, 
-			  	      subnet_id=subnet_id,
-				      security_group_ids=[security_group])
-	return reservation 
-
-# Stop the specified list of instances.
-def stop_instances(region, instance_list):
-	ec2 = boto.ec2.connect_to_region(region)	
-	instance_ids = list(map(lambda x: x.id, instance_list)) 
-	stopped = ec2.stop_instances(instance_ids=instance_ids)
-	while True:
-		try_again = False
-		for inst in stopped:
-			inst.update()
-			if inst.state != 'stopped':
-				try_again = True
-		if try_again == True:
-			time.sleep(2)
-		else:
-			break
 			
 def launch_fuzzymap(fabhost, keyfile, logaddr, exp_range, exp_duration, client_id, workload, async, window_size):
         launch_str = 'fuzzymap_proc:' + logaddr
@@ -94,96 +30,40 @@ def launch_fuzzylog(fabhost, keyfile, port, nthreads=-1):
 	proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])  
 	return proc
 
-
-# Start stopped instances.
-def wakeup_instances(region):
-	instance_ids = get_stopped_instances(region)
-	return start_instances(region, instance_ids)
-
-# Launch a set of new EC2 instances. 
-def launch_instances(num_instances, region, instance_type, image_type):
-	instances = []
-	reservations = []
-	for i in range(0, num_instances):
-		reservations.append(launch_instance(region, instance_type, image_type))
-	for res in reservations:
-		instances += res.instances
-
-def test_proc(ipaddr, keyfile):
-	login = 'ubuntu@' + ipaddr
-	proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', login, 'ls_test'])
-	return proc
-
-def test_iteration(instance_list, keyfile):
-	procs = []
-	for inst in instance_list:
-		procs.append(test_proc(inst['public'], keyfile))
-	
-	for p in procs:
-		p.wait()
-			
-	for p in procs:
-		if p.returncode != 0:
-			return False 
-	return True
-
-def test_instances(instance_list, keyfile):
-	while True:
-		if test_iteration(instance_list, keyfile) == True:
-			break 
-		time.sleep(5)
-
-def get_filtered_servers(filters):
-	ec2 = boto.ec2.connect_to_region(settings.REGION)
-        reservations = ec2.get_all_reservations(filters=filters)
-	filtered = []
-	for r in reservations:
-		for i in r.instances:
-		        filtered.append(i.id)
-	return filtered 
-
-def get_fuzzylog_servers():
+def get_fuzzylog_servers(region):
         server_type = "fuzzylog server"
         filters = { "tag:Type": server_type }
-        return get_filtered_servers(filters)
+        return get_filtered_servers(region, filters)
 
-def get_fuzzylog_lockserver():
+def get_fuzzylog_lockserver(region):
         server_type = "fuzzylog lockserver"
         filters = { "tag:Type": server_type }
-        return get_filtered_servers(filters)
+        return get_filtered_servers(region, filters)
 
-def get_fuzzylog_clients():
+def get_fuzzylog_clients(region):
         server_type = "fuzzylog client"
         filters = { "tag:Type": server_type }
-        return get_filtered_servers(filters)
+        return get_filtered_servers(region, filters)
 
-def to_ip(instances):
-        return list(map(lambda x: {'public' : x.ip_address, 'private' : x.private_ip_address}, instances))
-
-def addr_to_str(ips, port): 
-        # escape comma
-        return "\,".join(["{0}:{1}".format(s['public'], port) for s in ips]) 
-
-def start_and_test_fuzzylog_servers():
-        instance_ids = get_fuzzylog_lockserver() + get_fuzzylog_servers()
-        instances = start_instances(settings.REGION, instance_ids)
+def start_and_test_fuzzylog_servers(region):
+        instance_ids = get_fuzzylog_lockserver(region) + get_fuzzylog_servers(region)
+        instances = start_instances(region, instance_ids)
         # test servers
         instance_ips = to_ip(instances)
-        test_instances(instance_ips, settings.KEYFILE)
+        test_instances(instance_ips, settings.KEYFILE[region])
         return instances
 
-def start_and_test_fuzzylog_clients():
-        instance_ids = get_fuzzylog_clients()
-        instances = start_instances(settings.REGION, instance_ids)
+def start_and_test_fuzzylog_clients(region):
+        instance_ids = get_fuzzylog_clients(region)
+        instances = start_instances(region, instance_ids)
         # test servers
         instance_ips = to_ip(instances)
-        test_instances(instance_ips, settings.KEYFILE)
+        test_instances(instance_ips, settings.KEYFILE[region])
         return instances
-
 
 def fuzzymap_single_put_test(server_ips, client_ips, num_clients, window_size):
 	fabhost_prefix = 'ubuntu@' 
-        keyfile = settings.KEYFILE
+        keyfile = settings.KEYFILE[0]   # deprecated
         fuzzylog_port = settings.FUZZYLOG_PORT
         
         # cleanup servers and clients 
@@ -245,7 +125,7 @@ def fuzzymap_multiput_test(server_ips, client_ips, percent, window_size):
         assert len(client_ips) >= 2, "At lease 2 instances are required for this test."
 
 	fabhost_prefix = 'ubuntu@' 
-        keyfile = settings.KEYFILE
+        keyfile = settings.KEYFILE[0]           # deprecated
         fuzzylog_port = settings.FUZZYLOG_PORT
         
         # cleanup servers and clients 
@@ -366,12 +246,12 @@ def postprocess_results(vals):
     high_idx = int(len(vals)*0.95)
     return [vals[median_idx]/float(1000), vals[low_idx]/float(1000), vals[high_idx]/float(1000)]
 
-def test_scalability(clients, window_size):
+def test_scalability(region, clients, window_size):
         summary = {}
         for c in clients: 
                 # start servers
-                servers = start_and_test_fuzzylog_servers() 
-                clients = start_and_test_fuzzylog_clients() 
+                servers = start_and_test_fuzzylog_servers(region)
+                clients = start_and_test_fuzzylog_clients(region)
 
                 # TODO: do experiment 
                 server_ips = to_ip(servers)
@@ -379,17 +259,17 @@ def test_scalability(clients, window_size):
                 samples = fuzzymap_single_put_test(server_ips, client_ips, c, window_size)
 
                 # stop servers
-                stop_instances(settings.REGION, servers)
-                stop_instances(settings.REGION, clients)
+                stop_instances(region, servers)
+                stop_instances(region, clients)
                 summary[c] = samples
         write_output(summary, 'scale_w{0}.txt'.format(window_size))
 
-def test_multiput_txn(multiput_percents, window_size):
+def test_multiput_txn(region, multiput_percents, window_size):
         summary = {}
         for p in multiput_percents: 
                 # start servers
-                servers = start_and_test_fuzzylog_servers() 
-                clients = start_and_test_fuzzylog_clients() 
+                servers = start_and_test_fuzzylog_servers(region)
+                clients = start_and_test_fuzzylog_clients(region)
 
                 # TODO: do experiment 
                 server_ips = to_ip(servers)
@@ -397,38 +277,42 @@ def test_multiput_txn(multiput_percents, window_size):
                 samples = fuzzymap_multiput_test(server_ips, client_ips, p, window_size)
 
                 # stop servers
-                stop_instances(settings.REGION, servers)
-                stop_instances(settings.REGION, clients)
+                stop_instances(region, servers)
+                stop_instances(region, clients)
                 summary[p] = samples
         write_output(summary, 'multiput_w{0}.txt'.format(window_size))
 
 
-def update_fuzzymap_binary():
+def update_fuzzymap_binary(region):
 	fabhost_prefix = 'ubuntu@' 
-        keyfile = settings.KEYFILE
+        keyfile = settings.KEYFILE[region]
         
         # update clients
-        clients = start_and_test_fuzzylog_clients() 
+        clients = start_and_test_fuzzylog_clients(region)
         client_ips = to_ip(clients)
         for c in client_ips:
                 os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + c['public'] + ' update_fuzzymap_binary')
-        stop_instances(settings.REGION, clients)
+        stop_instances(region, clients)
 
-def update_fuzzylog_binary():
+def update_fuzzylog_binary(region, commit=None):
 	fabhost_prefix = 'ubuntu@' 
-        keyfile = settings.KEYFILE
+        keyfile = settings.KEYFILE[region]
 
         # update servers + clients
-        servers = start_and_test_fuzzylog_servers() + start_and_test_fuzzylog_clients()
+        servers = start_and_test_fuzzylog_servers(region) + start_and_test_fuzzylog_clients(region)
         server_ips = to_ip(servers)
+        cmd = 'update_fuzzylog_binary'
+        if commit:
+                cmd += ":" + commit
         for s in server_ips:
-                os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + s['public'] + ' update_fuzzylog_binary')
-        stop_instances(settings.REGION, servers)
+                os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + s['public'] + ' ' + cmd)
+        stop_instances(region, servers)
 
 def main():
         #test_scalability(clients=[1], window_size=32)
         #test_multiput_txn(multiput_percents=[0,20,40,60,80,100], window_size=32)
-        #update_fuzzylog_binary()
+        #update_fuzzylog_binary(settings.REGION, '908c9c9f33a745931c90e253d56be2caf784cb32')
+        update_fuzzymap_binary(settings.AP_NORTHEAST_1)
         pass
 
 if __name__ == "__main__":

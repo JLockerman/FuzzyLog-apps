@@ -17,16 +17,20 @@ def update_fuzzymap_binary():
         run('make clean')
         run('make')
 
-def update_fuzzylog_binary():
+def update_fuzzylog_binary(commit=None):
     with cd('~/fuzzylog/delos-rust/'):
-        run('git pull')
+        if commit:
+                run('git reset --hard ' + commit)
+        else:
+                run('git pull')
 
     with cd('~/fuzzylog/delos-rust/examples/c_linking'): 
         run('make clean')
         run('make')
 
     with cd('~/fuzzylog/delos-rust/servers/tcp_server'):
-        run('cargo run --release %d' % settings.FUZZYLOG_PORT)
+        run('cargo clean') 
+        run('cargo build --release')
 
 def kill_fuzzylog():
     run('killall delos_tcp_server')
@@ -50,7 +54,7 @@ def fuzzymap_proc(log_addr, exp_range, exp_duration, client_id, workload, async,
         args += '--expt_duration=' + str(exp_duration) + ' '
         args += '--client_id=' + str(client_id) + ' '
         args += '--workload=' + str(workload) + ' '
-        if async:
+        if async == "True":
             args += '--async '
             args += '--window_size=' + str(window_size)
         run(args)
