@@ -5,18 +5,6 @@
 
 using namespace std;
 
-// Transaction class which is aware of HashMap
-class Txn {
-public:
-        Txn() {}
-        virtual ~Txn(){}
-        virtual void Run() = 0;
-        virtual void AsyncRun() = 0;
-        virtual new_write_id wait_for_any_op() = 0;
-        virtual void wait_for_all_ops() = 0;
-        virtual void flush_completed_ops() = 0;
-};
-
 class Context {
 private:
         std::atomic<uint64_t>                   m_num_executed;
@@ -40,6 +28,18 @@ public:
         }
 };
 
+// Transaction class which is aware of HashMap
+class Txn {
+public:
+        Txn() {}
+        virtual ~Txn(){}
+        virtual void Run() = 0;
+        virtual void AsyncRun() = 0;
+        virtual new_write_id wait_for_any_op() { return NEW_WRITE_ID_NIL; }
+        virtual void wait_for_all_ops() {}
+        virtual void flush_completed_ops() {}
+};
+
 class ycsb_insert : public Txn {
 private:
         HashMap*                                m_map;
@@ -58,9 +58,29 @@ public:
         ~ycsb_insert(){}
         virtual void Run();
         virtual void AsyncRun();
-        virtual new_write_id wait_for_any_op();
-        virtual void wait_for_all_ops();
-        virtual void flush_completed_ops();
+        new_write_id wait_for_any_op();
+        void wait_for_all_ops();
+        void flush_completed_ops();
+};
+
+class ycsb_read : public Txn {
+private:
+        HashMap*                                m_map;
+        uint32_t                                m_start;
+        uint32_t                                m_end;
+        struct colors*                          m_color;
+        Context*                                m_context;
+public:
+        ycsb_read(HashMap* map, struct colors* color, uint32_t start, uint32_t end, Context* context) {
+                this->m_map = map;
+                this->m_color = color;
+                this->m_start = start;
+                this->m_end = end;
+                this->m_context = context;
+        }
+        ~ycsb_read(){}
+        virtual void Run();
+        virtual void AsyncRun();
 };
 
 class workload_generator {

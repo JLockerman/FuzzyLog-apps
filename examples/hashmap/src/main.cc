@@ -59,7 +59,7 @@ void do_experiment(config cfg) {
         Context ctx;    // Can be used to share info between Worker and Txns
 
         // Fuzzymap
-        map = new HashMap(&cfg.log_addr);
+        map = new HashMap(&cfg.log_addr, &cfg.workload);
 
         // Generate append workloads: uniform distribution
         workload_gen = new workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);
@@ -84,7 +84,7 @@ void do_experiment(config cfg) {
         }
 
         // Wait until worker finishes
-        pthread_join(*worker->get_pthread_id(), NULL);
+        worker->join();
 
         // Write to output file
         write_output(cfg.client_id, results);

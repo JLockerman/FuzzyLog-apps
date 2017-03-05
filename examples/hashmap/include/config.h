@@ -28,6 +28,7 @@ static struct option long_options[] = {
 };
 
 struct workload_config {
+        std::string                     op_type;
         struct colors                   color;
         uint64_t                        op_count;
 };
@@ -111,12 +112,21 @@ private:
                 // workload
                 std::vector<std::string> workloads = split(std::string(_arg_map[WORKLOAD]), ',');
                 for (auto w : workloads) {
-                        // parse: <color[:color2]>=<op_count>                        
+                        // parse: <get|put>@<color[:color2]>=<op_count>                        
                         std::vector<std::string> pair = split(w, '='); 
                         assert(pair.size() == 2); 
 
+                        // op type
+                        std::vector<std::string> op_type_and_color = split(pair[0], '@');
+                        assert(op_type_and_color.size() == 2); 
+                        std::string op_type = op_type_and_color[0]; 
+                        if (op_type != "get" && op_type != "put") {
+                                std::cerr << "Error. --" << long_options[WORKLOAD].name << " only allows get|put\n";
+                                exit(-1);
+                        }
+
                         // color
-                        std::vector<std::string> color_list = split(pair[0], ':');
+                        std::vector<std::string> color_list = split(op_type_and_color[1], ':');
                         struct colors c;
                         c.numcolors = color_list.size();
                         c.mycolors = new ColorID[color_list.size()];
@@ -129,6 +139,7 @@ private:
 
                         // workload
                         workload_config wc;
+                        wc.op_type = op_type;
                         wc.color = c;
                         wc.op_count = op_count; 
                         ret.workload.push_back(wc);

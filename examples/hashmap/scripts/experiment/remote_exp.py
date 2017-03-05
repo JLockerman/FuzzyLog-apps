@@ -211,7 +211,7 @@ def fuzzymap_single_put_test(server_ips, client_ips, num_clients, window_size):
         round_robin = [i % len(client_ips) for i in range(num_clients)]
         async = True
         for i in range(num_clients):
-                workload = "{color}\={op_count}".format(color=i, op_count=op_count)
+                workload = "put@{color}\={op_count}".format(color=i+1, op_count=op_count)
                 proc = launch_fuzzymap(fabhost_prefix + client_ips[round_robin[i]]['public'], keyfile, logaddr, expt_range, expt_duration, i, workload, async, window_size)
                 time.sleep(0.1)
                 client_procs.append(proc) 
@@ -277,13 +277,13 @@ def fuzzymap_multiput_test(server_ips, client_ips, percent, window_size):
         singleput_op = int(op_count - multiput_op)
 
         # client1
-        workload = "100\={single}\,100:200\={multi}".format(single=singleput_op, multi=multiput_op)
+        workload = "put@100\={single}\,put@100:200\={multi}".format(single=singleput_op, multi=multiput_op)
         proc = launch_fuzzymap(fabhost_prefix + client_ips[0]['public'], keyfile, logaddr, expt_range, expt_duration, 100, workload, async, window_size)
         client_procs.append(proc) 
         time.sleep(0.1)
 
         # client2
-        workload = "200\={single}\,100:200\={multi}".format(single=singleput_op, multi=multiput_op)
+        workload = "put@200\={single}\,put@100:200\={multi}".format(single=singleput_op, multi=multiput_op)
         proc = launch_fuzzymap(fabhost_prefix + client_ips[1]['public'], keyfile, logaddr, expt_range, expt_duration, 200, workload, async, window_size)
         client_procs.append(proc) 
 
@@ -366,8 +366,7 @@ def postprocess_results(vals):
     high_idx = int(len(vals)*0.95)
     return [vals[median_idx]/float(1000), vals[low_idx]/float(1000), vals[high_idx]/float(1000)]
 
-def test_scalability(window_size):
-        clients = [1]
+def test_scalability(clients, window_size):
         summary = {}
         for c in clients: 
                 # start servers
@@ -385,8 +384,7 @@ def test_scalability(window_size):
                 summary[c] = samples
         write_output(summary, 'scale_w{0}.txt'.format(window_size))
 
-def test_multiput_txn(window_size):
-        multiput_percents = [0, 20, 40, 60, 80, 100]
+def test_multiput_txn(multiput_percents, window_size):
         summary = {}
         for p in multiput_percents: 
                 # start servers
@@ -428,8 +426,8 @@ def update_fuzzylog_binary():
         stop_instances(settings.REGION, servers)
 
 def main():
-        test_scalability(window_size=32)
-        #test_multiput_txn(window_size=32)
+        #test_scalability(clients=[1], window_size=32)
+        #test_multiput_txn(multiput_percents=[0,20,40,60,80,100], window_size=32)
         #update_fuzzylog_binary()
         pass
 

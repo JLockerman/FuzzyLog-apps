@@ -11,6 +11,7 @@ public:
         Runnable() {}
         virtual ~Runnable() {}
         virtual void run() = 0;
+        virtual void join() = 0;
 };
 
 // Worker class which should be unaware of HashMap 
@@ -37,6 +38,7 @@ public:
         }
         ~Worker();
         virtual void run();
+        virtual void join();
         static void* bootstrap(void *arg);
         pthread_t* get_pthread_id();
         void Execute(); 

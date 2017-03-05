@@ -16,6 +16,10 @@ void Worker::run() {
         assert(err == 0);
 }
 
+void Worker::join() {
+        pthread_join(m_thread, NULL);
+}
+
 void* Worker::bootstrap(void *arg) {
         Worker *worker = (Worker*)arg;
         worker->Execute();

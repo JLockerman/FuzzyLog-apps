@@ -45,6 +45,26 @@ void ycsb_insert::flush_completed_ops() {
         m_map->flush_completed_puts(); 
 }
 
+void ycsb_read::Run() {
+        uint32_t key;
+        assert(m_map != NULL);
+       
+        // key = (start, end)
+        key = rand() % (m_end - m_start);
+
+        m_map->get(key, m_color);
+}
+
+void ycsb_read::AsyncRun() {
+        uint32_t key;
+        assert(m_map != NULL);
+       
+        // key = (start, end)
+        key = rand() % (m_end - m_start);
+
+        m_map->get(key, m_color);
+}
+
 Txn** workload_generator::Gen() {
         uint32_t i;
         uint32_t total_op_count;
@@ -75,7 +95,11 @@ Txn** workload_generator::Gen() {
 
                 for (auto j = 0; j < proportions.size(); j++) {
                         if (proportions[j] > r && allocations[j] > 0) { 
-                                txns[i] = new ycsb_insert(m_map, &(*m_workload)[j].color, 0, m_range, m_context);
+                                if ((*m_workload)[j].op_type == "get") {
+                                        txns[i] = new ycsb_read(m_map, &(*m_workload)[j].color, 0, m_range, m_context);
+                                } else if ((*m_workload)[j].op_type == "put") {
+                                        txns[i] = new ycsb_insert(m_map, &(*m_workload)[j].color, 0, m_range, m_context);
+                                }
                                 allocations[j] = allocations[j] - 1;
                                 i++;
                                 break;

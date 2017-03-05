@@ -8,6 +8,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <city.h>
+#include <config.h>
 
 extern "C" {
         #include "fuzzy_log.h"
@@ -50,10 +51,11 @@ private:
         std::vector<std::chrono::duration<double>>                                             m_latencies;
 
 public:
-        HashMap(std::vector<std::string>* log_addr);
+        HashMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload);
         ~HashMap();
 
-        void init_fuzzylog_client(std::vector<std::string>* log_addr);
+        struct colors* get_interesting_colors(std::vector<workload_config>* workload);
+        void init_fuzzylog_client(std::vector<std::string>* log_addr, struct colors* interesting_colors);
 
         // Synchronous operations
         uint32_t get(uint32_t key, struct colors* op_color);

@@ -6,21 +6,35 @@
 
 static char out[DELOS_MAX_DATA_SIZE];
 
-HashMap::HashMap(std::vector<std::string>* log_addr) {
-        init_fuzzylog_client(log_addr);        
+HashMap::HashMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload) {
+        // find interesting colors from get workload
+        struct colors* interesting_colors = get_interesting_colors(workload); 
+        init_fuzzylog_client(log_addr, interesting_colors); 
 }
 
-void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
-        // FIXME: using temp snapshot color 
-        struct colors color; 
-        color.numcolors = 1;
-        color.mycolors = (ColorID*)malloc(sizeof(ColorID));
-        color.mycolors[0] = 0;
+struct colors* HashMap::get_interesting_colors(std::vector<workload_config>* workload) {
+        struct colors* c = NULL;
+        for (auto w : *workload) {
+                if (w.op_type == "get") {
+                        c = &w.color;
+                        break;
+                }
+        }
+        return c;
+}
 
+void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr, struct colors* interesting_colors) {
+        if (interesting_colors == NULL) {
+                // If no interesting colors (i.e. no get workload), using arbitrary snapshot color 
+                interesting_colors = (struct colors*)malloc(sizeof(struct colors));
+                interesting_colors->numcolors = 1;
+                interesting_colors->mycolors = (ColorID*)malloc(sizeof(ColorID));
+                interesting_colors->mycolors[0] = 0;
+        }
         // Initialize fuzzylog connection
         if (log_addr->size() == 1) {
                 const char *server_ip = log_addr->at(0).c_str();
-                m_fuzzylog_client = new_dag_handle_for_single_server(server_ip, &color);
+                m_fuzzylog_client = new_dag_handle_for_single_server(server_ip, interesting_colors);
         } else {
                 const char *lock_server_ip = log_addr->at(0).c_str();
                 size_t num_chain_servers = log_addr->size() - 1;
@@ -28,7 +42,7 @@ void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_ips[i] = log_addr->at(i+1).c_str();
                 }
-                m_fuzzylog_client = new_dag_handle(lock_server_ip, num_chain_servers, chain_server_ips, &color);
+                m_fuzzylog_client = new_dag_handle(lock_server_ip, num_chain_servers, chain_server_ips, interesting_colors);
         }
 }
 
