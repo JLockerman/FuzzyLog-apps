@@ -65,7 +65,6 @@ void wait_signal(DAGHandle *handle, config cfg)
 	depends.numcolors = 0;
 		
 	append(handle, buffer, buf_sz, &c, &depends);
-	append(handle, buffer, buf_sz, &c, &depends);
 	while (true) {
 		snapshot(handle);
 		get_next(handle, buffer, &buf_sz, &c);
