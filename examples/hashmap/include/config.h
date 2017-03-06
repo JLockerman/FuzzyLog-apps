@@ -17,16 +17,18 @@ extern "C" {
 #define DEFAULT_WINDOW_SIZE 32
 
 static struct option long_options[] = {
-        {"log_addr", required_argument, NULL, 0},
-        {"expt_range", required_argument, NULL, 1},
-        {"client_id", required_argument, NULL, 2},
-        {"workload", required_argument, NULL, 3},
-        {"async", optional_argument, NULL, 4},
-        {"window_size", optional_argument, NULL, 5},
-        {NULL, no_argument, NULL, 6},
+        {"log_addr",            required_argument, NULL, 0},
+        {"expt_range",          required_argument, NULL, 1},
+        {"expt_duration",       required_argument, NULL, 2},
+        {"client_id",           required_argument, NULL, 3},
+        {"workload",            required_argument, NULL, 4},
+        {"async",               optional_argument, NULL, 5},
+        {"window_size",         optional_argument, NULL, 6},
+        {NULL,                  no_argument,       NULL, 7},
 };
 
 struct workload_config {
+        std::string                     op_type;
         struct colors                   color;
         uint64_t                        op_count;
 };
@@ -34,6 +36,7 @@ struct workload_config {
 struct config {
 	std::vector<std::string>        log_addr;
 	uint32_t 		        expt_range;
+        uint32_t                        expt_duration;
 	uint8_t 		        client_id;
 	std::vector<workload_config>    workload;
         bool                            async;
@@ -43,12 +46,13 @@ struct config {
 class config_parser {
 private:
 	enum OptionCode {
-		LOG_ADDR = 0,
-		EXPT_RANGE = 1,
-		CLIENT_ID = 2,
-		WORKLOAD = 3,
-		ASYNC = 4,
-		WINDOW_SIZE = 5,
+		LOG_ADDR        = 0,
+		EXPT_RANGE      = 1,
+		EXPT_DURATION   = 2,
+		CLIENT_ID       = 3,
+		WORKLOAD        = 4,
+		ASYNC           = 5,
+		WINDOW_SIZE     = 6,
 	};
 
 	bool 					_init;
@@ -80,11 +84,13 @@ private:
 
 		if (_arg_map.count(LOG_ADDR) == 0 || 
 		    _arg_map.count(EXPT_RANGE) == 0 ||
+		    _arg_map.count(EXPT_DURATION) == 0 ||
 		    _arg_map.count(CLIENT_ID) == 0 || 
 		    _arg_map.count(WORKLOAD) == 0) {
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_RANGE].name << "\n";
+		        std::cerr << "--" << long_options[EXPT_DURATION].name << "\n";
 		        std::cerr << "--" << long_options[CLIENT_ID].name << "\n";
 		        std::cerr << "--" << long_options[WORKLOAD].name << "\n";
 			exit(-1);
@@ -99,17 +105,28 @@ private:
                 ret.log_addr = split(std::string(_arg_map[LOG_ADDR]), ',');
                 // expt_range
 		ret.expt_range = (uint32_t)atoi(_arg_map[EXPT_RANGE]);
+                // expt_duration
+		ret.expt_duration = (uint32_t)atoi(_arg_map[EXPT_DURATION]);
                 // client_id
 		ret.client_id = (uint8_t)atoi(_arg_map[CLIENT_ID]);
                 // workload
                 std::vector<std::string> workloads = split(std::string(_arg_map[WORKLOAD]), ',');
                 for (auto w : workloads) {
-                        // parse: <color[:color2]>=<op_count>                        
+                        // parse: <get|put>@<color[:color2]>=<op_count>                        
                         std::vector<std::string> pair = split(w, '='); 
                         assert(pair.size() == 2); 
 
+                        // op type
+                        std::vector<std::string> op_type_and_color = split(pair[0], '@');
+                        assert(op_type_and_color.size() == 2); 
+                        std::string op_type = op_type_and_color[0]; 
+                        if (op_type != "get" && op_type != "put") {
+                                std::cerr << "Error. --" << long_options[WORKLOAD].name << " only allows get|put\n";
+                                exit(-1);
+                        }
+
                         // color
-                        std::vector<std::string> color_list = split(pair[0], ':');
+                        std::vector<std::string> color_list = split(op_type_and_color[1], ':');
                         struct colors c;
                         c.numcolors = color_list.size();
                         c.mycolors = new ColorID[color_list.size()];
@@ -122,6 +139,7 @@ private:
 
                         // workload
                         workload_config wc;
+                        wc.op_type = op_type;
                         wc.color = c;
                         wc.op_count = op_count; 
                         ret.workload.push_back(wc);

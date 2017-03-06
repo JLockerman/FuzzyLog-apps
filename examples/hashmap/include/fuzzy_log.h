@@ -258,12 +258,12 @@ void start_fuzzy_log_server_thread_from_group(const char * server_ip,
 		uint32_t server_number, uint32_t total_servers_in_group);
 
 
-//      static inline void start_fuzzy_log_servers(uint32_t num_servers,
-//              const char * const server_ips[num_servers])
-//      {
-//              for(uint32_t i = 0; i < num_servers; i++)
-//                      start_fuzzy_log_server_thread_from_group(server_ips[i], i, num_servers);
-//      }
+        static inline void start_fuzzy_log_servers(uint32_t num_servers,
+                const char ** server_ips)
+        {
+                for(uint32_t i = 0; i < num_servers; i++)
+                        start_fuzzy_log_server_thread_from_group(server_ips[i], i, num_servers);
+        }
 
 //! Start a number of fuzzy log server threads based on a config file.
 //! NOTE this function _does_ return after all servers start.

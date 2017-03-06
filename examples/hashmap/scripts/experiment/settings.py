@@ -1,0 +1,11 @@
+# EC2
+REGION = 'us-east-2'
+KEYFILE = '~/.ssh/juno.pem'
+
+# Fuzzylog
+FUZZYLOG_PORT = 9990
+
+# Client workload
+EXPERIMENT_RANGE = 10000
+EXPERIMENT_DURATION = 120
+OPERATION_PER_CLIENT = 1000
