@@ -14,18 +14,22 @@ static struct option long_options[] = {
   {"server_id", required_argument, NULL, 3},
   {"sync_duration", required_argument, NULL, 4},
   {"window_sz", required_argument, NULL, 5},
-  {"num_rqs", required_argument, NULL, 6},
-  {NULL, no_argument, NULL, 7},
+  {"num_clients", required_argument, NULL, 6},
+  {"num_rqs", required_argument, NULL, 7},
+  {"sample_interval", required_argument, NULL, 8},
+  {NULL, no_argument, NULL, 9},
 };
 
 struct config {
 	std::string 		log_addr;
-	uint64_t 		expt_duration;
+	int	 		expt_duration;
 	uint64_t 		expt_range;
 	uint8_t 		server_id;		
 	uint64_t		sync_duration; 	
 	uint64_t 		window_sz;	
+	uint64_t 		num_clients;
 	uint64_t 		num_rqs;
+	int 			sample_interval;
 }; 
 
 class config_parser {
@@ -37,7 +41,9 @@ private:
 		SERVER_ID = 3,
 		SYNC_DURATION=4,
 		WINDOW_SZ=5,
-		NUM_RQS=6,
+		NUM_CLIENTS=6,
+		NUM_RQS=7,
+		SAMPLE_INTERVAL=8,
 	};
 
 	bool 					_init;
@@ -72,26 +78,32 @@ private:
 		    _arg_map.count(EXPT_RANGE) == 0 ||
 		    _arg_map.count(SERVER_ID) == 0 || 
 		    _arg_map.count(SYNC_DURATION) == 0 ||
-		    _arg_map.count(NUM_RQS) == 0 ||
-		    _arg_map.count(WINDOW_SZ) == 0) {
+		    _arg_map.count(NUM_CLIENTS) == 0 ||
+		    _arg_map.count(WINDOW_SZ) == 0 || 
+		    _arg_map.count(NUM_RQS) == 0  || 
+	       	    _arg_map.count(SAMPLE_INTERVAL) == 0) { 
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_DURATION].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_RANGE].name << "\n";
 		        std::cerr << "--" << long_options[SERVER_ID].name << "\n";
 		        std::cerr << "--" << long_options[SYNC_DURATION].name << "\n";
-			std::cerr << "--" << long_options[NUM_RQS].name << "\n";
+			std::cerr << "--" << long_options[NUM_CLIENTS].name << "\n";
 			std::cerr << "--" << long_options[WINDOW_SZ].name << "\n";
+			std::cerr << "--" << long_options[NUM_RQS].name << "\n";
+			std::cerr << "--" << long_options[SAMPLE_INTERVAL].name << "\n";
 			exit(-1);
 		}
 		
-		ret.expt_duration = (uint64_t)atoi(_arg_map[EXPT_DURATION]);		
+		ret.expt_duration = atoi(_arg_map[EXPT_DURATION]);		
 		ret.expt_range = (uint64_t)atoi(_arg_map[EXPT_RANGE]);
 		ret.server_id = (uint8_t)atoi(_arg_map[SERVER_ID]);
-		ret.num_rqs = (uint64_t)atoi(_arg_map[NUM_RQS]);
+		ret.num_clients = (uint64_t)atoi(_arg_map[NUM_CLIENTS]);
 		ret.window_sz = (uint64_t)atoi(_arg_map[WINDOW_SZ]);
 		ret.log_addr.assign(_arg_map[LOG_ADDR]);
 		ret.sync_duration = (uint64_t)atoi(_arg_map[SYNC_DURATION]);	
+		ret.num_rqs = (uint64_t)atoi(_arg_map[NUM_RQS]);
+		ret.sample_interval = atoi(_arg_map[SAMPLE_INTERVAL]);
 		return ret;
 	}
 

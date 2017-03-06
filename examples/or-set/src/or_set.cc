@@ -11,7 +11,9 @@ or_set::or_set(DAGHandle *handle, struct colors *color, uint8_t proc_id,
 	_guid_counter = 0;
 	_state.clear();
 	_sync_duration = std::chrono::microseconds(sync_duration);
-	_sync_thread = 	std::thread(&or_set::check_remotes, this); 
+		
+	/* Turn off anti-entropy for the time being */
+	//	_sync_thread = 	std::thread(&or_set::check_remotes, this); 
 }
 
 uint64_t or_set::make_opcode(log_opcode opcode)
@@ -34,6 +36,9 @@ void or_set::get_remote_updates()
 	size_t buf_sz;
 	struct colors c;
 	uint64_t *uint_buf;
+	
+	/* XXX Shouldn't get here! */
+	assert(false);
 	
 	snapshot(_log_client);
 	while (true) {
