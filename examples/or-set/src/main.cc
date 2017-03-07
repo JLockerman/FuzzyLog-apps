@@ -65,12 +65,12 @@ void wait_signal(DAGHandle *handle, config cfg)
 	depends.numcolors = 0;
 		
 	append(handle, buffer, buf_sz, &c, &depends);
+	assert(c.numcolors == 1 && c.mycolors[0] == 1);
 	while (true) {
 		snapshot(handle);
 		get_next(handle, buffer, &buf_sz, &c);
 		assert(c.numcolors == 0 || c.numcolors == 1);	
 		if (c.numcolors == 1) {
-			std::cerr << c.mycolors[0] << "\n"; 
 			assert(c.mycolors[0] == 1);
 			num_received += 1;
 			free(c.mycolors);
@@ -108,7 +108,6 @@ void do_experiment(config cfg)
 {
 	std::vector<tester_request*> inputs;
 	std::vector<double> throughput_samples;
-	std::cerr << (uint64_t)cfg.server_id << "\n";	
 	run_crdt(cfg, inputs, throughput_samples);
 	write_output(cfg, throughput_samples, inputs);
 }
