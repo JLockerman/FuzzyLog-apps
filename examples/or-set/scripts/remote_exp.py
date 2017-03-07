@@ -88,19 +88,22 @@ def stop_instances(region, instance_list):
 			
 
 # Launch a CRDT applicatino process.
-def launch_crdt(fabhost, keyfile, logaddr, duration, exp_range, server_id, sync_duration):
+def launch_crdt(fabhost, keyfile, logaddr, duration, exp_range, server_id, sync_duration,
+		num_clients, window_sz, num_rqs, sample_interval):
 	launch_str = 'crdt_proc:' + logaddr + ',' + str(duration)
 	launch_str += ',' + str(exp_range)
 	launch_str += ',' + str(server_id)
 	launch_str += ',' + str(sync_duration)
-	print keyfile
+	launch_str += ',' + str(num_clients)
+	launch_str += ',' + str(window_sz)
+	launch_str += ',' + str(num_rqs)
+	launch_str += ',' + str(sample_interval)
 	return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])
 	
 
 # Launch fuzzy log. 
 def launch_fuzzylog(fabhost, keyfile, port, nthreads=-1):
 	launch_str = 'fuzzylog_proc:' + str(port) + ',' + str(nthreads)
-	print keyfile
 	proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])  
 	return proc
 
@@ -110,7 +113,13 @@ def launch_fuzzylog(fabhost, keyfile, port, nthreads=-1):
 # Fabric only supports synchronous calls to hosts. Create a process per-remote call, 
 # either corresponding to a client or server. Manage clients and servers by joining/killing
 # these processes.  
-def fuzzylog_exp(instances, num_clients):
+def fuzzylog_exp(instances, num_clients, window_sz):
+	duration = 30
+	sync_duration = 300
+	exp_range = 1000000
+	num_rqs = 30000000
+	sample_interval = 1
+
 	logaddr = instances[0]['private']+ ':3333'
 	fabhost_prefix = 'ubuntu@' 
 	keyfile = '~/.ssh/jmfaleiro.pem'
@@ -124,16 +133,15 @@ def fuzzylog_exp(instances, num_clients):
 	client_procs = []
 
 	for i in range(0, num_clients):
-		client_procs.append(launch_crdt(fabhost_prefix+instances[1]['public'], keyfile, logaddr, 150, 1000, i, 50000)) 	
+		client_procs.append(launch_crdt(fabhost_prefix+instances[1]['public'], keyfile, logaddr, 
+						duration, exp_range, i, sync_duration, num_clients, window_sz, num_rqs, sample_interval))
 		time.sleep(1)
 	
 	for c in client_procs:
 		c.wait()
 	
 	log_proc.kill()
-
-	for i in range(0, num_clients):
-		os.system('scp -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ' + fabhost_prefix+instances[1]['public'] + ':~/fuzzylog/delos-apps/examples/or-set/*.txt .')	
+	os.system('scp -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ' + fabhost_prefix+instances[1]['public'] + ':~/fuzzylog/delos-apps/examples/or-set/*.txt .')	
 
 # Start stopped instances.
 def wakeup_instances(region):
@@ -174,17 +182,22 @@ def test_instances(instance_list, keyfile):
 		time.sleep(5)
 
 def main():
-	nclients = [1,4,8,12,16,20,24,28,32]
-	for c in nclients:
-		os.system('mkdir -p results/' + str(c))
-		instance_ids = get_stopped_instances(REGION)
-		instances = start_instances(REGION, instance_ids)
-		instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, instances))
 
-		test_instances(instance_ips, KEYFILE)
-		fuzzylog_exp(instance_ips, c)	
-		stop_instances(REGION, instances)	
-		os.system('mv *.txt results/' + str(c))
+	# Start up instances for experiment. 
+	instance_ids = get_stopped_instances(REGION)
+	instances = start_instances(REGION, instance_ids)
+	instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, instances))
+	test_instances(instance_ips, KEYFILE)
+
+	nclients = [1,4,8,12,16]
+	windows = [32]
+	for c in nclients:
+		for w in windows:
+			os.system('mkdir -p results/c_' + str(c) + 'w_' + str(w))
+			fuzzylog_exp(instance_ips, c)	
+			os.system('mv *.txt results/c_' + str(c) + 'w_' + str(w))
+
+	stop_instances(REGION, instances)	
 
 if __name__ == "__main__":
     main()
