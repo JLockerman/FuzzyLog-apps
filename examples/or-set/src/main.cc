@@ -48,7 +48,7 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*>
 	} 
 }
 
-void wait_signal(DAGHandle *handle, config cfg)
+void wait_signal(config cfg)
 {
 	char buffer[DELOS_MAX_DATA_SIZE];
 	size_t buf_sz;
@@ -61,6 +61,8 @@ void wait_signal(DAGHandle *handle, config cfg)
 	c.numcolors = 1;
 	buf_sz = 1;
 	
+	auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
+
 	depends.mycolors = NULL;
 	depends.numcolors = 0;
 		
@@ -71,7 +73,7 @@ void wait_signal(DAGHandle *handle, config cfg)
 		get_next(handle, buffer, &buf_sz, &c);
 		assert(c.numcolors == 0 || c.numcolors == 1);	
 		if (c.numcolors == 1) {
-			assert(c.mycolors[0] == 1);
+			//assert(c.mycolors[0] == 1);
 			num_received += 1;
 			free(c.mycolors);
 		}
@@ -79,6 +81,7 @@ void wait_signal(DAGHandle *handle, config cfg)
 		if (num_received == cfg.num_clients)
 			break;
 	}	
+	close_dag_handle(handle);	
 }
 
 void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<double> &throughput_samples)
@@ -86,22 +89,18 @@ void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<doub
 	struct colors c;
 	c.numcolors = 1;
 	c.mycolors = new ColorID[1];
-	c.mycolors[0] = cfg.server_id + 2;
+	c.mycolors[0] = 2; 
 	
-	struct colors int_c;
-	int_c.numcolors = 2;
-	int_c.mycolors = new ColorID[2];
-	int_c.mycolors[0] = 1;
-	int_c.mycolors[1] = cfg.server_id + 2;
-	
-	auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &int_c);
+	auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
 	auto orset = new or_set(handle, &c, cfg.server_id, cfg.sync_duration);	
 
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
 	
 	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 
-	wait_signal(handle, cfg);	
+//	wait_signal(handle, cfg);	
+	std::cerr << "Worker " << (uint64_t)cfg.server_id << " initialized!\n";
 	tester->do_run(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration);
+	close_dag_handle(handle);
 }
 
 void do_experiment(config cfg)

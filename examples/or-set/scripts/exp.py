@@ -14,11 +14,11 @@ def main():
 		sys.exit()
 	
 	os.chdir(os.getenv('DELOS_ORSET_LOC'))
-	clients = [1,4,8,12,16,20,24,28,32]
-	sync_duration = [500000, 300000000]	
+	clients = [4]
+	window_sz = [32]	
 	for c in clients:
-		for s in sync_duration:
-			single_expt(c, s)				
+		for w in window_sz:
+			single_expt(c, w)				
 	
 # Start the fuzzy log. 
 def init_fuzzy_log():
@@ -27,43 +27,46 @@ def init_fuzzy_log():
 	log_bin_path = os.path.join(prefix, 'servers/tcp_server')
 	os.chdir(log_bin_path)
 	os.system('cargo build --release') 
-	proc = subprocess.Popen(['target/release/tcp_server', '3333', '-w', '10'])
+	proc = subprocess.Popen(['target/release/delos_tcp_server', '3333', '-w', '10'])
 	os.chdir(original_dir)
 	time.sleep(5)	
 	return proc
 	
 # Start clients.
-def init_clients(num_clients, sync_duration):
-	args = ['./build/or-set', '--log_addr', '127.0.0.1:3333', '--expt_duration', '120', '--expt_range', '1000', '--server_id']
+def init_clients(num_clients, window_sz):
+	args = ['./build/or-set', '--log_addr', '127.0.0.1:3333', '--expt_duration', '30', '--expt_range', '1000000', 
+	 	'--num_rqs', '30000000', '--sample_interval', '1', '--sync_duration', '500', '--server_id'] 
 	client_procs = []
 	for i in range(0, num_clients):
 		client_args = list(args)
 		client_args.append(str(i))
-		client_args.append('--sync_duration')
-		client_args.append(str(sync_duration))
+		client_args.append('--num_clients')
+		client_args.append(str(num_clients))
+		client_args.append('--window_sz')
+		client_args.append(str(window_sz))
 		proc = subprocess.Popen(client_args)
 		client_procs.append(proc)
 	return client_procs		
 	
-def get_resultdir_name(num_clients, sync_duration):
+def get_resultdir_name(num_clients, window_sz):
 	result_dir = 'results'
-	expt_dir = 'c' + str(num_clients) + '_d' + str(sync_duration)
+	expt_dir = 'c' + str(num_clients) + '_w' + str(window_sz)
 	return os.path.join(result_dir, expt_dir)
 
-def mv_results(num_clients, sync_duration):
-	result_dir = get_resultdir_name(num_clients, sync_duration)	
+def mv_results(num_clients, window_sz):
+	result_dir = get_resultdir_name(num_clients, window_sz)	
 	os.system('mkdir -p ' + result_dir)
 	os.system('mv *.txt ' + result_dir)
 
 # Single experiment. 
-def single_expt(num_clients, sync_duration):
+def single_expt(num_clients, window_sz):
 	os.system('rm *.txt')
 	log_proc = init_fuzzy_log()
-	client_procs = init_clients(num_clients, sync_duration)
+	client_procs = init_clients(num_clients, window_sz)
 	for c in client_procs:
 		c.wait()
 	log_proc.kill()
-	mv_results(num_clients, sync_duration)
+	mv_results(num_clients, window_sz)
 
 if __name__ == "__main__":
     main()
