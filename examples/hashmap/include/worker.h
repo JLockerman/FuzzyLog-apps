@@ -2,22 +2,14 @@
 
 #include <pthread.h>
 #include <workload.h>
+#include <runnable.h>
 #include <iostream>
-
-class Runnable {
-protected:
-        pthread_t                       m_thread;
-public:
-        Runnable() {}
-        virtual ~Runnable() {}
-        virtual void run() = 0;
-        virtual void join() = 0;
-};
 
 // Worker class which should be unaware of HashMap 
 class Worker : public Runnable {
 public:
         Context*                        m_context;
+        HashMap*                        m_map;  // FIXME: hacky way for calling fuzzylog api...
         Txn**                           m_txns;
         uint32_t                        m_num_txns;
         bool                            m_async;
@@ -27,8 +19,9 @@ public:
         std::atomic<uint64_t>           m_num_executed; 
         
 public:
-        Worker(Context* context, std::atomic<bool>* flag, Txn** txns, uint32_t num_txns, bool async, uint32_t window_size): Runnable() {
+        Worker(Context* context, HashMap* map, std::atomic<bool>* flag, Txn** txns, uint32_t num_txns, bool async, uint32_t window_size): Runnable() {
                 this->m_context = context;
+                this->m_map = map;
                 this->m_flag = flag;
                 this->m_txns = txns;
                 this->m_num_txns = num_txns;
@@ -43,4 +36,5 @@ public:
         pthread_t* get_pthread_id();
         void Execute(); 
         uint64_t get_num_executed();
+        uint32_t try_get_completed();
 };

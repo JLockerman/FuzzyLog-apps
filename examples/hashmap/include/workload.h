@@ -31,13 +31,16 @@ public:
 // Transaction class which is aware of HashMap
 class Txn {
 public:
+        typedef enum {
+                GET = 0,
+                PUT = 1,
+        } optype;
+public:
         Txn() {}
         virtual ~Txn(){}
         virtual void Run() = 0;
         virtual void AsyncRun() = 0;
-        virtual new_write_id wait_for_any_op() { return NEW_WRITE_ID_NIL; }
-        virtual void wait_for_all_ops() {}
-        virtual void flush_completed_ops() {}
+        virtual optype op_type() = 0; 
 };
 
 class ycsb_insert : public Txn {
@@ -47,20 +50,22 @@ private:
         uint32_t                                m_end;
         struct colors*                          m_color;
         Context*                                m_context;
+        optype                                  m_op_type;
 public:
-        ycsb_insert(HashMap* map, struct colors* color, uint32_t start, uint32_t end, Context* context) {
+        ycsb_insert(HashMap* map, struct colors* color, uint32_t start, uint32_t end, Context* context, optype op_type) {
                 this->m_map = map;
                 this->m_color = color;
                 this->m_start = start;
                 this->m_end = end;
                 this->m_context = context;
+                this->m_op_type = op_type;
         }
         ~ycsb_insert(){}
         virtual void Run();
         virtual void AsyncRun();
-        new_write_id wait_for_any_op();
-        void wait_for_all_ops();
-        void flush_completed_ops();
+        virtual optype op_type() {
+                return m_op_type;
+        }
 };
 
 class ycsb_read : public Txn {
@@ -70,17 +75,22 @@ private:
         uint32_t                                m_end;
         struct colors*                          m_color;
         Context*                                m_context;
+        optype                                  m_op_type;
 public:
-        ycsb_read(HashMap* map, struct colors* color, uint32_t start, uint32_t end, Context* context) {
+        ycsb_read(HashMap* map, struct colors* color, uint32_t start, uint32_t end, Context* context, optype op_type) {
                 this->m_map = map;
                 this->m_color = color;
                 this->m_start = start;
                 this->m_end = end;
                 this->m_context = context;
+                this->m_op_type = op_type;
         }
         ~ycsb_read(){}
         virtual void Run();
         virtual void AsyncRun();
+        virtual optype op_type() {
+                return m_op_type;
+        }
 };
 
 class workload_generator {

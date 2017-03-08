@@ -9,11 +9,7 @@
 #include <condition_variable>
 #include <city.h>
 #include <config.h>
-
-extern "C" {
-        #include "fuzzy_log.h"
-}
-
+#include <synchronizer.h>
 
 // Extended version of the original write_id to be used as key in std::unordered_map
 typedef struct new_write_id {
@@ -24,6 +20,10 @@ typedef struct new_write_id {
                 other.id.p2 == this->id.p2;
         }
 
+        bool operator!=(const new_write_id &other) const {
+                return other.id.p1 != this->id.p1 ||
+                other.id.p2 != this->id.p2;
+        }
 } new_write_id;
 
 static new_write_id NEW_WRITE_ID_NIL = {.id = WRITE_ID_NIL};
@@ -44,27 +44,32 @@ class HashMap {
 
 private:
         std::unordered_map<uint32_t, uint32_t>          m_cache;  
-        DAGHandle*                                      m_fuzzylog_client;
+        DAGHandle*                                      m_fuzzylog_client_for_put;
        
         // Map for tracking latencies
         std::unordered_map<new_write_id, std::chrono::time_point<std::chrono::system_clock>>   m_start_time_map;
         std::vector<std::chrono::duration<double>>                                             m_latencies;
 
+        // Color synchronizer
+        Synchronizer*                                   m_synchronizer; 
+
 public:
         HashMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload);
         ~HashMap();
 
-        struct colors* get_interesting_colors(std::vector<workload_config>* workload);
-        void init_fuzzylog_client(std::vector<std::string>* log_addr, struct colors* interesting_colors);
+        void get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors);
+        void init_fuzzylog_client(std::vector<std::string>* log_addr);
+        void init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
 
         // Synchronous operations
-        uint32_t get(uint32_t key, struct colors* op_color);
+        uint32_t get(uint32_t key);
         void put(uint32_t key, uint32_t value, struct colors* op_color);
         void remove(uint32_t key, struct colors* op_color);
 
         // Asynchronous operations
         void async_put(uint32_t key, uint32_t value, struct colors* op_color);
         void flush_completed_puts();
+        new_write_id try_wait_for_any_put();
         new_write_id wait_for_any_put();
         void wait_for_all_puts();
 };
