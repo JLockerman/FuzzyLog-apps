@@ -86,6 +86,13 @@ def stop_instances(region, instance_list):
 		else:
 			break
 			
+def stop_all_running_instances(region):
+	instance_list = get_running_instances(region)
+	stop_instances(region, instance_list)	
+
+def launch_client_controller(fabhost, keyfile, logaddr, num_clients, window_sz):
+	launch_str = 'run_crdt_clients:' + logaddr + ',' + str(num_clients) + ',' + str(window_sz)	
+	return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])
 
 # Launch a CRDT applicatino process.
 def launch_crdt(fabhost, keyfile, logaddr, duration, exp_range, server_id, sync_duration,
@@ -114,7 +121,7 @@ def launch_fuzzylog(fabhost, keyfile, port, nthreads=-1):
 # either corresponding to a client or server. Manage clients and servers by joining/killing
 # these processes.  
 def fuzzylog_exp(instances, num_clients, window_sz):
-	duration = 30
+	duration = 30 
 	sync_duration = 300
 	exp_range = 1000000
 	num_rqs = 30000000
@@ -130,18 +137,21 @@ def fuzzylog_exp(instances, num_clients, window_sz):
 
 	log_proc = launch_fuzzylog(fabhost_prefix+instances[0]['public'], keyfile, 3333) 
 	time.sleep(5)	
-	client_procs = []
-
-	for i in range(0, num_clients):
-		client_procs.append(launch_crdt(fabhost_prefix+instances[1]['public'], keyfile, logaddr, 
-						duration, exp_range, i, sync_duration, num_clients, window_sz, num_rqs, sample_interval))
-		time.sleep(1)
+	client_proc = launch_client_controller(fabhost_prefix+instances[1]['public'], keyfile, logaddr, num_clients, window_sz)	
+	client_proc.wait()
 	
-	for c in client_procs:
-		c.wait()
+#	client_procs = []
+#	
+#	
+#	for i in range(0, num_clients):
+#		client_procs.append(launch_crdt(fabhost_prefix+instances[1]['public'], keyfile, logaddr, 
+#						duration, exp_range, i, sync_duration, num_clients, window_sz, num_rqs, sample_interval))
+#		time.sleep(1)
+#	
+#	for c in client_procs:
+#		c.wait()
 	
 	log_proc.kill()
-	os.system('scp -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ' + fabhost_prefix+instances[1]['public'] + ':~/fuzzylog/delos-apps/examples/or-set/*.txt .')	
 
 # Start stopped instances.
 def wakeup_instances(region):
@@ -189,14 +199,16 @@ def main():
 	instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, instances))
 	test_instances(instance_ips, KEYFILE)
 
-	nclients = [1,4,8,12,16]
-	windows = [32]
-	for c in nclients:
-		for w in windows:
-			os.system('mkdir -p results/c_' + str(c) + 'w_' + str(w))
-			fuzzylog_exp(instance_ips, c)	
-			os.system('mv *.txt results/c_' + str(c) + 'w_' + str(w))
+	#nclients = [1,4,8,12,16]
+	#windows = [32]
+	#for c in nclients:
+	#	for w in windows:
+	#		os.system('mkdir -p results/c_' + str(c) + 'w_' + str(w))
+	#		fuzzylog_exp(instance_ips, c, w)	
+	#		os.system('mv *.txt results/c_' + str(c) + 'w_' + str(w))
 
+	os.system('scp -r -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ubuntu@' + instance_ips[1]['public'] + ':~/fuzzylog/delos-apps/examples/or-set/results .')	
+	os.system('scp -r -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ubuntu@' + instance_ips[0]['public'] + ':~/fuzzylog/delos-apps/examples/or-set/results .')	
 	stop_instances(REGION, instances)	
 
 if __name__ == "__main__":
