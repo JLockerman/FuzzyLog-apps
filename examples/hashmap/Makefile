@@ -12,7 +12,7 @@ build/%.o: src/%.cc
 	@mkdir -p build
 	@$(CC) -c -o $@ $< $(INCLUDE) $(LIBPATH) $(CFLAGS) $(LIBS)
 
-OBJECTS = build/workload.o build/worker.o build/hashmap.o build/main.o
+OBJECTS = build/workload.o build/worker.o build/synchronizer.o build/hashmap.o build/main.o
 
 build/hashmap: $(OBJECTS)
 	$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)

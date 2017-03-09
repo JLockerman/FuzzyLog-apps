@@ -67,7 +67,7 @@ void do_experiment(config cfg) {
         
         // One worker thread
         flag = true;
-        worker = new Worker(&ctx, &flag, txns, total_op_count, cfg.async, cfg.window_size);
+        worker = new Worker(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size);
 
         // Run workers
         worker->run();
