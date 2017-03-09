@@ -97,7 +97,7 @@ void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<doub
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
 	
 	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 
-//	wait_signal(handle, cfg);	
+//	wait_signal(cfg);	
 	std::cerr << "Worker " << (uint64_t)cfg.server_id << " initialized!\n";
 	tester->do_run(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration);
 	close_dag_handle(handle);

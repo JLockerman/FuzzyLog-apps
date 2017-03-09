@@ -13,12 +13,16 @@ def main():
 		print 'The DELOS_ORSET_LOC environment variable must point to the top level of the or-set example directory'	
 		sys.exit()
 	
+	log_ip = sys.argv[1]
+	client = int(sys.argv[2])
+	window_sz = int(sys.argv[3])
 	os.chdir(os.getenv('DELOS_ORSET_LOC'))
-	clients = [4]
-	window_sz = [32]	
-	for c in clients:
-		for w in window_sz:
-			single_expt(c, w)				
+	single_expt(client, window_sz, log_ip)
+	# clients = [1, 4, 8, 12, 16]
+	# window_sz = [32]
+	# for c in clients:
+ 	#		for w in window_sz:
+	#		single_expt(c, w, log_ip)				
 	
 # Start the fuzzy log. 
 def init_fuzzy_log():
@@ -33,8 +37,8 @@ def init_fuzzy_log():
 	return proc
 	
 # Start clients.
-def init_clients(num_clients, window_sz):
-	args = ['./build/or-set', '--log_addr', '127.0.0.1:3333', '--expt_duration', '30', '--expt_range', '1000000', 
+def init_clients(num_clients, window_sz, log_ip):
+	args = ['./build/or-set', '--log_addr', log_ip, '--expt_duration', '30', '--expt_range', '1000000', 
 	 	'--num_rqs', '30000000', '--sample_interval', '1', '--sync_duration', '500', '--server_id'] 
 	client_procs = []
 	for i in range(0, num_clients):
@@ -59,13 +63,13 @@ def mv_results(num_clients, window_sz):
 	os.system('mv *.txt ' + result_dir)
 
 # Single experiment. 
-def single_expt(num_clients, window_sz):
+def single_expt(num_clients, window_sz, log_ip):
 	os.system('rm *.txt')
-	log_proc = init_fuzzy_log()
-	client_procs = init_clients(num_clients, window_sz)
+	# log_proc = init_fuzzy_log()
+	client_procs = init_clients(num_clients, window_sz, log_ip)
 	for c in client_procs:
 		c.wait()
-	log_proc.kill()
+	# log_proc.kill()
 	mv_results(num_clients, window_sz)
 
 if __name__ == "__main__":

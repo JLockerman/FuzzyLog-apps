@@ -59,7 +59,6 @@ def vary_window_single(num_clients, window_sizes):
 	return result_dict
 
 
-
 def single_expt(num_clients, sync_duration):
 	result_dir = exp.get_resultdir_name(num_clients, sync_duration)
 	result_files = os.listdir(result_dir)	
