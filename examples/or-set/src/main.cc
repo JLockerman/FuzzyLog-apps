@@ -89,7 +89,7 @@ void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<doub
 	struct colors c;
 	c.numcolors = 1;
 	c.mycolors = new ColorID[1];
-	c.mycolors[0] = 2; 
+	c.mycolors[0] = cfg.server_id + 1; 
 	
 	auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
 	auto orset = new or_set(handle, &c, cfg.server_id, cfg.sync_duration);	
@@ -97,7 +97,7 @@ void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<doub
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
 	
 	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 
-//	wait_signal(cfg);	
+	wait_signal(cfg);	
 	std::cerr << "Worker " << (uint64_t)cfg.server_id << " initialized!\n";
 	tester->do_run(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration);
 	close_dag_handle(handle);
