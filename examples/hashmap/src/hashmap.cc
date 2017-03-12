@@ -23,6 +23,10 @@ void HashMap::get_interesting_colors(std::vector<workload_config>* workload, std
                         break;
                 }
         }
+        if (interesting_colors.size() == 0) {
+                // Make dummy interesting color (without this, synchronizer's get_next doesn't proceed) 
+                interesting_colors.push_back((ColorID)1);
+        }
 }
 
 void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {

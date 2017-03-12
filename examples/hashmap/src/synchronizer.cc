@@ -72,9 +72,7 @@ void Synchronizer::Execute() {
                                 key = (uint32_t)(data >> 32);
                                 val = (uint32_t)(data & 0xFFFFFFFF); 
 
-                                //std::cout << "sync k:" << key << ", v:" << val << std::endl;
-
-                                // TODO: update to local map
+                                // update to local map
                                 m_local_map[key] = val;
                         }
                 }
