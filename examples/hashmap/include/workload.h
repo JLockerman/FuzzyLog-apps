@@ -49,12 +49,14 @@ private:
         uint32_t                                m_start;
         uint32_t                                m_end;
         struct colors*                          m_color;
+        struct colors*                          m_dep_color;
         Context*                                m_context;
         optype                                  m_op_type;
 public:
-        ycsb_insert(HashMap* map, struct colors* color, uint32_t start, uint32_t end, Context* context, optype op_type) {
+        ycsb_insert(HashMap* map, struct colors* color, struct colors* dep_color, uint32_t start, uint32_t end, Context* context, optype op_type) {
                 this->m_map = map;
                 this->m_color = color;
+                this->m_dep_color = dep_color;
                 this->m_start = start;
                 this->m_end = end;
                 this->m_context = context;

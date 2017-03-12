@@ -82,11 +82,11 @@ uint32_t HashMap::get(uint32_t key) {
         return val;
 }
 
-void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color) {
+void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
         uint64_t data = ((uint64_t)key << 32) | value;
         // For latency measurement 
         auto start_time = std::chrono::system_clock::now();
-        append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, NULL);
+        append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
         auto end_time = std::chrono::system_clock::now();
         auto latency = end_time - start_time; 
         m_latencies.push_back(latency);
@@ -101,12 +101,12 @@ void HashMap::remove(uint32_t key, struct colors* op_color) {
         m_cache.erase(key);
 }
 
-void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color) {
+void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
         // For latency measurement 
         auto start_time = std::chrono::system_clock::now();
         // Async append 
         uint64_t data = ((uint64_t)key << 32) | value;
-        write_id wid = async_append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, NULL);
+        write_id wid = async_append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
         new_write_id nwid;
         nwid.id = wid;
         // Mark start time

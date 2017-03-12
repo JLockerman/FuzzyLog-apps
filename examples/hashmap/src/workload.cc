@@ -11,7 +11,7 @@ void ycsb_insert::Run() {
         key = rand() % (m_end - m_start);
         value = rand();
 
-        m_map->put(key, value, m_color);
+        m_map->put(key, value, m_color, m_dep_color);
         // increment executed count
         m_context->inc_num_executed();
 }
@@ -24,7 +24,7 @@ void ycsb_insert::AsyncRun() {
         key = rand() % (m_end - m_start);
         value = rand();
 
-        m_map->async_put(key, value, m_color);
+        m_map->async_put(key, value, m_color, m_dep_color);
 }
 
 void ycsb_read::Run() {
@@ -80,7 +80,7 @@ Txn** workload_generator::Gen() {
                                 if ((*m_workload)[j].op_type == "get") {
                                         txns[i] = new ycsb_read(m_map, &(*m_workload)[j].color, 0, m_range, m_context, Txn::optype::GET);
                                 } else if ((*m_workload)[j].op_type == "put") {
-                                        txns[i] = new ycsb_insert(m_map, &(*m_workload)[j].color, 0, m_range, m_context, Txn::optype::PUT);
+                                        txns[i] = new ycsb_insert(m_map, &(*m_workload)[j].color, &(*m_workload)[j].has_dependency? &(*m_workload)[j].dep_color : NULL, 0, m_range, m_context, Txn::optype::PUT);
                                 }
                                 allocations[j] = allocations[j] - 1;
                                 i++;
