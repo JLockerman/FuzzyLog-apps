@@ -234,7 +234,7 @@ class MultiputTestCase(FuzzMapTestCase):
                 client_procs = []
                 client_ips = self.client_ips[test_region]
                 log_addr = self.get_log_addr(self.server_ips[test_region])
-                self.assertEqual(len(client_ips) >= 2, 'At least 2 client machines are required')
+                self.assertTrue(len(client_ips) >= 2, 'At least 2 client machines are required')
 
                 # operation ratio
                 multiput_op = int(self.op_count * multiput_percent / 100.0)
