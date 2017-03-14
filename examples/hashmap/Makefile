@@ -5,7 +5,7 @@ DELOS_LIB=$(DELOS_RUST_LOC)/examples/c_linking/target/release $(DELOS_RUST_LOC)/
 LIB_DIRS=./libs/lib/ $(DELOS_LIB)
 LIBPATH=$(foreach d, $(LIB_DIRS), -L$d)
 LIBS=-pthread -lc_link -ldl -lrt -lcityhash
-INC_DIRS=include libs/include
+INC_DIRS=include libs/include $(DELOS_RUST_LOC)/examples/c_linking
 INCLUDE=$(foreach d, $(INC_DIRS), -I$d)
 
 build/%.o: src/%.cc 
