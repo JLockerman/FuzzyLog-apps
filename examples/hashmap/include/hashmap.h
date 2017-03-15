@@ -63,11 +63,11 @@ public:
 
         // Synchronous operations
         uint32_t get(uint32_t key);
-        void put(uint32_t key, uint32_t value, struct colors* op_color);
+        void put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color);
         void remove(uint32_t key, struct colors* op_color);
 
         // Asynchronous operations
-        void async_put(uint32_t key, uint32_t value, struct colors* op_color);
+        void async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color);
         void flush_completed_puts();
         new_write_id try_wait_for_any_put();
         new_write_id wait_for_any_put();

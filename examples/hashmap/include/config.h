@@ -30,6 +30,8 @@ static struct option long_options[] = {
 struct workload_config {
         std::string                     op_type;
         struct colors                   color;
+        struct colors                   dep_color;
+        bool                            has_dependency;
         uint64_t                        op_count;
 };
 
@@ -112,11 +114,12 @@ private:
                 // workload
                 std::vector<std::string> workloads = split(std::string(_arg_map[WORKLOAD]), ',');
                 for (auto w : workloads) {
-                        // parse: <get|put>@<color[:color2]>=<op_count>                        
+                        // parse: {get|put}@color_name[-color_name]=op_count
+                        // color_name = color_value[:color_value]...
                         std::vector<std::string> pair = split(w, '='); 
                         assert(pair.size() == 2); 
 
-                        // op type
+                        // operation type = {get|put}
                         std::vector<std::string> op_type_and_color = split(pair[0], '@');
                         assert(op_type_and_color.size() == 2); 
                         std::string op_type = op_type_and_color[0]; 
@@ -125,14 +128,23 @@ private:
                                 exit(-1);
                         }
 
-                        // color
-                        std::vector<std::string> color_list = split(op_type_and_color[1], ':');
-                        struct colors c;
-                        c.numcolors = color_list.size();
-                        c.mycolors = new ColorID[color_list.size()];
-                        for (auto i = 0; i < color_list.size(); ++i) {
-                                c.mycolors[i] = (ColorID)stoi(color_list[i]);
-                        }
+                        // color scheme = color_name[-color_name]
+                        struct colors color;
+                        struct colors dep_color;
+                        std::string& color_scheme = op_type_and_color[1];
+                        std::vector<std::string> color_dep = split(color_scheme, '-');
+                        assert(color_dep.size() <= 2);
+                        bool has_dependency = color_dep.size() == 2;
+
+                        if (has_dependency) {
+                                // depedency color
+                                string_to_colors(color_dep[0], &color);
+                                string_to_colors(color_dep[1], &dep_color);
+
+                        } else {
+                                // no depedency color
+                                string_to_colors(color_scheme, &color);
+                        }        
 
                         // op_count
                         uint32_t op_count = (uint32_t)stoi(pair[1]);
@@ -140,7 +152,9 @@ private:
                         // workload
                         workload_config wc;
                         wc.op_type = op_type;
-                        wc.color = c;
+                        wc.color = color;
+                        wc.dep_color = dep_color;
+                        wc.has_dependency = has_dependency; 
                         wc.op_count = op_count; 
                         ret.workload.push_back(wc);
                 }
@@ -156,6 +170,17 @@ private:
 
 		return ret;
 	}
+
+        void string_to_colors(std::string& str, struct colors* out)
+        {
+                std::vector<std::string> color_list = split(str, ':');
+                out->numcolors = color_list.size();
+                out->mycolors = new ColorID[color_list.size()];
+                for (auto i = 0; i < color_list.size(); ++i) {
+                        out->mycolors[i] = (ColorID)stoi(color_list[i]);
+                }
+        }
+
 
 
 public:

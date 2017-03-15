@@ -89,5 +89,4 @@ ENV/
 .ropeproject
 
 # gnuplot
-*.data
 *.eps
