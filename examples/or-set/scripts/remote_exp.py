@@ -199,16 +199,15 @@ def main():
 	instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, instances))
 	test_instances(instance_ips, KEYFILE)
 
-	#nclients = [1,4,8,12,16]
-	#windows = [32]
-	#for c in nclients:
-	#	for w in windows:
-	#		os.system('mkdir -p results/c_' + str(c) + 'w_' + str(w))
-	#		fuzzylog_exp(instance_ips, c, w)	
-	#		os.system('mv *.txt results/c_' + str(c) + 'w_' + str(w))
+	nclients = [16]
+	windows = [16,32,64]
+	for c in nclients:
+		for w in windows:
+			#os.system('mkdir -p results/c_' + str(c) + 'w_' + str(w))
+			fuzzylog_exp(instance_ips, c, w)	
+			#os.system('mv *.txt results/c_' + str(c) + 'w_' + str(w))
 
 	os.system('scp -r -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ubuntu@' + instance_ips[1]['public'] + ':~/fuzzylog/delos-apps/examples/or-set/results .')	
-	os.system('scp -r -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ubuntu@' + instance_ips[0]['public'] + ':~/fuzzylog/delos-apps/examples/or-set/results .')	
 	stop_instances(REGION, instances)	
 
 if __name__ == "__main__":

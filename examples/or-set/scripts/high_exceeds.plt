@@ -19,9 +19,14 @@ set ylabel 'Throughput ' font ",40" offset -9
 set xrange [1:32]
 set logscale x
 set xtics ("1" 1, "2" 2, "4" 4, "8" 8, "16" 16, "32" 32)
-set yrange [0:200]
+set logscale y
+set yrange [1:128]
 set xlabel 'Window size' font ",40" offset 0,-2.5
-plot "throughput_1.txt" using 1:2 title "1 client" with linespoints pt 6 ps 4 lt 4 lc rgb "red" linewidth 10 
+plot "throughput_1.txt" using 1:2 title "1 client" with linespoints pt 6 ps 4 lt 4 lc rgb "red" linewidth 10, \
+ "throughput_4.txt" using 1:2 title "1 client" with linespoints pt 6 ps 4 lt 4 lc rgb "orange" linewidth 10, \
+"throughput_8.txt" using 1:2 title "1 client" with linespoints pt 6 ps 4 lt 4 lc rgb "dark-green" linewidth 10, \
+ "throughput_12.txt" using 1:2 title "1 client" with linespoints pt 6 ps 4 lt 4 lc rgb "blue" linewidth 10, \
+ "throughput_16.txt" using 1:2 title "1 client" with linespoints pt 6 ps 4 lt 4 lc rgb "dark-pink" linewidth 10 
 
 unset xtics
 unset key

@@ -13,7 +13,7 @@ def main():
 		print 'The DELOS_ORSET_LOC environment variable must point to the top level of the or-set example directory'	
 		sys.exit()
 	
-	log_ip = sys.argv[1]
+	log_ips = sys.argv[1]
 	client = int(sys.argv[2])
 	window_sz = int(sys.argv[3])
 	os.chdir(os.getenv('DELOS_ORSET_LOC'))
