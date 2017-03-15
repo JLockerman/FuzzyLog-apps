@@ -1,7 +1,6 @@
 #include <or_set.h>
 #include <or_set_tester.h>
 #include <chrono>
-#include <worker.h>
 #include <workload_generator.h>
 #include <config.h>
 #include <tuple>
@@ -50,6 +49,9 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*>
 
 void wait_signal(config cfg)
 {
+	assert(false);
+	
+	/*
 	char buffer[DELOS_MAX_DATA_SIZE];
 	size_t buf_sz;
 	struct colors c, depends, interested;	
@@ -85,6 +87,7 @@ void wait_signal(config cfg)
 		}
 	}	
 	close_dag_handle(handle);	
+	*/
 }
 
 void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<double> &throughput_samples)
@@ -94,7 +97,21 @@ void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<doub
 	c.mycolors = new ColorID[1];
 	c.mycolors[0] = cfg.server_id + 1; 
 	
-	auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
+	
+	size_t num_servers = cfg.log_addr.size();
+	assert(num_servers > 0);
+
+	const char *lock_server = cfg.log_addr[0].c_str();
+	const char *server_ips[num_servers];
+	auto i = 0;
+	for (auto ip : cfg.log_addr) { 
+		server_ips[i] = ip.c_str();
+		i += 1;
+	}
+
+	auto handle = new_dag_handle(lock_server, num_servers, server_ips, &c);
+	
+	//auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
 	auto orset = new or_set(handle, &c, cfg.server_id, cfg.sync_duration);	
 
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);

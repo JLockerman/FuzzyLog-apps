@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sstream>
+#include <vector>
 #include <string>
 #include <cstdint>
 #include <cassert>
@@ -21,15 +23,15 @@ static struct option long_options[] = {
 };
 
 struct config {
-	std::string 		log_addr;
-	int	 		expt_duration;
-	uint64_t 		expt_range;
-	uint8_t 		server_id;		
-	uint64_t		sync_duration; 	
-	uint64_t 		window_sz;	
-	uint64_t 		num_clients;
-	uint64_t 		num_rqs;
-	int 			sample_interval;
+	std::vector<std::string> 		log_addr;
+	int			 		expt_duration;
+	uint64_t 				expt_range;
+	uint8_t 				server_id;		
+	uint64_t				sync_duration; 	
+	uint64_t 				window_sz;	
+	uint64_t		 		num_clients;
+	uint64_t 				num_rqs;
+	int 					sample_interval;
 }; 
 
 class config_parser {
@@ -100,10 +102,18 @@ private:
 		ret.server_id = (uint8_t)atoi(_arg_map[SERVER_ID]);
 		ret.num_clients = (uint64_t)atoi(_arg_map[NUM_CLIENTS]);
 		ret.window_sz = (uint64_t)atoi(_arg_map[WINDOW_SZ]);
-		ret.log_addr.assign(_arg_map[LOG_ADDR]);
 		ret.sync_duration = (uint64_t)atoi(_arg_map[SYNC_DURATION]);	
 		ret.num_rqs = (uint64_t)atoi(_arg_map[NUM_RQS]);
 		ret.sample_interval = atoi(_arg_map[SAMPLE_INTERVAL]);
+		
+		std::string log_addresses;
+		log_addresses.assign(_arg_map[LOG_ADDR]);
+		std::stringstream addr_s(log_addresses);	
+		std::string item;
+			
+		while (getline(addr_s, item, ',')) 
+			ret.log_addr.push_back(item);
+		
 		return ret;
 	}
 
