@@ -52,7 +52,7 @@ void wait_signal(config cfg)
 {
 	char buffer[DELOS_MAX_DATA_SIZE];
 	size_t buf_sz;
-	struct colors c, depends;	
+	struct colors c, depends, interested;	
 	auto num_received = 0;
 
 	ColorID sig_color[1];	
@@ -61,6 +61,8 @@ void wait_signal(config cfg)
 	c.numcolors = 1;
 	buf_sz = 1;
 	
+	interested = c;
+
 	auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
 
 	depends.mycolors = NULL;
@@ -68,18 +70,19 @@ void wait_signal(config cfg)
 		
 	append(handle, buffer, buf_sz, &c, &depends);
 	assert(c.numcolors == 1 && c.mycolors[0] == 1);
-	while (true) {
+	while (num_received < cfg.num_clients) {
 		snapshot(handle);
-		get_next(handle, buffer, &buf_sz, &c);
-		assert(c.numcolors == 0 || c.numcolors == 1);	
-		if (c.numcolors == 1) {
-			//assert(c.mycolors[0] == 1);
-			num_received += 1;
-			free(c.mycolors);
+		while (true) {
+			get_next(handle, buffer, &buf_sz, &c);
+			assert(c.numcolors == 0 || c.numcolors == 1);	
+			if (c.numcolors == 1) {
+				//assert(c.mycolors[0] == 1);
+				num_received += 1;
+				free(c.mycolors);
+			} else {
+				break;
+			}
 		}
-		
-		if (num_received == cfg.num_clients)
-			break;
 	}	
 	close_dag_handle(handle);	
 }
@@ -97,7 +100,7 @@ void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<doub
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
 	
 	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 
-	wait_signal(cfg);	
+//	wait_signal(cfg);	
 	std::cerr << "Worker " << (uint64_t)cfg.server_id << " initialized!\n";
 	tester->do_run(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration);
 	close_dag_handle(handle);
