@@ -11,7 +11,6 @@ extern "C" {
         #include "fuzzy_log.h"
 }
 
-
 // Synchronizer class which eagerly synchronize with fuzzylog 
 class Synchronizer : public Runnable {
 public:
@@ -27,7 +26,7 @@ public:
         std::mutex                                                              m_local_map_mtx;
         
 public:
-        Synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
+        Synchronizer(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<ColorID>& interesting_colors);
         ~Synchronizer() {}
         virtual void run();
         virtual void join();

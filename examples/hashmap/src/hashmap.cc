@@ -5,13 +5,13 @@
 #include <unistd.h>
 
 
-HashMap::HashMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload) {
+HashMap::HashMap(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<workload_config>* workload) {
         // find interesting colors from get workload
-        init_fuzzylog_client(log_addr); 
+        init_fuzzylog_client(log_addr, txn_version); 
 
         std::vector<ColorID> interesting_colors;
         get_interesting_colors(workload, interesting_colors); 
-        init_synchronizer(log_addr, interesting_colors); 
+        init_synchronizer(log_addr, txn_version, interesting_colors); 
 }
 
 void HashMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors) {
@@ -29,7 +29,7 @@ void HashMap::get_interesting_colors(std::vector<workload_config>* workload, std
         }
 }
 
-void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
+void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr, uint8_t txn_version) {
         // This color is not used
         struct colors* c;
         c = (struct colors*)malloc(sizeof(struct colors));
@@ -39,7 +39,11 @@ void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
         // Initialize fuzzylog connection
         if (log_addr->size() == 1) {
                 const char *server_ip = log_addr->at(0).c_str();
-                m_fuzzylog_client_for_put = new_dag_handle_for_single_server(server_ip, c);
+                const char *server_ips[] = { server_ip };
+                if (txn_version == txn_protocol::INIT) 
+                        m_fuzzylog_client_for_put = new_dag_handle(NULL, 1, server_ips, c);
+                else if (txn_version == txn_protocol::SKEENS)
+                        m_fuzzylog_client_for_put = new_dag_handle_with_skeens(1, server_ips, c);
         } else {
                 const char *lock_server_ip = log_addr->at(0).c_str();
                 size_t num_chain_servers = log_addr->size() - 1;
@@ -47,12 +51,15 @@ void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_ips[i] = log_addr->at(i+1).c_str();
                 }
-                m_fuzzylog_client_for_put = new_dag_handle(lock_server_ip, num_chain_servers, chain_server_ips, c);
+                if (txn_version == txn_protocol::INIT)
+                        m_fuzzylog_client_for_put = new_dag_handle(lock_server_ip, num_chain_servers, chain_server_ips, c);
+                else if (txn_version == txn_protocol::SKEENS)
+                        m_fuzzylog_client_for_put = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, c);
         }
 }
 
-void HashMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors) {
-        m_synchronizer = new Synchronizer(log_addr, interesting_colors);
+void HashMap::init_synchronizer(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<ColorID>& interesting_colors) {
+        m_synchronizer = new Synchronizer(log_addr, txn_version, interesting_colors);
         m_synchronizer->run();
 }
 

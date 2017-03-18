@@ -2,10 +2,11 @@
 #include <cstring>
 #include <cassert>
 #include <thread>
+#include <hashmap.h>
 
 static char out[DELOS_MAX_DATA_SIZE];
 
-Synchronizer::Synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors) {
+Synchronizer::Synchronizer(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<ColorID>& interesting_colors) {
         uint32_t i;
         struct colors* c;
         c = (struct colors*)malloc(sizeof(struct colors));
@@ -18,7 +19,11 @@ Synchronizer::Synchronizer(std::vector<std::string>* log_addr, std::vector<Color
 
         if (log_addr->size() == 1) {
                 const char *server_ip = log_addr->at(0).c_str();
-                m_fuzzylog_client = new_dag_handle_for_single_server(server_ip, c);
+                const char *server_ips[] = { server_ip };
+                if (txn_version == HashMap::txn_protocol::INIT)
+                        m_fuzzylog_client = new_dag_handle(NULL, 1, server_ips, c);
+                else if (txn_version == HashMap::txn_protocol::SKEENS)
+                        m_fuzzylog_client = new_dag_handle_with_skeens(1, server_ips, c);
         } else {
                 const char *lock_server_ip = log_addr->at(0).c_str();
                 size_t num_chain_servers = log_addr->size() - 1;
@@ -26,7 +31,10 @@ Synchronizer::Synchronizer(std::vector<std::string>* log_addr, std::vector<Color
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_ips[i] = log_addr->at(i+1).c_str();
                 }
-                m_fuzzylog_client = new_dag_handle(lock_server_ip, num_chain_servers, chain_server_ips, c);
+                if (txn_version == HashMap::txn_protocol::INIT)
+                        m_fuzzylog_client = new_dag_handle(lock_server_ip, num_chain_servers, chain_server_ips, c);
+                else if (txn_version == HashMap::txn_protocol::SKEENS)
+                        m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, c);
         }
 
         this->m_running = true;
