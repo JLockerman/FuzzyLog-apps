@@ -4,6 +4,7 @@
 #include <cassert>
 #include <unistd.h>
 
+#define DUMMY_INTERESTING_COLOR         100000
 
 HashMap::HashMap(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<workload_config>* workload) {
         // find interesting colors from get workload
@@ -25,17 +26,17 @@ void HashMap::get_interesting_colors(std::vector<workload_config>* workload, std
         }
         if (interesting_colors.size() == 0) {
                 // Make dummy interesting color (without this, synchronizer's get_next doesn't proceed) 
-                interesting_colors.push_back((ColorID)1);
+                interesting_colors.push_back((ColorID)DUMMY_INTERESTING_COLOR);
         }
 }
 
 void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr, uint8_t txn_version) {
-        // This color is not used
+        // XXX This color is not used
         struct colors* c;
         c = (struct colors*)malloc(sizeof(struct colors));
         c->numcolors = 1;
         c->mycolors = (ColorID*)malloc(sizeof(ColorID));
-        c->mycolors[0] = 1;
+        c->mycolors[0] = (ColorID)DUMMY_INTERESTING_COLOR;
         // Initialize fuzzylog connection
         if (log_addr->size() == 1) {
                 const char *server_ip = log_addr->at(0).c_str();
