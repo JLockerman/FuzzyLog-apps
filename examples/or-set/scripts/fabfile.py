@@ -17,13 +17,16 @@ def fuzzylog_proc(port, maxthreads):
 		else:
 			run('target/release/delos_tcp_server ' + str(port) + ' -w ' + str(maxthreads))
 
+def check_network_statistics():
+	run('netstat -i')
+
 def clean_crdt():
 	with cd('fuzzylog/delos-apps/examples/or-set'):
 		run('rm *.txt')
 
-def run_crdt_clients(log_addr, num_clients, window_sz):
+def run_crdt_clients(log_addr, start_clients, num_clients, window_sz):
 	with cd('fuzzylog/delos-apps/examples/or-set'):
-		args = 'scripts/exp.py ' + str(log_addr) + ' ' + str(num_clients) + ' ' + str(window_sz)
+		args = 'scripts/exp.py ' + str(log_addr) + ' ' + str(start_clients) + ' ' + str(num_clients) + ' ' + str(window_sz)
 		run(args)
 
 def crdt_proc(log_addr, duration, exp_range, server_id, sync_duration,

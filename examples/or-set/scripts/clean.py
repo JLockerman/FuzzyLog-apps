@@ -31,6 +31,39 @@ def latency_proc(results, filename):
 
 	outfile.close()			
 	
+
+def get_single_server_info(filename):
+	handle = open(filename)
+	lines = handle.readlines()
+	io_readings = []
+	for l in lines:
+		pieces = l.split()	
+		if 'eth0' in pieces:
+			idx = pieces.index('eth0')		
+			io_count = int(pieces[idx+3])
+			io_readings.append(io_count)
+	handle.close()
+	return io_readings[len(io_readings)-1] - io_readings[0]
+
+def get_server_stats(server_count):
+	filename_format = 's{0}_{1}' 
+	server_info = []
+	for s in range(0, server_count):
+		filename = filename_format.format(str(server_count), str(s))				
+		server_info.append(get_single_server_info(os.path.join('stats', filename)))	
+	return server_info	
+
+def postprocess_server_stats(server_list):
+	results = []
+	for s in server_list:
+		results.append(' '.join(str(x) for x in get_server_stats(s)))
+	
+	filename = 'server_stats.txt'
+	f = open(filename, 'w')
+	for s, r in zip(server_list, results):
+		f.write(str(s) + ' ' + r + '\n')	
+	f.close()
+
 def latency_window(num_clients, window_sz):
 	result_dir = exp.get_resultdir_name(num_clients, window_sz)
 	result_files = []
