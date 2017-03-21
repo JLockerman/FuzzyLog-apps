@@ -41,6 +41,11 @@ namespace std {
 
 
 class HashMap {
+public:
+        typedef enum {
+                INIT = 1,
+                SKEENS = 2,
+        } txn_protocol;
 
 private:
         std::unordered_map<uint32_t, uint32_t>          m_cache;  
@@ -54,12 +59,12 @@ private:
         Synchronizer*                                   m_synchronizer; 
 
 public:
-        HashMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload);
+        HashMap(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<workload_config>* workload);
         ~HashMap();
 
         void get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors);
-        void init_fuzzylog_client(std::vector<std::string>* log_addr);
-        void init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
+        void init_fuzzylog_client(std::vector<std::string>* log_addr, uint8_t txn_version);
+        void init_synchronizer(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<ColorID>& interesting_colors);
 
         // Synchronous operations
         uint32_t get(uint32_t key);

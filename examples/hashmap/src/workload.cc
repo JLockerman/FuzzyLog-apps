@@ -80,7 +80,7 @@ Txn** workload_generator::Gen() {
                                 if ((*m_workload)[j].op_type == "get") {
                                         txns[i] = new ycsb_read(m_map, &(*m_workload)[j].color, 0, m_range, m_context, Txn::optype::GET);
                                 } else if ((*m_workload)[j].op_type == "put") {
-                                        txns[i] = new ycsb_insert(m_map, &(*m_workload)[j].color, &(*m_workload)[j].has_dependency? &(*m_workload)[j].dep_color : NULL, 0, m_range, m_context, Txn::optype::PUT);
+                                        txns[i] = new ycsb_insert(m_map, &(*m_workload)[j].color, (*m_workload)[j].has_dependency ? &(*m_workload)[j].dep_color : NULL, 0, m_range, m_context, Txn::optype::PUT);
                                 }
                                 allocations[j] = allocations[j] - 1;
                                 i++;
