@@ -91,9 +91,6 @@ uint32_t HashMap::get(uint32_t key) {
         val = m_synchronizer->get(key);
         lock.unlock();
 
-        // Cache value
-        m_cache[key] = val;        
-
         return val;
 }
 
@@ -107,9 +104,6 @@ void HashMap::remove(uint32_t key, struct colors* op_color) {
         // Note: remove is the same as putting a zero value
         uint64_t data = (uint64_t)key << 32;
         append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, NULL);
-
-        // Remove cache
-        m_cache.erase(key);
 }
 
 void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {

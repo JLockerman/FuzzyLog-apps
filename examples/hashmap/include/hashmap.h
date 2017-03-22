@@ -48,7 +48,6 @@ public:
         } txn_protocol;
 
 private:
-        std::unordered_map<uint32_t, uint32_t>          m_cache;  
         DAGHandle*                                      m_fuzzylog_client_for_put;
        
         // Color synchronizer
