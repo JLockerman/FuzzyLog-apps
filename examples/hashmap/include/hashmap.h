@@ -51,10 +51,6 @@ private:
         std::unordered_map<uint32_t, uint32_t>          m_cache;  
         DAGHandle*                                      m_fuzzylog_client_for_put;
        
-        // Map for tracking latencies
-        std::unordered_map<new_write_id, std::chrono::time_point<std::chrono::system_clock>>   m_start_time_map;
-        std::vector<std::chrono::duration<double>>                                             m_latencies;
-
         // Color synchronizer
         Synchronizer*                                   m_synchronizer; 
 

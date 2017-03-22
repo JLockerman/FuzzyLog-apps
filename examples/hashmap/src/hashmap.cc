@@ -100,11 +100,7 @@ uint32_t HashMap::get(uint32_t key) {
 void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
         uint64_t data = ((uint64_t)key << 32) | value;
         // For latency measurement 
-        auto start_time = std::chrono::system_clock::now();
         append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
-        auto end_time = std::chrono::system_clock::now();
-        auto latency = end_time - start_time; 
-        m_latencies.push_back(latency);
 }
 
 void HashMap::remove(uint32_t key, struct colors* op_color) {
@@ -117,15 +113,9 @@ void HashMap::remove(uint32_t key, struct colors* op_color) {
 }
 
 void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
-        // For latency measurement 
-        auto start_time = std::chrono::system_clock::now();
         // Async append 
         uint64_t data = ((uint64_t)key << 32) | value;
         write_id wid = async_append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
-        new_write_id nwid;
-        nwid.id = wid;
-        // Mark start time
-        m_start_time_map[nwid] = start_time;
 }
 
 void HashMap::flush_completed_puts() {
@@ -138,17 +128,6 @@ new_write_id HashMap::try_wait_for_any_put() {
         write_id wid = try_wait_for_any_append(m_fuzzylog_client_for_put);
         new_write_id nwid;
         nwid.id = wid; 
-
-        if (nwid == NEW_WRITE_ID_NIL) return nwid;      // no more pending appends 
-
-        // Measure latency
-        auto searched = m_start_time_map.find(nwid);
-        assert(searched != m_start_time_map.end());
-        auto end_time = std::chrono::system_clock::now();
-        auto latency = end_time - searched->second;
-        m_latencies.push_back(latency);
-        m_start_time_map.erase(nwid);
-        
         return nwid;
 }
 
@@ -157,17 +136,6 @@ new_write_id HashMap::wait_for_any_put() {
         write_id wid = wait_for_any_append(m_fuzzylog_client_for_put);
         new_write_id nwid;
         nwid.id = wid; 
-
-        if (nwid == NEW_WRITE_ID_NIL) return nwid;      // no more pending appends 
-
-        // Measure latency
-        auto searched = m_start_time_map.find(nwid);
-        assert(searched != m_start_time_map.end());
-        auto end_time = std::chrono::system_clock::now();
-        auto latency = end_time - searched->second;
-        m_latencies.push_back(latency);
-        m_start_time_map.erase(nwid);
-        
         return nwid;
 }
 
