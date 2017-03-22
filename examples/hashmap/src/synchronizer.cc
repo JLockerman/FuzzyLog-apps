@@ -25,16 +25,23 @@ Synchronizer::Synchronizer(std::vector<std::string>* log_addr, uint8_t txn_versi
                 else if (txn_version == HashMap::txn_protocol::SKEENS)
                         m_fuzzylog_client = new_dag_handle_with_skeens(1, server_ips, c);
         } else {
-                const char *lock_server_ip = log_addr->at(0).c_str();
-                size_t num_chain_servers = log_addr->size() - 1;
-                const char *chain_server_ips[num_chain_servers]; 
-                for (auto i = 0; i < num_chain_servers; i++) {
-                        chain_server_ips[i] = log_addr->at(i+1).c_str();
-                }
-                if (txn_version == HashMap::txn_protocol::INIT)
+                if (txn_version == HashMap::txn_protocol::INIT) {
+                        const char *lock_server_ip = log_addr->at(0).c_str();
+                        size_t num_chain_servers = log_addr->size() - 1;
+                        const char *chain_server_ips[num_chain_servers]; 
+                        for (auto i = 0; i < num_chain_servers; i++) {
+                                chain_server_ips[i] = log_addr->at(i+1).c_str();
+                        }
                         m_fuzzylog_client = new_dag_handle(lock_server_ip, num_chain_servers, chain_server_ips, c);
-                else if (txn_version == HashMap::txn_protocol::SKEENS)
+
+                } else if (txn_version == HashMap::txn_protocol::SKEENS) {
+                        size_t num_chain_servers = log_addr->size();
+                        const char *chain_server_ips[num_chain_servers]; 
+                        for (auto i = 0; i < num_chain_servers; i++) {
+                                chain_server_ips[i] = log_addr->at(i).c_str();
+                        }
                         m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, c);
+                }
         }
 
         this->m_running = true;
