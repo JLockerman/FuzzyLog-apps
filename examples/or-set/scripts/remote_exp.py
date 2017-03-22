@@ -14,7 +14,7 @@ import time
 # XXX Should probably go into a config file. 
 SUBNET_ID = 'subnet-95bce7b8' 
 SECURITY_GROUP = 'sg-1d531961' 
-IMAGE_ID='ami-2d3f883b'
+IMAGE_ID='ami-52b40444'
 KEYFILE = '~/.ssh/jmfaleiro.pem'
 REGION = 'us-east-1'
 SERVER_INSTANCE_TYPE = 'm4.16xlarge'
@@ -110,8 +110,8 @@ def stop_all_running_instances(region):
 	instance_list = get_running_instances(region)
 	stop_instances(region, instance_list)	
 
-def launch_client_controller(fabhost, keyfile, logaddr, start_clients, num_clients, window_sz):
-	launch_str = 'run_crdt_clients:' + logaddr + ',' + str(start_clients) + ',' + str(num_clients) + ',' + str(window_sz)	
+def launch_client_controller(fabhost, keyfile, logaddr, start_clients, num_clients, window_sz, duration):
+	launch_str = 'run_crdt_clients:' + logaddr + ',' + str(start_clients) + ',' + str(num_clients) + ',' + str(window_sz) + ',' + str(duration)	
 	return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])
 
 # Launch a CRDT applicatino process.
@@ -162,8 +162,7 @@ def launch_fuzzylog(fabhost, keyfile, port, nthreads=-1):
 # Fabric only supports synchronous calls to hosts. Create a process per-remote call, 
 # either corresponding to a client or server. Manage clients and servers by joining/killing
 # these processes.  
-def fuzzylog_exp(server_instances, client_instances, clients_per_instance, window_sz):
-	duration = 60 
+def fuzzylog_exp(server_instances, client_instances, clients_per_instance, window_sz, duration):
 	sync_duration = 300
 	exp_range = 1000000
 	num_rqs = 30000000
@@ -184,6 +183,7 @@ def fuzzylog_exp(server_instances, client_instances, clients_per_instance, windo
 	for i in range(0, len(client_instances)):
 		os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + client_instances[i]['public'] + ' clean_crdt')
 		os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + client_instances[i]['public'] + ' kill_crdts')
+		os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + client_instances[i]['public'] + ' enable_logging')
 
 	log_procs = []
 	for i in range(0, len(server_instances)):
@@ -193,12 +193,12 @@ def fuzzylog_exp(server_instances, client_instances, clients_per_instance, windo
 	client_procs = []
 	for i in range(0, len(client_instances)):
 		start_c = i * clients_per_instance
-		client_proc = launch_client_controller(fabhost_prefix+client_instances[i]['public'], keyfile, logaddr, start_c, clients_per_instance, window_sz)	
+		client_proc = launch_client_controller(fabhost_prefix+client_instances[i]['public'], keyfile, logaddr, start_c, clients_per_instance, window_sz, duration)	
 		client_procs.append(client_proc)
 		
 	server_ips = list(map(lambda x: x['public'], server_instances))	
 
-	for i in range(0, 60):
+	for i in range(0, duration):
 		time.sleep(1)	
 		check_statistics(server_ips, keyfile) 
 
@@ -266,20 +266,22 @@ def do_expt():
 	client_instances = launch_instances(4, CLIENT_INSTANCE_TYPE, REGION)
 	# instance_ids = get_stopped_instances(REGION)
 	# instances = start_instances(REGION, instance_ids)
+	server_instances = launch_instances(5, SERVER_INSTANCE_TYPE, REGION)
+
+
 	client_instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, client_instances))
+	server_instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, server_instances))
+	test_instances(server_instance_ips, KEYFILE)
 	test_instances(client_instance_ips, KEYFILE)
 	
 	os.system('mkdir results')
 	
 	num_clients = 4
-	num_warehouses = 32
-
-	server_instances = launch_instances(5, SERVER_INSTANCE_TYPE, REGION)
-	server_instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, server_instances))
-	test_instances(server_instance_ips, KEYFILE)
+	num_warehouses = 48 
+	duration = 90
 
 	for i in range(0, 5):	
-		fuzzylog_exp(server_instance_ips[0:i+1], client_instance_ips, num_clients, num_warehouses)	
+		fuzzylog_exp(server_instance_ips[0:i+1], client_instance_ips, num_clients, num_warehouses, duration)	
 
 		result_dir = 'c' + str(num_clients) + '_s' + str(i+1) + '_w' + str(num_warehouses)
 		os.system('mkdir ' + result_dir)
@@ -290,7 +292,8 @@ def do_expt():
 	terminate_instances(REGION, instances)	
 
 def main():
-	do_expt()
+	do_expt()	
+
 
 
 if __name__ == "__main__":

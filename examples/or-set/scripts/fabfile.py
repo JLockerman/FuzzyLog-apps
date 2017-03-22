@@ -1,5 +1,6 @@
 from fabric.api import run 
 from fabric.api import cd
+from fabric.api import prefix
 
 def ls_test():
 	run('ls')
@@ -24,10 +25,14 @@ def clean_crdt():
 	with cd('fuzzylog/delos-apps/examples/or-set'):
 		run('rm *.txt')
 
-def run_crdt_clients(log_addr, start_clients, num_clients, window_sz):
+def run_crdt_clients(log_addr, start_clients, num_clients, window_sz, duration):
 	with cd('fuzzylog/delos-apps/examples/or-set'):
-		args = 'scripts/exp.py ' + str(log_addr) + ' ' + str(start_clients) + ' ' + str(num_clients) + ' ' + str(window_sz)
+		#with prefix('export RUST_LOG=fuzzy_log'):
+		args = 'scripts/exp.py ' + str(log_addr) + ' ' + str(start_clients) + ' ' + str(num_clients) + ' ' + str(window_sz) + ' ' + str(duration)
 		run(args)
+
+def enable_logging():
+	run('export RUST_LOG=fuzzy_log')
 
 def crdt_proc(log_addr, duration, exp_range, server_id, sync_duration,
 	      num_clients, window_sz, num_rqs, sample_interval):
