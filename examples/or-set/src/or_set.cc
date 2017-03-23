@@ -269,6 +269,9 @@ write_id or_set::async_remove(uint64_t e, char *buf)
 {
 	{
 		std::lock_guard<std::mutex> lck(_instance_mutex);
+		if (_state.count(e) == 0)
+			return WRITE_ID_NIL;	
+
 		auto guid_set = _state[e];
 		do_remove(e, guid_set);
 		return send_remove_async(e, guid_set, buf);

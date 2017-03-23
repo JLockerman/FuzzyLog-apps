@@ -39,7 +39,10 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*>
 	for (i = 0; i < num_inputs; ++i) {
 		auto rq = static_cast<or_set_rq*>(malloc(sizeof(or_set_rq))); 
 		rq->_key = gen.gen_next();
-		rq->_opcode = or_set::log_opcode::ADD;
+		if (rand() % 2 == 0)
+			rq->_opcode = or_set::log_opcode::ADD;
+		else
+			rq->_opcode = or_set::log_opcode::REMOVE;
 			
 		auto temp = reinterpret_cast<tester_request*>(rq);
 		temp->_executed = false;
@@ -136,7 +139,7 @@ int main(int argc, char **argv)
 	std::vector<uint64_t> results;
 	config_parser cfg_prser;			
 	config cfg = cfg_prser.get_config(argc, argv);
-
+	
 	do_experiment(cfg);	
 	return 0;
 }
