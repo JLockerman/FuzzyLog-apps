@@ -25,6 +25,7 @@ void or_set_tester::issue_request(tester_request *rq)
 	write_id w_id;
 	auto fuzzy_buf = _freelist;
 	_freelist = fuzzy_buf->_next;	
+	or_rq->_buffer = fuzzy_buf;
 
 	switch (or_rq->_opcode) {
 	case or_set::log_opcode::ADD:
@@ -36,16 +37,31 @@ void or_set_tester::issue_request(tester_request *rq)
 	default:
 		assert(false);
 	}
-	assert(_request_map.count(w_id) == 0);
-	or_rq->_buffer = fuzzy_buf;
-	_request_map[w_id] = or_rq;
+	
+	if (wid_equality{}(w_id, WRITE_ID_NIL)) {
+		assert(or_rq->_opcode == or_set::log_opcode::REMOVE);
+		_done_requests.push_back(or_rq);
+		return;
+	} else {
+		assert(_request_map.count(w_id) == 0);
+		_request_map[w_id] = or_rq;
+	}
 }
 
 tester_request* or_set_tester::wait_single_request()
 {
-	auto w_id = wait_for_any_append(_fuzzylog);
-	assert(_request_map.count(w_id) > 0);
-	auto rq = _request_map[w_id];
+	tester_request *rq;
+
+	if (_done_requests.size() > 0) {
+		rq = _done_requests.front();
+		_done_requests.pop_front();
+	} else {
+		auto w_id = wait_for_any_append(_fuzzylog);
+		assert(_request_map.count(w_id) > 0);
+		rq = _request_map[w_id];
+		_request_map.erase(w_id);
+	}
+
 	auto or_rq = static_cast<or_set_rq*>(rq);
 	auto buf = or_rq->_buffer;
 	buf->_next = _freelist;

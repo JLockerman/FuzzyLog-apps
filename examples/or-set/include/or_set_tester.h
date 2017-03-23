@@ -6,6 +6,7 @@
 #include <or_set.h>
 #include <fuzzy_log.h>
 #include <functional>
+#include <deque>
 
 struct fuzzylog_buf {
 	fuzzylog_buf 		*_next;
@@ -37,6 +38,7 @@ private:
 	or_set 									*_or_set;	
 	DAGHandle 								*_fuzzylog;
 	std::unordered_map<write_id, or_set_rq*, wid_hasher, wid_equality> 	_request_map;
+	std::deque<or_set_rq*> 							_done_requests;
 	fuzzylog_buf 								*_freelist;
 	
 protected:
