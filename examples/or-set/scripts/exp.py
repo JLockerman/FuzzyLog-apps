@@ -6,18 +6,12 @@ import time
 import sys
 
 def main():
-	if os.getenv('DELOS_RUST_LOC') == None:
-		print 'The DELOS_RUST_LOC environment variable must point to the top level of the delos-rust repo'
-		sys.exit()
-	if os.getenv('DELOS_ORSET_LOC') == None:
-		print 'The DELOS_ORSET_LOC environment variable must point to the top level of the or-set example directory'	
-		sys.exit()
-	
 	log_ips = sys.argv[1]
-	client = int(sys.argv[2])
-	window_sz = int(sys.argv[3])
-	os.chdir(os.getenv('DELOS_ORSET_LOC'))
-	single_expt(client, window_sz, log_ip)
+	start_clients = int(sys.argv[2])
+	client = int(sys.argv[3])
+	window_sz = int(sys.argv[4])
+	duration = int(sys.argv[5])
+	single_expt(start_clients, client, window_sz, log_ips, duration)
 	# clients = [1, 4, 8, 12, 16]
 	# window_sz = [32]
 	# for c in clients:
@@ -37,20 +31,26 @@ def init_fuzzy_log():
 	return proc
 	
 # Start clients.
-def init_clients(num_clients, window_sz, log_ip):
-	args = ['./build/or-set', '--log_addr', log_ip, '--expt_duration', '30', '--expt_range', '1000000', 
+def init_clients(start_clients, num_clients, window_sz, log_ip, duration):
+	args = ['./build/or-set', '--log_addr', log_ip, '--expt_range', '1000000', 
 	 	'--num_rqs', '30000000', '--sample_interval', '1', '--sync_duration', '500', '--server_id'] 
 	client_procs = []
+	log_files = []
 	for i in range(0, num_clients):
 		client_args = list(args)
-		client_args.append(str(i))
+		client_args.append(str(i+start_clients))
+		logf = str(i+start_clients) + '_log.txt'	
+		log_handle = open(logf, 'w')
+		log_files.append(log_handle)
 		client_args.append('--num_clients')
 		client_args.append(str(num_clients))
 		client_args.append('--window_sz')
 		client_args.append(str(window_sz))
-		proc = subprocess.Popen(client_args)
+		client_args.append('--expt_duration')
+		client_args.append(str(duration))
+		proc = subprocess.Popen(client_args, stderr=log_handle, stdout=log_handle)
 		client_procs.append(proc)
-	return client_procs		
+	return zip(client_procs, log_files)		
 	
 def get_resultdir_name(num_clients, window_sz):
 	result_dir = 'results'
@@ -63,12 +63,13 @@ def mv_results(num_clients, window_sz):
 	os.system('mv *.txt ' + result_dir)
 
 # Single experiment. 
-def single_expt(num_clients, window_sz, log_ip):
+def single_expt(start_clients, num_clients, window_sz, log_ip, duration):
 	os.system('rm *.txt')
 	# log_proc = init_fuzzy_log()
-	client_procs = init_clients(num_clients, window_sz, log_ip)
-	for c in client_procs:
+	client_procs = init_clients(start_clients, num_clients, window_sz, log_ip, duration)
+	for c, f in client_procs:
 		c.wait()
+		f.close()
 	# log_proc.kill()
 	mv_results(num_clients, window_sz)
 

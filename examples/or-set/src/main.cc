@@ -92,28 +92,48 @@ void wait_signal(config cfg)
 
 void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<double> &throughput_samples)
 {
+	/* Colors for DAG Handle */
 	struct colors c;
-	c.numcolors = 1;
-	c.mycolors = new ColorID[1];
-	c.mycolors[0] = cfg.server_id + 1; 
+	c.numcolors = cfg.num_clients;
+	c.mycolors = new ColorID[cfg.num_clients];
+	for (auto i = 0; i < cfg.num_clients; ++i) 
+		c.mycolors[i] = (uint8_t)(i+1);	
+	
+	/* Local appends */
+	struct colors local_c;
+	local_c.numcolors = 1;
+	local_c.mycolors = new ColorID[1];
+	local_c.mycolors[0] = (uint8_t)(cfg.server_id + 1);
 	
 	
-	size_t num_servers = cfg.log_addr.size();
-	assert(num_servers > 0);
-
-	const char *lock_server = cfg.log_addr[0].c_str();
-	const char *server_ips[num_servers];
-	auto i = 0;
-	for (auto ip : cfg.log_addr) { 
-		server_ips[i] = ip.c_str();
+	/* For playing back remote appends */
+	std::set<uint8_t> remote_color_set;
+	for (auto i = 0; i < cfg.num_clients; ++i)
+		if (i != cfg.server_id)
+			remote_color_set.insert(i); 
+	
+	struct colors remote_colors;
+	remote_colors.numcolors = cfg.num_clients-1;
+	remote_colors.mycolors = new ColorID[cfg.num_clients-1];
+	auto i = 0; 
+	for (auto c : remote_color_set) {
+		remote_colors.mycolors[i] = c;
 		i += 1;
 	}
 
-	auto handle = new_dag_handle(lock_server, num_servers, server_ips, &c);
-	
-	//auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
-	auto orset = new or_set(handle, &c, cfg.server_id, cfg.sync_duration);	
+	/* Server ips for handle. */
+	size_t num_servers = cfg.log_addr.size();
+	assert(num_servers > 0);
+	const char *server_ips[num_servers];
+	std::cerr << "Num servers: " << num_servers << "\n";
+	std::cerr << "Server list:\n";
+	for (auto i = 0; i < num_servers; ++i) {
+		server_ips[i] = cfg.log_addr[i].c_str();
+		std::cerr << server_ips[i] << "\n";	
+	}
 
+	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
+	auto orset = new or_set(handle, &local_c, &remote_colors, cfg.server_id, cfg.sync_duration);	
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
 	
 	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 

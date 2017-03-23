@@ -42,6 +42,7 @@ private:
 protected:
 	void issue_request(tester_request *rq);
 	void wait_requests(std::set<tester_request*> &done_set); 
+	virtual void use_idle_cycles();
 	tester_request* wait_single_request();
 
 public:

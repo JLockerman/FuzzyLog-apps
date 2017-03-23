@@ -25,6 +25,10 @@ uint32_t async_tester::try_get_pending()
 	return done_rqs.size();
 }
 
+void async_tester::use_idle_cycles()
+{
+}
+
 void async_tester::wait_single()
 {
 	auto rq = wait_single_request();
@@ -73,12 +77,21 @@ void async_tester::run(const std::vector<tester_request*> &requests)
 		assert(rq->_executed == false);
 		if (_quit == true)
 			break;
-	
+		
+		while (num_pending == _window_sz) {
+			use_idle_cycles();
+			auto diff = try_get_pending();
+			num_pending -= diff;
+			_num_elapsed += diff;
+		}	
+
+		/*
 		if (num_pending == _window_sz) {
 			wait_single();	
 			num_pending -= 1;
 			_num_elapsed++;
 		}
+		*/
 			
 		rq->_start_time = std::chrono::system_clock::now();
 		issue_request(rq);	

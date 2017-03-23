@@ -2,11 +2,12 @@
 #include <cassert>
 #include <iostream>
 
-or_set::or_set(DAGHandle *handle, struct colors *color, uint8_t proc_id, 
+or_set::or_set(DAGHandle *handle, struct colors *color, struct colors *remote_colors, uint8_t proc_id, 
 	       uint64_t sync_duration)
 {
 	_log_client = handle;
 	_color = color;
+	_remote_colors = remote_colors;
 	_proc_id = proc_id;
 	_guid_counter = 0;
 	_state.clear();
@@ -31,6 +32,35 @@ uint8_t or_set::get_proc_id(uint64_t code)
 	return static_cast<uint8_t>(0xFF & code);
 }
 
+void or_set::get_single_remote()
+{
+	size_t data_sz, locs_read; 
+	auto entry = get_next2(_log_client, &data_sz, &locs_read);		
+	
+	if (locs_read == 0) {
+		snapshot_colors(_log_client, _remote_colors);
+		return;
+	}	
+	
+	auto uint_buf = reinterpret_cast<const uint64_t*>(entry.data);	
+	auto opcode = uint_buf[0];	
+	assert(get_proc_id(opcode) != _proc_id);
+	switch (get_opcode(opcode)) {
+	case ADD:
+		remote_add(entry.data, data_sz); 
+		break;
+	case REMOVE:
+		remote_remove(entry.data, data_sz);
+		break;
+	default:
+		/* XXX Shouldn't get here!!! */
+		std::cerr << std::showbase << std::hex;
+		std::cerr << opcode << "\n";
+		assert(false); 
+	}
+}
+
+
 void or_set::get_remote_updates()
 {
 	size_t buf_sz;
@@ -39,34 +69,6 @@ void or_set::get_remote_updates()
 	
 	/* XXX Shouldn't get here! */
 	assert(false);
-	
-	snapshot(_log_client);
-	while (true) {
-		get_next(_log_client, _buf, &buf_sz, &c);
-	
-		if (c.numcolors == 0)
-			break;
-		
-		uint_buf = reinterpret_cast<uint64_t*>(_buf);
-		auto opcode = uint_buf[0];			
-	
-		if (get_proc_id(opcode) == _proc_id)
-			continue;
-
-		switch (get_opcode(opcode)) {
-		case ADD: 
-			remote_add(_buf, buf_sz);
-			break;
-		case REMOVE:	
-			remote_remove(_buf, buf_sz);
-			break;
-		default:
-			/* XXX Debugging log playback issue. */
-			std::cerr << std::showbase << std::hex;
-			std::cerr << opcode << "\n";	
-			assert(false);
-		}
-        }
 }
 
 void or_set::check_remotes()
@@ -187,7 +189,7 @@ void or_set::do_remove(uint64_t e, const std::set<uint64_t> &guid_set)
 	}	
 }
 
-void or_set::remote_remove(char *buf, size_t sz)
+void or_set::remote_remove(const uint8_t *buf, size_t sz)
 {
 	uint64_t e;
 	std::set<uint64_t> guids;
@@ -196,7 +198,7 @@ void or_set::remote_remove(char *buf, size_t sz)
 	do_remove(e, guids);
 }
 
-void or_set::remote_add(char *buf, size_t sz)
+void or_set::remote_add(const uint8_t *buf, size_t sz)
 {
 	uint64_t e, guid;
 	
@@ -204,9 +206,9 @@ void or_set::remote_add(char *buf, size_t sz)
 	do_add(e, guid);
 }
 
-void or_set::deserialize_remove(char *buf, size_t sz, uint64_t *e, std::set<uint64_t> *guids)
+void or_set::deserialize_remove(const uint8_t *buf, size_t sz, uint64_t *e, std::set<uint64_t> *guids)
 {
-	auto uint_buf = reinterpret_cast<uint64_t*>(buf);
+	auto uint_buf = reinterpret_cast<const uint64_t*>(buf);
 	auto opcode = get_opcode(uint_buf[0]);
 	assert(opcode == REMOVE);
 	
@@ -217,9 +219,9 @@ void or_set::deserialize_remove(char *buf, size_t sz, uint64_t *e, std::set<uint
 		guids->insert(uint_buf[i]);				
 }
 
-void or_set::deserialize_add(char *buf, size_t sz, uint64_t *e, uint64_t *guid) 
+void or_set::deserialize_add(const uint8_t *buf, size_t sz, uint64_t *e, uint64_t *guid) 
 {
-	auto uint_buf = reinterpret_cast<uint64_t*>(buf);
+	auto uint_buf = reinterpret_cast<const uint64_t*>(buf);
 	auto opcode = get_opcode(uint_buf[0]); 
 	assert(opcode == ADD && sz == sizeof(uint64_t)*3);
 

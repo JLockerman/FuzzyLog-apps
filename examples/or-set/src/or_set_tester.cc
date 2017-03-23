@@ -13,6 +13,11 @@ or_set_tester::or_set_tester(uint32_t window_sz, or_set *set, DAGHandle *fuzzylo
 	_freelist[MAX_ASYNC_REQUESTS-1]._next = NULL;	
 }
 
+void or_set_tester::use_idle_cycles()
+{
+	_or_set->get_single_remote();
+}
+
 void or_set_tester::issue_request(tester_request *rq)
 {
 	assert(_freelist != NULL);
@@ -46,6 +51,7 @@ tester_request* or_set_tester::wait_single_request()
 	buf->_next = _freelist;
 	_freelist = buf;
 	or_rq->_buffer = NULL;		
+	_request_map.erase(w_id);
 	return rq;
 }
 

@@ -23,7 +23,8 @@ protected:
 	virtual void issue_request(tester_request *rq) = 0;
 	virtual void wait_requests(std::set<tester_request*> &done_set) = 0; 
 	virtual tester_request* wait_single_request() = 0;
-
+	virtual void use_idle_cycles(); 
+	
 	void do_measurement(std::vector<double> &samples,
 	  	     	    int interval, 
 			    int duration);

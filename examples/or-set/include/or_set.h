@@ -24,6 +24,7 @@ public:
 private:
 	
 	struct colors 						*_color;
+	struct colors 						*_remote_colors;
 	DAGHandle 						*_log_client;
 	std::unordered_map<uint64_t, std::set<uint64_t> > 	_state;
  	uint64_t 						_guid_counter;
@@ -41,8 +42,8 @@ private:
 	/* Serialization logic for communication via the fuzzy log. */
 	void serialize_add(uint64_t e, uint64_t guid, char **buf, size_t *sz);
 	void serialize_remove(uint64_t e, const std::set<uint64_t> &guid_set, char **buf, size_t *sz);
-	void deserialize_add(char *buf, size_t sz, uint64_t *e, uint64_t *guid);
-	void deserialize_remove(char *buf, size_t sz, uint64_t *e, std::set<uint64_t> *guids);
+	void deserialize_add(const uint8_t *buf, size_t sz, uint64_t *e, uint64_t *guid);
+	void deserialize_remove(const uint8_t *buf, size_t sz, uint64_t *e, std::set<uint64_t> *guids);
 	
 	/* Guid generator for add operations. */
 	uint64_t gen_guid();
@@ -54,8 +55,8 @@ private:
 	write_id send_remove_async(uint64_t e, const std::set<uint64_t> &guid_set, char *buf);
 
 	/* Receive and process remote add/remove info from the fuzzy log. */	
-	void remote_remove(char *buf, size_t sz);
-	void remote_add(char *buf, size_t sz);
+	void remote_remove(const uint8_t *buf, size_t sz);
+	void remote_add(const uint8_t *buf, size_t sz);
 
 	/* Add and remove elements from local copy of the or-set */
 	void do_add(uint64_t e, uint64_t guid);
@@ -80,7 +81,7 @@ public:
 	 * instances' updates. 
 	 *
 	 */ 
-  	or_set(DAGHandle *handle, struct colors *color, uint8_t proc_id, uint64_t sync_duration);
+  	or_set(DAGHandle *handle, struct colors *local_color, struct colors *remote_colors, uint8_t proc_id, uint64_t sync_duration);
 	
 	/* Returns true if e exists in the local set */
 	bool lookup(uint64_t e);
@@ -91,6 +92,7 @@ public:
 	/* Remove e from the or-set */
 	void remove(uint64_t e);
 	
+	void get_single_remote();
 	write_id async_add(uint64_t e, char *buf);
 	write_id async_remove(uint64_t e, char *buf);
 };
