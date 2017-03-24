@@ -84,7 +84,7 @@ void async_tester::run(const std::vector<tester_request*> &requests)
 			num_pending -= diff;
 			_num_elapsed += diff;
 		}	
-
+		
 		/*
 		if (num_pending == _window_sz) {
 			wait_single();	
@@ -102,8 +102,8 @@ void async_tester::run(const std::vector<tester_request*> &requests)
 	assert(_quit == true);	
 
 	while (num_pending != 0) {
-		wait_single();
-		_num_elapsed++;
-		num_pending -= 1;
+		auto diff = try_get_pending();
+		num_pending -= diff;
+		_num_elapsed += diff;
 	}
 }

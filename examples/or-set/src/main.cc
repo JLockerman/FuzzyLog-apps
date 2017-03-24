@@ -36,14 +36,19 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*>
 	workload_generator gen(range);
 	uint64_t i;
 	
+	std::vector<uint64_t> seen_keys; 	
 	for (i = 0; i < num_inputs; ++i) {
 		auto rq = static_cast<or_set_rq*>(malloc(sizeof(or_set_rq))); 
 		rq->_key = gen.gen_next();
-		if (rand() % 2 == 0)
+		if (i == 0 || rand() % 2 == 0) {
 			rq->_opcode = or_set::log_opcode::ADD;
-		else
+			rq->_key = gen.gen_next();
+			seen_keys.push_back(rq->_key);
+		} else {
 			rq->_opcode = or_set::log_opcode::REMOVE;
-			
+			auto idx = rand() % seen_keys.size();
+			rq->_key = seen_keys[idx];
+		}	
 		auto temp = reinterpret_cast<tester_request*>(rq);
 		temp->_executed = false;
 		output.push_back(temp);

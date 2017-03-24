@@ -15,7 +15,7 @@ or_set_tester::or_set_tester(uint32_t window_sz, or_set *set, DAGHandle *fuzzylo
 
 void or_set_tester::use_idle_cycles()
 {
-	_or_set->get_single_remote();
+//	_or_set->get_single_remote();
 }
 
 void or_set_tester::issue_request(tester_request *rq)
@@ -67,12 +67,24 @@ tester_request* or_set_tester::wait_single_request()
 	buf->_next = _freelist;
 	_freelist = buf;
 	or_rq->_buffer = NULL;		
-	_request_map.erase(w_id);
 	return rq;
 }
 
 void or_set_tester::wait_requests(std::set<tester_request*> &done_set) 
 {
+	while (_done_requests.size() > 0) {
+		auto rq = _done_requests.front();
+		_done_requests.pop_front();
+	
+		auto or_rq = static_cast<or_set_rq*>(rq);	
+		auto buf = or_rq->_buffer;
+		buf->_next = _freelist;
+		_freelist = buf;
+		or_rq->_buffer = NULL;
+		
+		done_set.insert(rq);
+	}	
+
 	while (true) {
 		auto w_id = try_wait_for_any_append(_fuzzylog);
 		if (wid_equality{}(w_id, WRITE_ID_NIL))
