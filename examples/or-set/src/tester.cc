@@ -102,6 +102,7 @@ void async_tester::run(const std::vector<tester_request*> &requests)
 	assert(_quit == true);	
 
 	while (num_pending != 0) {
+		use_idle_cycles();
 		auto diff = try_get_pending();
 		num_pending -= diff;
 		_num_elapsed += diff;

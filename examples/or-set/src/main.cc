@@ -118,14 +118,16 @@ void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<doub
 	std::set<uint8_t> remote_color_set;
 	for (auto i = 0; i < cfg.num_clients; ++i)
 		if (i != cfg.server_id)
-			remote_color_set.insert(i); 
+			remote_color_set.insert(i+1); 
 	
 	struct colors remote_colors;
 	remote_colors.numcolors = cfg.num_clients-1;
 	remote_colors.mycolors = new ColorID[cfg.num_clients-1];
 	auto i = 0; 
+	std::cerr << "Remote colors:\n";
 	for (auto c : remote_color_set) {
 		remote_colors.mycolors[i] = c;
+		std::cerr << (uint64_t)c << "\n";
 		i += 1;
 	}
 
