@@ -19,7 +19,9 @@ static struct option long_options[] = {
   {"num_clients", required_argument, NULL, 6},
   {"num_rqs", required_argument, NULL, 7},
   {"sample_interval", required_argument, NULL, 8},
-  {NULL, no_argument, NULL, 9},
+  {"writer", no_argument, NULL, 9},
+  {"reader", no_argument, NULL, 10},
+  {NULL, no_argument, NULL, 11},
 };
 
 struct config {
@@ -32,6 +34,7 @@ struct config {
 	uint64_t		 		num_clients;
 	uint64_t 				num_rqs;
 	int 					sample_interval;
+	bool 					writer;
 }; 
 
 class config_parser {
@@ -46,6 +49,8 @@ private:
 		NUM_CLIENTS=6,
 		NUM_RQS=7,
 		SAMPLE_INTERVAL=8,
+		WRITER=9,
+		READER=10,
 	};
 
 	bool 					_init;
@@ -105,6 +110,17 @@ private:
 		ret.sync_duration = (uint64_t)atoi(_arg_map[SYNC_DURATION]);	
 		ret.num_rqs = (uint64_t)atoi(_arg_map[NUM_RQS]);
 		ret.sample_interval = atoi(_arg_map[SAMPLE_INTERVAL]);
+		
+		if (_arg_map.count(WRITER) != 0) {
+			assert(_arg_map.count(READER) == 0); 
+			ret.writer = true;
+		} else if (_arg_map.count(READER) != 0) { 
+			assert(_arg_map.count(WRITER) == 0);
+			ret.writer = false;	
+		} else {
+			std::cerr << "Missing correct reader//writer info!\n";
+			assert(false);
+		}
 		
 		std::string log_addresses;
 		log_addresses.assign(_arg_map[LOG_ADDR]);
