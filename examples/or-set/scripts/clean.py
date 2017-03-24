@@ -10,6 +10,7 @@ def readfile(filename):
 	for line in inpt_file:
 		val = float(line) 
 		results.append(val)
+	inpt_file.close()
 	return results
 
 def postprocess_results(vals):
@@ -19,6 +20,35 @@ def postprocess_results(vals):
 	high_idx = int(len(vals)*0.95)
 	return [vals[median_idx]/float(1000), vals[low_idx]/float(1000), vals[high_idx]/float(1000)]
 	
+def vary_servers(clients_per_machine, num_machines, window, server_list):
+	outer_fmt = 'c{0}_s{1}_w{2}'
+	inner_fmt = 'c{0}_w{1}'
+	file_fmt = '{0}.txt'
+	results = []
+	outfile = 'vary_servers.txt'
+	outline = '{0} {1} {2} {3}\n'
+
+	for s in server_list:
+		outer_dir = outer_fmt.format(str(clients_per_machine), str(s), str(window))
+		inner_dir = inner_fmt.format(str(clients_per_machine), str(window))
+		
+		num_clients = clients_per_machine*num_machines
+		temp = []
+		for c in range(0, num_clients):
+			filename = file_fmt.format(str(c))			
+			temp.append(readfile(os.path.join(outer_dir, inner_dir, filename)))	
+		
+		zipped = zip(*temp)								
+		summed = list(map(sum, zipped))
+		results.append(postprocess_results(summed))	
+	
+	tmp = zip(server_list, results)			
+	outhandle = open(outfile, 'w')
+	for s, r in tmp:
+		l = outline.format(str(s), str(r[0]), str(r[1]), str(r[2]))
+		outhandle.write(l)
+	outhandle.close()	
+
 def latency_proc(results, filename):
 	outfile = open(filename, 'w')
 	results.sort()	
