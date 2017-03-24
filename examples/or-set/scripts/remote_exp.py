@@ -14,7 +14,7 @@ import time
 # XXX Should probably go into a config file. 
 SUBNET_ID = 'subnet-95bce7b8' 
 SECURITY_GROUP = 'sg-1d531961' 
-IMAGE_ID='ami-52b40444'
+IMAGE_ID='ami-31e95b27'
 KEYFILE = '~/.ssh/jmfaleiro.pem'
 REGION = 'us-east-1'
 SERVER_INSTANCE_TYPE = 'm4.16xlarge'
@@ -292,7 +292,9 @@ def do_expt():
 	terminate_instances(REGION, instances)	
 
 def main():
-	do_expt()	
+	client_instances = launch_instances(1, CLIENT_INSTANCE_TYPE, REGION)
+	client_instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, client_instances))
+	test_instances(client_instance_ips, KEYFILE)
 
 
 
