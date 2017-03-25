@@ -38,18 +38,19 @@ def kill_fuzzylog():
 def fuzzylog_proc(port, maxthreads):
     with cd('~/fuzzylog/delos-rust/servers/tcp_server'):
         if maxthreads == '-1':
-            run('target/release/delos_tcp_server %d' % settings.FUZZYLOG_PORT)
+            run('target/release/delos_tcp_server %s' % port)
         else:
-            run('target/release/delos_tcp_server %d -w %d' % (settings.FUZZYLOG_PORT, maxthreads))
+            run('target/release/delos_tcp_server %s -w %s' % (port, maxthreads))
 
 def clean_fuzzymap():
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         run('rm *.txt')
 
-def fuzzymap_proc(log_addr, exp_range, exp_duration, client_id, workload, async, window_size):
+def fuzzymap_proc(log_addr, txn_version, exp_range, exp_duration, client_id, workload, async, window_size):
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         args = 'build/hashmap '
         args += '--log_addr=' + str(log_addr) + ' '
+        args += '--txn_version=' + str(txn_version) + ' '
         args += '--expt_range=' + str(exp_range) + ' '
         args += '--expt_duration=' + str(exp_duration) + ' '
         args += '--client_id=' + str(client_id) + ' '

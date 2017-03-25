@@ -311,8 +311,8 @@ def update_fuzzylog_binary(region, commit=None):
 def main():
         #test_scalability(clients=[1], window_size=32)
         #test_multiput_txn(multiput_percents=[0,20,40,60,80,100], window_size=32)
-        #update_fuzzylog_binary(settings.REGION, '908c9c9f33a745931c90e253d56be2caf784cb32')
-        update_fuzzymap_binary(settings.AP_NORTHEAST_1)
+        update_fuzzylog_binary(settings.US_EAST_2)
+        #update_fuzzymap_binary(settings.US_EAST_2)
         pass
 
 if __name__ == "__main__":

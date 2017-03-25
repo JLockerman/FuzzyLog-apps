@@ -5,10 +5,11 @@ import settings
 import os
 import subprocess
 import time
-from collections import defaultdict
+import random
+from collections import defaultdict, Counter
 
-class FuzzMapTestCase(unittest.TestCase):
-        results = defaultdict(dict)
+class FuzzyMapTestCase(unittest.TestCase):
+        results = []
 
         def __init__(self, *args, **kwargs):
                 unittest.TestCase.__init__(self, *args, **kwargs)
@@ -61,7 +62,7 @@ class FuzzMapTestCase(unittest.TestCase):
                 server_procs.append(proc) 
                 for region in self.server_ips.keys():
                         for s in self.server_ips[region]:
-                                proc = self.launch_fuzzylog(s['public'], self.keyfile[region]) 
+                                proc = self.launch_fuzzylog(s['public'], self.keyfile[region])
                                 server_procs.append(proc) 
                 time.sleep(5)
 
@@ -94,8 +95,9 @@ class FuzzMapTestCase(unittest.TestCase):
                 proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])  
                 return proc
 			
-        def launch_fuzzymap(self, fabhost, keyfile, logaddr, client_id, workload, async, window_size):
+        def launch_fuzzymap(self, fabhost, keyfile, logaddr, txn_version, client_id, workload, async, window_size):
                 launch_str = 'fuzzymap_proc:' + logaddr
+                launch_str += ',' + str(txn_version)
                 launch_str += ',' + str(self.expt_range)
                 launch_str += ',' + str(self.expt_duration)
                 launch_str += ',' + str(client_id)
@@ -152,18 +154,13 @@ class FuzzMapTestCase(unittest.TestCase):
         # Called once after all test cases finished
         @staticmethod
         def write_output(filename):
-                results = FuzzMapTestCase.results
-                window_sizes = results.keys()
-                window_sizes.sort()
-                for w in window_sizes:
-                        with open('../data/%s_w%d.txt' % (filename, w), 'w') as f:
-                                keys = results[w].keys()
-                                keys.sort()
-                                for k in keys:
-                                        samples = results[w][k]
-                                        mean, low, high = FuzzMapTestCase.postprocess_results(samples)
-                                        line = str(w) + ' ' + str(k) + ' ' + str(mean) + ' ' + str(low) + ' ' + str(high) + '\n'
-                                        f.write(line) 
+                results = FuzzyMapTestCase.results
+                with open('../data/%s.txt' % filename, 'w') as f:
+                        for r in results:
+                                samples = r[-1]
+                                mean, low, high = FuzzyMapTestCase.postprocess_results(samples)
+                                line = ' '.join(map(lambda x: str(x), r[:-1])) + ' ' + str(mean) + ' ' + str(low) + ' ' + str(high) + '\n'
+                                f.write(line) 
 
         @staticmethod
         def postprocess_results(vals):
@@ -177,6 +174,23 @@ class FuzzMapTestCase(unittest.TestCase):
                 high_idx = int(len(vals)*0.95)
                 return [vals[median_idx]/float(1000), vals[low_idx]/float(1000), vals[high_idx]/float(1000)]
 
+        def get_multiput_workload(self, exclude, num_clients, target):
+                picked_counter = Counter()
+                pool = range(1, num_clients+1)
+                while True:
+                        picked = random.choice(pool)
+                        if exclude == picked:
+                                continue
+                        picked_counter[picked] += 1
+                        if sum(picked_counter.values()) == target:
+                                break
+
+                workloads = []
+                for c2, op_cnt in dict(picked_counter).iteritems():
+                        w = "put@{c1}:{c2}\={op_cnt}".format(c1=exclude, c2=c2, op_cnt=op_cnt)
+                        workloads.append(w)
+
+                return "\,".join(workloads)
 
         # Logging (For debugging purpose, it's useful to keep intermediate data into log)
         def logging(self, *args):
@@ -186,25 +200,63 @@ class FuzzMapTestCase(unittest.TestCase):
                         f.write(line + "\n") 
 
 
-class ScalabilityTestCase(FuzzMapTestCase):
+class ScalabilityTestCase(FuzzyMapTestCase):
 
-        # (async, window_size, num_clients)
+        # (async, txn_version, window_size, num_clients, multiput_percent, num_servers)
         @parameterized.expand([
-                (True, 32, 1),
-                (True, 32, 4),
-                (True, 16, 1),
-                (True, 16, 4),
+                (True, 2, 80, 1, 0.0, 7),
+                (True, 2, 80, 2, 0.0, 7),
+                (True, 2, 80, 2, 0.1, 7),
+                (True, 2, 80, 2, 1.0, 7),
+                (True, 2, 80, 2, 10.0, 7),
+                (True, 2, 80, 2, 100.0, 7),
+                (True, 2, 80, 4, 0.0, 7),
+                (True, 2, 80, 4, 0.1, 7),
+                (True, 2, 80, 4, 1.0, 7),
+                (True, 2, 80, 4, 10.0, 7),
+                (True, 2, 80, 4, 100.0, 7),
+                (True, 2, 80, 8, 0.0, 7),
+                (True, 2, 80, 8, 0.1, 7),
+                (True, 2, 80, 8, 1.0, 7),
+                (True, 2, 80, 8, 10.0, 7),
+                (True, 2, 80, 8, 100.0, 7),
+       #        (True, 2, 80, 16, 0.0, 7),
+       #        (True, 2, 80, 16, 0.1, 7),
+       #        (True, 2, 80, 16, 1.0, 7),
+       #        (True, 2, 80, 16, 10.0, 7),
+       #        (True, 2, 80, 16, 100.0, 7),
+       #        (True, 2, 80, 32, 0.0, 7),
+       #        (True, 2, 80, 32, 0.1, 7),
+       #        (True, 2, 80, 32, 1.0, 7),
+       #        (True, 2, 80, 32, 10.0, 7),
+       #        (True, 2, 80, 32, 10.0, 7),
         ])
-        def test_scalability(self, async, window_size, num_clients):
+        def test_scalability(self, async, txn_version, window_size, num_clients, multiput_percent, num_servers):
                 # run clients
                 test_region = settings.REGIONS[0]
                 client_procs = []
                 client_ips = self.client_ips[test_region]
-                log_addr = self.get_log_addr(self.server_ips[test_region])
+                available_servers = self.server_ips[test_region]
+                self.assertTrue(num_servers <= len(available_servers), 'Requested servers: %d, Available servers: %d' % (num_servers, len(available_servers)))
+
+                log_addr = self.get_log_addr(self.server_ips[test_region][:num_servers])
                 round_robin = [i % len(client_ips) for i in range(num_clients)]
+                # operation ratio
+                if num_clients > 1: 
+                        multiput_op = int(self.op_count * multiput_percent / 100.0)
+                        singleput_op = int(self.op_count - multiput_op)
+                elif num_clients == 1:
+                        multiput_op = 0
+                        singleput_op = self.op_count
+
                 for i in range(num_clients):
-                        workload = "put@{color}\={op_count}".format(color=i+1, op_count=self.op_count)
-                        proc = self.launch_fuzzymap(client_ips[round_robin[i]]['public'], self.keyfile[test_region], log_addr, i, workload, async, window_size)
+                        # single put workload
+                        workload = "put@{color}\={op_count}".format(color=i+1, op_count=singleput_op)
+                        # multiput workload
+                        if multiput_op > 0:
+                                multiput_workload = self.get_multiput_workload(i+1, num_clients, multiput_op)
+                                workload = workload + "\," + multiput_workload
+                        proc = self.launch_fuzzymap(client_ips[round_robin[i]]['public'], self.keyfile[test_region], log_addr, txn_version, i, workload, async, window_size)
                         time.sleep(0.1)
                         client_procs.append(proc) 
 
@@ -214,56 +266,14 @@ class ScalabilityTestCase(FuzzMapTestCase):
                 # gather statistics
                 interested = [(test_region, i) for i in set(round_robin)]
                 thr = self.gather_throughput(interested)
-                FuzzMapTestCase.results[window_size][num_clients] = thr
+                FuzzyMapTestCase.results.append((async, txn_version, window_size, num_clients, multiput_percent, num_servers, thr))
 
         @classmethod
         def tearDownClass(cls):
-                FuzzMapTestCase.write_output('scalability')
+                FuzzyMapTestCase.write_output('scalability')
 
 
-class MultiputTestCase(FuzzMapTestCase):
-
-        # (async, window_size, multiput_percent)
-        @parameterized.expand([
-                (False, 32, 0),
-                (False, 32, 20),
-        ])
-        def test_multiput(self, async, window_size, multiput_percent):
-
-                test_region = settings.REGIONS[0]
-                client_procs = []
-                client_ips = self.client_ips[test_region]
-                log_addr = self.get_log_addr(self.server_ips[test_region])
-                self.assertTrue(len(client_ips) >= 2, 'At least 2 client machines are required')
-
-                # operation ratio
-                multiput_op = int(self.op_count * multiput_percent / 100.0)
-                singleput_op = int(self.op_count - multiput_op)
-
-                # client1
-                workload = "put@100\={single}\,put@100:200\={multi}".format(single=singleput_op, multi=multiput_op)
-                proc = self.launch_fuzzymap(client_ips[0]['public'], self.keyfile[test_region], log_addr, 100, workload, async, window_size)
-                client_procs.append(proc) 
-                time.sleep(0.1)
-
-                # client2
-                workload = "put@200\={single}\,put@100:200\={multi}".format(single=singleput_op, multi=multiput_op)
-                proc = self.launch_fuzzymap(client_ips[1]['public'], self.keyfile[test_region], log_addr, 200, workload, async, window_size)
-                client_procs.append(proc) 
-
-                for c in client_procs:
-                        c.wait()
-
-                # gather statistics
-                thr = self.gather_throughput(interested = [(test_region, 0), (test_region, 1)])
-                FuzzMapTestCase.results[window_size][multiput_percent] = thr
-
-        @classmethod
-        def tearDownClass(cls):
-                FuzzMapTestCase.write_output('multiput')
-
-
-class CausalConsistencyTestCase(FuzzMapTestCase):
+class CausalConsistencyTestCase(FuzzyMapTestCase):
 
         # (async, window_size, get_op_percent)
         @parameterized.expand([
@@ -287,13 +297,13 @@ class CausalConsistencyTestCase(FuzzMapTestCase):
 
                 # client at site 1
                 workload = "put@100-200\={put_op_count}\,get@100:200\={get_op_count}".format(put_op_count=put_op_count, get_op_count=get_op_count)
-                proc = self.launch_fuzzymap(site_one_client_ips[0]['public'], self.keyfile[site_one], log_addr, 100, workload, async, window_size)
+                proc = self.launch_fuzzymap(site_one_client_ips[0]['public'], self.keyfile[site_one], log_addr, 1, 100, workload, async, window_size)
                 client_procs.append(proc) 
                 time.sleep(0.1)
 
                 # client2
                 workload = "put@200-100\={put_op_count}\,get@100:200\={get_op_count}".format(put_op_count=put_op_count, get_op_count=get_op_count)
-                proc = self.launch_fuzzymap(site_two_client_ips[0]['public'], self.keyfile[site_two], log_addr, 200, workload, async, window_size)
+                proc = self.launch_fuzzymap(site_two_client_ips[0]['public'], self.keyfile[site_two], log_addr, 1, 200, workload, async, window_size)
                 client_procs.append(proc) 
 
                 for c in client_procs:
@@ -301,18 +311,15 @@ class CausalConsistencyTestCase(FuzzMapTestCase):
 
                 # gather statistics
                 thr = self.gather_throughput(interested = [(site_one, 0), (site_two, 0)])
-                FuzzMapTestCase.results[window_size][get_op_percent] = thr
+                FuzzyMapTestCase.results.append((async, window_size, get_op_percent, thr))
 
         @classmethod
         def tearDownClass(cls):
-                FuzzMapTestCase.write_output('causal')
-
-
+                FuzzyMapTestCase.write_output('causal')
 
 
 if __name__ == '__main__':
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(ScalabilityTestCase)
-        #suite = unittest.defaultTestLoader.loadTestsFromTestCase(MultiputTestCase)
         #suite = unittest.defaultTestLoader.loadTestsFromTestCase(CausalConsistencyTestCase)
         runner = unittest.TextTestRunner(verbosity=2)
         runner.run(suite)
