@@ -118,7 +118,7 @@ private:
 			assert(_arg_map.count(WRITER) == 0);
 			ret.writer = false;	
 		} else {
-			std::cerr << "Missing correct reader//writer info!\n";
+			std::cerr << "Missing correct reader-writer info!\n";
 			assert(false);
 		}
 		

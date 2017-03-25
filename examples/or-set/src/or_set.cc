@@ -12,7 +12,8 @@ or_set::or_set(DAGHandle *handle, struct colors *color, struct colors *remote_co
 	_guid_counter = 0;
 	_state.clear();
 	_sync_duration = std::chrono::microseconds(sync_duration);
-	snapshot_colors(_log_client, _remote_colors);		
+	
+	snapshot_colors(_log_client, _remote_colors);
 	/* Turn off anti-entropy for the time being */
 	//	_sync_thread = 	std::thread(&or_set::check_remotes, this); 
 }

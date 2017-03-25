@@ -8,10 +8,11 @@ import sys
 def main():
 	log_ips = sys.argv[1]
 	start_clients = int(sys.argv[2])
-	client = int(sys.argv[3])
+	clients_on_machine = int(sys.argv[3])
 	window_sz = int(sys.argv[4])
 	duration = int(sys.argv[5])
-	single_expt(start_clients, client, window_sz, log_ips, duration)
+	total_clients = int(sys.argv[6])
+	single_expt(start_clients, clients_on_machine, window_sz, log_ips, duration, total_clients)
 	# clients = [1, 4, 8, 12, 16]
 	# window_sz = [32]
 	# for c in clients:
@@ -31,7 +32,7 @@ def init_fuzzy_log():
 	return proc
 	
 # Start clients.
-def init_clients(start_clients, num_clients, window_sz, log_ip, duration):
+def init_clients(start_clients, num_clients, window_sz, log_ip, duration, total_clients):
 	args = ['./build/or-set', '--log_addr', log_ip, '--expt_range', '1000000', 
 	 	'--num_rqs', '30000000', '--sample_interval', '1', '--sync_duration', '500', '--server_id'] 
 	client_procs = []
@@ -43,7 +44,7 @@ def init_clients(start_clients, num_clients, window_sz, log_ip, duration):
 		log_handle = open(logf, 'w')
 		log_files.append(log_handle)
 		client_args.append('--num_clients')
-		client_args.append(str(num_clients))
+		client_args.append(str(total_clients))
 		client_args.append('--window_sz')
 		client_args.append(str(window_sz))
 		client_args.append('--expt_duration')
@@ -63,10 +64,10 @@ def mv_results(num_clients, window_sz):
 	os.system('mv *.txt ' + result_dir)
 
 # Single experiment. 
-def single_expt(start_clients, num_clients, window_sz, log_ip, duration):
+def single_expt(start_clients, num_clients, window_sz, log_ip, duration, total_clients):
 	os.system('rm *.txt')
 	# log_proc = init_fuzzy_log()
-	client_procs = init_clients(start_clients, num_clients, window_sz, log_ip, duration)
+	client_procs = init_clients(start_clients, num_clients, window_sz, log_ip, duration, total_clients)
 	for c, f in client_procs:
 		c.wait()
 		f.close()
