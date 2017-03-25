@@ -1,15 +1,15 @@
 #pragma once
 
 #include <pthread.h>
-#include <workload.h>
+#include <capmap_workload.h>
 #include <runnable.h>
 #include <iostream>
 
-// Worker class which should be unaware of HashMap 
-class Worker : public Runnable {
+// CAPMapTester class which should be unaware of AtomicMap 
+class CAPMapTester : public Runnable {
 public:
         Context*                        m_context;
-        HashMap*                        m_map;  // FIXME: hacky way for calling fuzzylog api...
+        CAPMap*                         m_map;  // FIXME: hacky way for calling fuzzylog api...
         Txn**                           m_txns;
         uint32_t                        m_num_txns;
         bool                            m_async;
@@ -19,7 +19,7 @@ public:
         std::atomic<uint64_t>           m_num_executed; 
         
 public:
-        Worker(Context* context, HashMap* map, std::atomic<bool>* flag, Txn** txns, uint32_t num_txns, bool async, uint32_t window_size): Runnable() {
+        CAPMapTester(Context* context, CAPMap* map, std::atomic<bool>* flag, Txn** txns, uint32_t num_txns, bool async, uint32_t window_size): Runnable() {
                 this->m_context = context;
                 this->m_map = map;
                 this->m_flag = flag;
@@ -29,7 +29,7 @@ public:
                 this->m_window_size = window_size;
                 this->m_num_executed = 0;
         }
-        ~Worker();
+        ~CAPMapTester();
         virtual void run();
         virtual void join();
         static void* bootstrap(void *arg);

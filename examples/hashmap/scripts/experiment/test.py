@@ -83,18 +83,26 @@ class FuzzyMapTestCase(unittest.TestCase):
                 proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])  
                 return proc
 			
-        def launch_fuzzymap(self, fabhost, keyfile, logaddr, txn_version, client_id, workload, async, window_size, causal=False):
-                launch_str = 'fuzzymap_proc:' + logaddr
-                launch_str += ',' + str(txn_version)
+        def launch_atomicmap(self, fabhost, keyfile, logaddr, client_id, workload, async, window_size):
+                launch_str = 'atomicmap_proc:' + logaddr
                 launch_str += ',' + str(self.expt_range)
                 launch_str += ',' + str(self.expt_duration)
                 launch_str += ',' + str(client_id)
                 launch_str += ',' + workload
                 launch_str += ',' + str(async)
                 launch_str += ',' + str(window_size) 
-                launch_str += ',' + str(causal) 
                 return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])
-        
+
+        def launch_capmap(self, fabhost, keyfile, logaddr, expt_duration, client_id, workload, async, window_size):
+                launch_str = 'capmap_proc:' + logaddr
+                launch_str += ',' + str(self.expt_range)
+                launch_str += ',' + str(expt_duration)
+                launch_str += ',' + str(client_id)
+                launch_str += ',' + workload
+                launch_str += ',' + str(async)
+                launch_str += ',' + str(window_size)
+                return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])
+ 
         # ---------------
         # Data management
         # ---------------
@@ -103,6 +111,14 @@ class FuzzyMapTestCase(unittest.TestCase):
         # gather_throughput: cleanup_dir ==> gather_raw_data ==> cleanup_dir ==> calculate_metric
         def gather_throughput(self, interested):
                 outdir = 'tmp'
+                self.download_output_files(interested, outdir)
+                results, num_files = self.gather_raw_data(outdir)
+                self.cleanup_dir(outdir)
+
+                aggr_throughputs = self.calculate_metric(results)
+                return aggr_throughputs
+
+        def download_output_files(self, interested, outdir):
                 self.cleanup_dir(outdir)
                 os.system('mkdir ' + outdir)
                 for region, i in interested:
@@ -110,11 +126,6 @@ class FuzzyMapTestCase(unittest.TestCase):
                         dest = outdir + '/.'
                         cmd = 'scp -i {key} -o StrictHostKeyChecking=no {src} {dest}'.format(key=self.keyfile[region], src=src, dest=dest)
                         os.system(cmd) 
-                results, num_files = self.gather_raw_data(outdir)
-                self.cleanup_dir(outdir)
-
-                aggr_throughputs = self.calculate_metric(results)
-                return aggr_throughputs
         
         def cleanup_dir(self, dirname):
                 if os.path.isdir(dirname) and os.path.exists(dirname):
@@ -191,41 +202,41 @@ class FuzzyMapTestCase(unittest.TestCase):
 
 class ScalabilityTestCase(FuzzyMapTestCase):
 
-        # (async, txn_version, window_size, num_clients, multiput_percent, num_servers)
+        # (async, window_size, num_clients, multiput_percent, num_servers)
         @parameterized.expand([
-                (True, 2, 80, 1, 0.0, 8),
+                (True, 80, 1, 0.0, 8),
 
-                (True, 2, 80, 2, 0.0, 8),
-                (True, 2, 80, 2, 0.1, 8),
-                (True, 2, 80, 2, 1.0, 8),
-                (True, 2, 80, 2, 10.0, 8),
-                (True, 2, 80, 2, 100.0, 8),
+                (True, 80, 2, 0.0, 8),
+                (True, 80, 2, 0.1, 8),
+                (True, 80, 2, 1.0, 8),
+                (True, 80, 2, 10.0, 8),
+                (True, 80, 2, 100.0, 8),
 
-                (True, 2, 80, 4, 0.0, 8),
-                (True, 2, 80, 4, 0.1, 8),
-                (True, 2, 80, 4, 1.0, 8),
-                (True, 2, 80, 4, 10.0, 8),
-                (True, 2, 80, 4, 100.0, 8),
+                (True, 80, 4, 0.0, 8),
+                (True, 80, 4, 0.1, 8),
+                (True, 80, 4, 1.0, 8),
+                (True, 80, 4, 10.0, 8),
+                (True, 80, 4, 100.0, 8),
 
-                (True, 2, 80, 8, 0.0, 8),
-                (True, 2, 80, 8, 0.1, 8),
-                (True, 2, 80, 8, 1.0, 8),
-                (True, 2, 80, 8, 10.0, 8),
-                (True, 2, 80, 8, 100.0, 8),
+                (True, 80, 8, 0.0, 8),
+                (True, 80, 8, 0.1, 8),
+                (True, 80, 8, 1.0, 8),
+                (True, 80, 8, 10.0, 8),
+                (True, 80, 8, 100.0, 8),
 
-                (True, 2, 80, 16, 0.0, 8),
-                (True, 2, 80, 16, 0.1, 8),
-                (True, 2, 80, 16, 1.0, 8),
-                (True, 2, 80, 16, 10.0, 8),
-                (True, 2, 80, 16, 100.0, 8),
+                (True, 80, 16, 0.0, 8),
+                (True, 80, 16, 0.1, 8),
+                (True, 80, 16, 1.0, 8),
+                (True, 80, 16, 10.0, 8),
+                (True, 80, 16, 100.0, 8),
 
-                (True, 2, 80, 32, 0.0, 8),
-                (True, 2, 80, 32, 0.1, 8),
-                (True, 2, 80, 32, 1.0, 8),
-                (True, 2, 80, 32, 10.0, 8),
-                (True, 2, 80, 32, 100.0, 8),
+                (True, 80, 32, 0.0, 8),
+                (True, 80, 32, 0.1, 8),
+                (True, 80, 32, 1.0, 8),
+                (True, 80, 32, 10.0, 8),
+                (True, 80, 32, 100.0, 8),
         ])
-        def test_scalability(self, async, txn_version, window_size, num_clients, multiput_percent, num_servers):
+        def test_scalability(self, async, window_size, num_clients, multiput_percent, num_servers):
                 # run clients
                 test_region = settings.REGIONS[0]
                 client_procs = []
@@ -250,7 +261,7 @@ class ScalabilityTestCase(FuzzyMapTestCase):
                         if multiput_op > 0:
                                 multiput_workload = self.get_multiput_workload(i+1, num_clients, multiput_op)
                                 workload = workload + "\," + multiput_workload
-                        proc = self.launch_fuzzymap(client_ips[round_robin[i]]['public'], self.keyfile[test_region], log_addr, txn_version, i, workload, async, window_size)
+                        proc = self.launch_atomicmap(client_ips[round_robin[i]]['public'], self.keyfile[test_region], log_addr, i, workload, async, window_size)
                         time.sleep(0.1)
                         client_procs.append(proc) 
 
@@ -260,14 +271,14 @@ class ScalabilityTestCase(FuzzyMapTestCase):
                 # gather statistics
                 interested = [(test_region, i) for i in set(round_robin)]
                 thr = self.gather_throughput(interested)
-                FuzzyMapTestCase.results.append((async, txn_version, window_size, num_clients, multiput_percent, num_servers, thr))
+                FuzzyMapTestCase.results.append((async, window_size, num_clients, multiput_percent, num_servers, thr))
 
         @classmethod
         def tearDownClass(cls):
                 FuzzyMapTestCase.write_output('scalability')
 
 
-class CausalConsistencyTestCase(FuzzyMapTestCase):
+class ToleratingNetworkPartitionTestCase(FuzzyMapTestCase):
 
         # (async, window_size)
         @parameterized.expand([
@@ -287,32 +298,27 @@ class CausalConsistencyTestCase(FuzzyMapTestCase):
                 client_procs = []
                 # operation ratio
                 put_op_count = self.op_count
+                expt_duration = 50
 
                 # client at site 1
                 workload = "put@2-1\={put_op_count}".format(put_op_count=put_op_count)
-                proc = self.launch_fuzzymap(site_one_client_ips[0]['public'], self.keyfile[site_one], log_addr, 2, 2, workload, async, window_size, True)
+                proc = self.launch_capmap(site_one_client_ips[0]['public'], self.keyfile[site_one], log_addr, expt_duration, 1, workload, async, window_size)
                 client_procs.append(proc) 
                 time.sleep(0.1)
 
                 # client2
                 workload = "put@1-2\={put_op_count}".format(put_op_count=put_op_count)
-                proc = self.launch_fuzzymap(site_two_client_ips[0]['public'], self.keyfile[site_two], log_addr, 2, 1, workload, async, window_size, True)
+                proc = self.launch_capmap(site_two_client_ips[0]['public'], self.keyfile[site_two], log_addr, expt_duration, 2, workload, async, window_size)
                 client_procs.append(proc) 
 
                 for c in client_procs:
                         c.wait()
 
                 # gather statistics
-                thr = self.gather_throughput(interested = [(site_one, 0), (site_two, 0)])
-                FuzzyMapTestCase.results.append((async, window_size, thr))
-
-        @classmethod
-        def tearDownClass(cls):
-                FuzzyMapTestCase.write_output('causal')
-
+                self.download_output_files([(site_one, 0), (site_two, 0)], 'tmp')
 
 if __name__ == '__main__':
-        suite = unittest.defaultTestLoader.loadTestsFromTestCase(ScalabilityTestCase)
-        #suite = unittest.defaultTestLoader.loadTestsFromTestCase(CausalConsistencyTestCase)
+        #suite = unittest.defaultTestLoader.loadTestsFromTestCase(ScalabilityTestCase)
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(ToleratingNetworkPartitionTestCase)
         runner = unittest.TextTestRunner(verbosity=2)
         runner.run(suite)

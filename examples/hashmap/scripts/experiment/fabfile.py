@@ -46,11 +46,10 @@ def clean_fuzzymap():
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         run('rm *.txt')
 
-def fuzzymap_proc(log_addr, txn_version, exp_range, exp_duration, client_id, workload, async, window_size, causal):
+def atomicmap_proc(log_addr, exp_range, exp_duration, client_id, workload, async, window_size):
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
-        args = 'build/hashmap '
+        args = 'build/atomicmap '
         args += '--log_addr=' + str(log_addr) + ' '
-        args += '--txn_version=' + str(txn_version) + ' '
         args += '--expt_range=' + str(exp_range) + ' '
         args += '--expt_duration=' + str(exp_duration) + ' '
         args += '--client_id=' + str(client_id) + ' '
@@ -58,6 +57,17 @@ def fuzzymap_proc(log_addr, txn_version, exp_range, exp_duration, client_id, wor
         if async == "True":
             args += '--async '
             args += '--window_size=' + str(window_size)
-        if causal == "True":
-            args += ' --causal'
+        run(args)
+
+def capmap_proc(log_addr, exp_range, exp_duration, client_id, workload, async, window_size):
+    with cd('~/fuzzylog/delos-apps/examples/hashmap'):
+        args = 'build/capmap '
+        args += '--log_addr=' + str(log_addr) + ' '
+        args += '--expt_range=' + str(exp_range) + ' '
+        args += '--expt_duration=' + str(exp_duration) + ' '
+        args += '--client_id=' + str(client_id) + ' '
+        args += '--workload=' + str(workload) + ' '
+        if async == "True":
+            args += '--async '
+            args += '--window_size=' + str(window_size)
         run(args)

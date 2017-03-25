@@ -12,22 +12,23 @@ extern "C" {
 }
 
 // Synchronizer class which eagerly synchronize with fuzzylog 
-class Synchronizer : public Runnable {
-public:
+class AtomicMapSynchronizer : public Runnable {
+private:
         std::queue<std::pair<std::condition_variable*, std::atomic_bool*>>      m_pending_queue;
         std::queue<std::pair<std::condition_variable*, std::atomic_bool*>>      m_current_queue;
         std::mutex                                                              m_queue_mtx;
 
         DAGHandle*                                                              m_fuzzylog_client;
         struct colors*                                                          m_interesting_colors;
+        char                                                                    m_read_buf[DELOS_MAX_DATA_SIZE];
 
         std::atomic_bool                                                        m_running;
         std::unordered_map<uint32_t, uint32_t>                                  m_local_map; 
         std::mutex                                                              m_local_map_mtx;
         
 public:
-        Synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
-        ~Synchronizer() {}
+        AtomicMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
+        ~AtomicMapSynchronizer() {}
         virtual void run();
         virtual void join();
         static void* bootstrap(void *arg);

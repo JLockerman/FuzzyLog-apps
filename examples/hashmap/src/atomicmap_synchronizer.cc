@@ -1,12 +1,10 @@
-#include <synchronizer.h>
+#include <atomicmap_synchronizer.h>
 #include <cstring>
 #include <cassert>
 #include <thread>
-#include <hashmap.h>
+#include <atomicmap.h>
 
-static char out[DELOS_MAX_DATA_SIZE];
-
-Synchronizer::Synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors) {
+AtomicMapSynchronizer::AtomicMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors) {
         uint32_t i;
         struct colors* c;
         c = (struct colors*)malloc(sizeof(struct colors));
@@ -27,26 +25,26 @@ Synchronizer::Synchronizer(std::vector<std::string>* log_addr, std::vector<Color
         this->m_running = true;
 }
 
-void Synchronizer::run() {
+void AtomicMapSynchronizer::run() {
         int err;
         err = pthread_create(&m_thread, NULL, bootstrap, this);
         assert(err == 0);
 }
 
-void Synchronizer::join() {
+void AtomicMapSynchronizer::join() {
         m_running = false; 
         pthread_join(m_thread, NULL);
         close_dag_handle(m_fuzzylog_client);
 }
 
-void* Synchronizer::bootstrap(void *arg) {
-        Synchronizer *synchronizer= (Synchronizer*)arg;
+void* AtomicMapSynchronizer::bootstrap(void *arg) {
+        AtomicMapSynchronizer *synchronizer= (AtomicMapSynchronizer*)arg;
         synchronizer->Execute();
         return NULL;
 }
 
-void Synchronizer::Execute() {
-        std::cout << "Start synchronizer..." << std::endl;
+void AtomicMapSynchronizer::Execute() {
+        std::cout << "Start AtomicMap synchronizer..." << std::endl;
         uint64_t data;
         uint32_t key, val;
         size_t size;
@@ -61,9 +59,9 @@ void Synchronizer::Execute() {
                 {
                         std::lock_guard<std::mutex> lock(m_local_map_mtx);
                         snapshot(m_fuzzylog_client);
-                        while ((get_next(m_fuzzylog_client, out, &size, m_interesting_colors), 1)) {
+                        while ((get_next(m_fuzzylog_client, m_read_buf, &size, m_interesting_colors), 1)) {
                                 if (m_interesting_colors->numcolors == 0) break;
-                                data = *(uint64_t *)out;
+                                data = *(uint64_t *)m_read_buf;
                                 key = (uint32_t)(data >> 32);
                                 val = (uint32_t)(data & 0xFFFFFFFF); 
 
@@ -84,20 +82,20 @@ void Synchronizer::Execute() {
         }
 }
 
-void Synchronizer::enqueue_get(std::condition_variable* cv, std::atomic_bool* cv_spurious_wake_up) {
+void AtomicMapSynchronizer::enqueue_get(std::condition_variable* cv, std::atomic_bool* cv_spurious_wake_up) {
         std::lock_guard<std::mutex> lock(m_queue_mtx);
         m_pending_queue.push(std::make_pair(cv, cv_spurious_wake_up));
 }
 
-void Synchronizer::swap_queue() {
+void AtomicMapSynchronizer::swap_queue() {
         std::lock_guard<std::mutex> lock(m_queue_mtx);
         std::swap(m_pending_queue, m_current_queue);
 }
 
-std::mutex* Synchronizer::get_local_map_lock() {
+std::mutex* AtomicMapSynchronizer::get_local_map_lock() {
         return &m_local_map_mtx;
 }
 
-uint32_t Synchronizer::get(uint32_t key) {
+uint32_t AtomicMapSynchronizer::get(uint32_t key) {
         return m_local_map[key];
 }
