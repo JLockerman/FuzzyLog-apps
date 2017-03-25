@@ -52,8 +52,9 @@ private:
         struct colors*                          m_dep_color;
         Context*                                m_context;
         optype                                  m_op_type;
+        bool                                    m_is_causal;
 public:
-        ycsb_insert(HashMap* map, struct colors* color, struct colors* dep_color, uint32_t start, uint32_t end, Context* context, optype op_type) {
+        ycsb_insert(HashMap* map, struct colors* color, struct colors* dep_color, uint32_t start, uint32_t end, Context* context, optype op_type, bool is_causal) {
                 this->m_map = map;
                 this->m_color = color;
                 this->m_dep_color = dep_color;
@@ -61,6 +62,7 @@ public:
                 this->m_end = end;
                 this->m_context = context;
                 this->m_op_type = op_type;
+                this->m_is_causal = is_causal;
         }
         ~ycsb_insert(){}
         virtual void Run();

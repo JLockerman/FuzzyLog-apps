@@ -23,9 +23,10 @@ static struct option long_options[] = {
         {"expt_duration",       required_argument, NULL, 3},
         {"client_id",           required_argument, NULL, 4},
         {"workload",            required_argument, NULL, 5},
-        {"async",               optional_argument, NULL, 6},
-        {"window_size",         optional_argument, NULL, 7},
-        {NULL,                  no_argument,       NULL, 8},
+        {"causal",              optional_argument, NULL, 6},
+        {"async",               optional_argument, NULL, 7},
+        {"window_size",         optional_argument, NULL, 8},
+        {NULL,                  no_argument,       NULL, 9},
 };
 
 struct workload_config {
@@ -33,6 +34,7 @@ struct workload_config {
         struct colors                   color;
         struct colors                   dep_color;
         bool                            has_dependency;
+        bool                            is_causal;
         uint64_t                        op_count;
 };
 
@@ -43,6 +45,7 @@ struct config {
         uint32_t                        expt_duration;
 	uint8_t 		        client_id;
 	std::vector<workload_config>    workload;
+        bool                            causal;
         bool                            async;
         uint32_t                        window_size;
 }; 
@@ -56,8 +59,9 @@ private:
 		EXPT_DURATION   = 3,
 		CLIENT_ID       = 4,
 		WORKLOAD        = 5,
-		ASYNC           = 6,
-		WINDOW_SIZE     = 7,
+		CAUSAL          = 6,
+		ASYNC           = 7,
+		WINDOW_SIZE     = 8,
 	};
 
 	bool 					_init;
@@ -107,7 +111,7 @@ private:
                         std::cerr << "Error. --" << long_options[WINDOW_SIZE].name << " should be set with --" << long_options[ASYNC].name << " turned on\n";
                         exit(-1);
                 }
-		
+
                 // log_addr
                 ret.log_addr = split(std::string(_arg_map[LOG_ADDR]), ',');
                 // txn_version 
@@ -123,6 +127,8 @@ private:
 		ret.expt_duration = (uint32_t)atoi(_arg_map[EXPT_DURATION]);
                 // client_id
 		ret.client_id = (uint8_t)atoi(_arg_map[CLIENT_ID]);
+                // consistency level
+                ret.causal = _arg_map.count(CAUSAL) > 0;
                 // workload
                 std::vector<std::string> workloads = split(std::string(_arg_map[WORKLOAD]), ',');
                 for (auto w : workloads) {
@@ -167,9 +173,11 @@ private:
                         wc.color = color;
                         wc.dep_color = dep_color;
                         wc.has_dependency = has_dependency; 
+                        wc.is_causal = has_dependency && ret.causal;    // Note: ignore causal flag if there is no dependency
                         wc.op_count = op_count; 
                         ret.workload.push_back(wc);
                 }
+
                 // async
                 ret.async = _arg_map.count(ASYNC) > 0;
                 // window_size

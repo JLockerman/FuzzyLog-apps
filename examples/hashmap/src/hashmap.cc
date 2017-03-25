@@ -94,7 +94,7 @@ uint32_t HashMap::get(uint32_t key) {
         return val;
 }
 
-void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
+void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color, bool is_causal) {
         uint64_t data = ((uint64_t)key << 32) | value;
         // For latency measurement 
         append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
@@ -106,10 +106,14 @@ void HashMap::remove(uint32_t key, struct colors* op_color) {
         append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, NULL);
 }
 
-void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
+void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color, bool is_causal) {
         // Async append 
         uint64_t data = ((uint64_t)key << 32) | value;
-        write_id wid = async_append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
+        if (is_causal) {
+                async_simple_causal_append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
+        } else {
+                async_append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
+        }
 }
 
 void HashMap::flush_completed_puts() {
