@@ -48,13 +48,8 @@ public:
         } txn_protocol;
 
 private:
-        std::unordered_map<uint32_t, uint32_t>          m_cache;  
         DAGHandle*                                      m_fuzzylog_client_for_put;
        
-        // Map for tracking latencies
-        std::unordered_map<new_write_id, std::chrono::time_point<std::chrono::system_clock>>   m_start_time_map;
-        std::vector<std::chrono::duration<double>>                                             m_latencies;
-
         // Color synchronizer
         Synchronizer*                                   m_synchronizer; 
 
@@ -68,11 +63,11 @@ public:
 
         // Synchronous operations
         uint32_t get(uint32_t key);
-        void put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color);
+        void put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color, bool is_causal);
         void remove(uint32_t key, struct colors* op_color);
 
         // Asynchronous operations
-        void async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color);
+        void async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color, bool is_causal);
         void flush_completed_puts();
         new_write_id try_wait_for_any_put();
         new_write_id wait_for_any_put();
