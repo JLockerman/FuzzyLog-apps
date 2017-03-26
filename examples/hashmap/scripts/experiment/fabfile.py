@@ -46,7 +46,7 @@ def clean_fuzzymap():
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         run('rm *.txt')
 
-def fuzzymap_proc(log_addr, txn_version, exp_range, exp_duration, client_id, workload, async, window_size):
+def fuzzymap_proc(log_addr, txn_version, exp_range, exp_duration, client_id, workload, async, window_size, causal):
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         args = 'build/hashmap '
         args += '--log_addr=' + str(log_addr) + ' '
@@ -58,4 +58,6 @@ def fuzzymap_proc(log_addr, txn_version, exp_range, exp_duration, client_id, wor
         if async == "True":
             args += '--async '
             args += '--window_size=' + str(window_size)
+        if causal == "True":
+            args += ' --causal'
         run(args)

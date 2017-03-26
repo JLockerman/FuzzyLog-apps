@@ -20,21 +20,12 @@ class FuzzyMapTestCase(unittest.TestCase):
                 self.expt_duration = settings.EXPERIMENT_DURATION 
                 self.op_count = settings.OPERATION_PER_CLIENT
                 self.regions = settings.REGIONS
-                self.lock_server_region = settings.US_EAST_2
-                self.lock_server = None
-                self.lock_server_ip = None
                 self.servers = {}
                 self.server_ips = {}
                 self.clients = {}
                 self.client_ips = {}
 
         def setUp(self):
-                lock_server, lock_server_ip = ec2.start_and_test_fuzzylog_lock_server(self.lock_server_region)
-                self.assertTrue(len(lock_server) == 1, 'One lock server should exist')
-                self.assertTrue(len(lock_server_ip) == 1, 'One lock server should exist')
-                self.lock_server = lock_server 
-                self.lock_server_ip = lock_server_ip 
- 
                 for region in self.regions:
                         servers, server_ips = ec2.start_and_test_fuzzylog_servers(region)
                         self.servers[region] = servers
@@ -46,7 +37,6 @@ class FuzzyMapTestCase(unittest.TestCase):
                         self.client_ips[region] = client_ips
 
                 # cleanup servers
-                self.kill_fuzzylog(self.lock_server_ip[0]['public'], self.keyfile[self.lock_server_region])
                 for region in self.server_ips.keys():
                         for s in self.server_ips[region]:
                                 self.kill_fuzzylog(s['public'], self.keyfile[region])
@@ -58,8 +48,6 @@ class FuzzyMapTestCase(unittest.TestCase):
 
                 # run funzzylog
                 server_procs = []
-                proc = self.launch_fuzzylog(self.lock_server_ip[0]['public'], self.keyfile[self.lock_server_region])
-                server_procs.append(proc) 
                 for region in self.server_ips.keys():
                         for s in self.server_ips[region]:
                                 proc = self.launch_fuzzylog(s['public'], self.keyfile[region])
@@ -67,7 +55,6 @@ class FuzzyMapTestCase(unittest.TestCase):
                 time.sleep(5)
 
         def tearDown(self):
-                ec2.stop_instances(self.lock_server_region, self.lock_server)
                 for region in self.servers.keys():
                         ec2.stop_instances(region, self.servers[region])
                 for region in self.clients.keys():
@@ -78,7 +65,7 @@ class FuzzyMapTestCase(unittest.TestCase):
         # Helper functions
         # -----------------
         def get_log_addr(self, log_server_ips):
-                log_addr = ec2.addr_to_str(self.lock_server_ip + log_server_ips, self.fuzzylog_port)
+                log_addr = ec2.addr_to_str(log_server_ips, self.fuzzylog_port)
                 return log_addr
 
         # -----------------
@@ -95,7 +82,7 @@ class FuzzyMapTestCase(unittest.TestCase):
                 proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])  
                 return proc
 			
-        def launch_fuzzymap(self, fabhost, keyfile, logaddr, txn_version, client_id, workload, async, window_size):
+        def launch_fuzzymap(self, fabhost, keyfile, logaddr, txn_version, client_id, workload, async, window_size, causal=False):
                 launch_str = 'fuzzymap_proc:' + logaddr
                 launch_str += ',' + str(txn_version)
                 launch_str += ',' + str(self.expt_range)
@@ -104,6 +91,7 @@ class FuzzyMapTestCase(unittest.TestCase):
                 launch_str += ',' + workload
                 launch_str += ',' + str(async)
                 launch_str += ',' + str(window_size) 
+                launch_str += ',' + str(causal) 
                 return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])
         
         # ---------------
@@ -204,32 +192,33 @@ class ScalabilityTestCase(FuzzyMapTestCase):
 
         # (async, txn_version, window_size, num_clients, multiput_percent, num_servers)
         @parameterized.expand([
-                (True, 2, 80, 1, 0.0, 7),
-                (True, 2, 80, 2, 0.0, 7),
-                (True, 2, 80, 2, 0.1, 7),
-                (True, 2, 80, 2, 1.0, 7),
-                (True, 2, 80, 2, 10.0, 7),
-                (True, 2, 80, 2, 100.0, 7),
-                (True, 2, 80, 4, 0.0, 7),
-                (True, 2, 80, 4, 0.1, 7),
-                (True, 2, 80, 4, 1.0, 7),
-                (True, 2, 80, 4, 10.0, 7),
-                (True, 2, 80, 4, 100.0, 7),
-                (True, 2, 80, 8, 0.0, 7),
-                (True, 2, 80, 8, 0.1, 7),
-                (True, 2, 80, 8, 1.0, 7),
-                (True, 2, 80, 8, 10.0, 7),
-                (True, 2, 80, 8, 100.0, 7),
-       #        (True, 2, 80, 16, 0.0, 7),
-       #        (True, 2, 80, 16, 0.1, 7),
-       #        (True, 2, 80, 16, 1.0, 7),
-       #        (True, 2, 80, 16, 10.0, 7),
-       #        (True, 2, 80, 16, 100.0, 7),
-       #        (True, 2, 80, 32, 0.0, 7),
-       #        (True, 2, 80, 32, 0.1, 7),
-       #        (True, 2, 80, 32, 1.0, 7),
-       #        (True, 2, 80, 32, 10.0, 7),
-       #        (True, 2, 80, 32, 10.0, 7),
+                (True, 2, 80, 1, 0.0, 8),
+                (True, 2, 80, 2, 0.0, 8),
+                (True, 2, 80, 2, 0.1, 8),
+                (True, 2, 80, 2, 1.0, 8),
+                (True, 2, 80, 2, 10.0, 8),
+                (True, 2, 80, 2, 100.0, 8),
+                (True, 2, 80, 4, 0.0, 8),
+                (True, 2, 80, 4, 0.1, 8),
+                (True, 2, 80, 4, 1.0, 8),
+                (True, 2, 80, 4, 10.0, 8),
+                (True, 2, 80, 4, 100.0, 8),
+                (True, 2, 80, 8, 0.0, 8),
+                (True, 2, 80, 8, 0.1, 8),
+                (True, 2, 80, 8, 1.0, 8),
+                (True, 2, 80, 8, 10.0, 8),
+                (True, 2, 80, 8, 100.0, 8),
+
+       #        (True, 2, 80, 16, 0.0, 8),
+       #        (True, 2, 80, 16, 0.1, 8),
+       #        (True, 2, 80, 16, 1.0, 8),
+       #        (True, 2, 80, 16, 10.0, 8),
+       #        (True, 2, 80, 16, 100.0, 8),
+       #        (True, 2, 80, 32, 0.0, 8),
+       #        (True, 2, 80, 32, 0.1, 8),
+       #        (True, 2, 80, 32, 1.0, 8),
+       #        (True, 2, 80, 32, 10.0, 8),
+       #        (True, 2, 80, 32, 10.0, 8),
         ])
         def test_scalability(self, async, txn_version, window_size, num_clients, multiput_percent, num_servers):
                 # run clients
@@ -275,11 +264,11 @@ class ScalabilityTestCase(FuzzyMapTestCase):
 
 class CausalConsistencyTestCase(FuzzyMapTestCase):
 
-        # (async, window_size, get_op_percent)
+        # (async, window_size)
         @parameterized.expand([
-                (True, 32, 0),
+                (True, 80),
         ])
-        def test_causal(self, async, window_size, get_op_percent):
+        def test_causal(self, async, window_size):
                 # a pair of client/server at site 1, another pair of client/server at site 2 
                 self.assertTrue(len(settings.REGIONS) >= 2, 'At least 2 regions should be set')
                 site_one = settings.REGIONS[0]
@@ -292,18 +281,17 @@ class CausalConsistencyTestCase(FuzzyMapTestCase):
 
                 client_procs = []
                 # operation ratio
-                get_op_count = int(self.op_count * get_op_percent / 100.0)
-                put_op_count = int(self.op_count - get_op_count)
+                put_op_count = self.op_count
 
                 # client at site 1
-                workload = "put@100-200\={put_op_count}\,get@100:200\={get_op_count}".format(put_op_count=put_op_count, get_op_count=get_op_count)
-                proc = self.launch_fuzzymap(site_one_client_ips[0]['public'], self.keyfile[site_one], log_addr, 1, 100, workload, async, window_size)
+                workload = "put@1-2\={put_op_count}".format(put_op_count=put_op_count)
+                proc = self.launch_fuzzymap(site_one_client_ips[0]['public'], self.keyfile[site_one], log_addr, 2, 1, workload, async, window_size, True)
                 client_procs.append(proc) 
                 time.sleep(0.1)
 
                 # client2
-                workload = "put@200-100\={put_op_count}\,get@100:200\={get_op_count}".format(put_op_count=put_op_count, get_op_count=get_op_count)
-                proc = self.launch_fuzzymap(site_two_client_ips[0]['public'], self.keyfile[site_two], log_addr, 1, 200, workload, async, window_size)
+                workload = "put@2-1\={put_op_count}".format(put_op_count=put_op_count)
+                proc = self.launch_fuzzymap(site_two_client_ips[0]['public'], self.keyfile[site_two], log_addr, 2, 2, workload, async, window_size, True)
                 client_procs.append(proc) 
 
                 for c in client_procs:
@@ -311,7 +299,7 @@ class CausalConsistencyTestCase(FuzzyMapTestCase):
 
                 # gather statistics
                 thr = self.gather_throughput(interested = [(site_one, 0), (site_two, 0)])
-                FuzzyMapTestCase.results.append((async, window_size, get_op_percent, thr))
+                FuzzyMapTestCase.results.append((async, window_size, thr))
 
         @classmethod
         def tearDownClass(cls):
