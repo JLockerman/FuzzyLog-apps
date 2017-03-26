@@ -177,8 +177,12 @@ void run_getter(config cfg, std::vector<double> &throughput_samples)
 	struct colors c;
 	c.numcolors = cfg.num_clients;
 	c.mycolors = new ColorID[cfg.num_clients];
-	for (auto i = 0; i < cfg.num_clients; ++i) 
+	std::cerr << "Num colors: " << cfg.num_clients << "\n";
+	for (auto i = 0; i < cfg.num_clients; ++i) { 
 		c.mycolors[i] = (uint8_t)(i+1);	
+		std::cerr << "Color " << (uint64_t)(c.mycolors[i]) << "\n";
+		
+	}
 	
 	/* Server ips for handle. */
 	size_t num_servers = cfg.log_addr.size();

@@ -25,8 +25,8 @@ void or_set_getter::do_measurement(std::vector<double> &samples,
 void or_set_getter::do_run()
 {
 	while (_quit == false) {
-		_set->get_single_remote();
-		_num_elapsed += 1;
+		if (_set->get_single_remote() == true)
+			_num_elapsed += 1;
 	}
 }
 

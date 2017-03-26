@@ -92,7 +92,7 @@ public:
 	/* Remove e from the or-set */
 	void remove(uint64_t e);
 	
-	void get_single_remote();
+	bool get_single_remote();
 	write_id async_add(uint64_t e, char *buf);
 	write_id async_remove(uint64_t e, char *buf);
 };

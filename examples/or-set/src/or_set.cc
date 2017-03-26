@@ -13,7 +13,7 @@ or_set::or_set(DAGHandle *handle, struct colors *color, struct colors *remote_co
 	_state.clear();
 	_sync_duration = std::chrono::microseconds(sync_duration);
 	
-	snapshot_colors(_log_client, _remote_colors);
+	snapshot(_log_client);
 	/* Turn off anti-entropy for the time being */
 	//	_sync_thread = 	std::thread(&or_set::check_remotes, this); 
 }
@@ -33,14 +33,44 @@ uint8_t or_set::get_proc_id(uint64_t code)
 	return static_cast<uint8_t>(0xFF & code);
 }
 
-void or_set::get_single_remote()
+bool or_set::get_single_remote()
 {
+	size_t buf_sz;
+	struct colors c;
+	uint64_t *uint_buf;
+	
+	get_next(_log_client, _buf, &buf_sz, &c);
+	
+	if (c.numcolors == 0) {
+		snapshot(_log_client);	
+		return false;
+	}
+		
+	uint_buf = reinterpret_cast<uint64_t*>(_buf);
+	auto opcode = uint_buf[0];			
+
+	switch (get_opcode(opcode)) {
+	case ADD: 
+		remote_add((uint8_t*)_buf, buf_sz);
+		break;
+	case REMOVE:	
+		remote_remove((uint8_t*)_buf, buf_sz);
+		break;
+	default:
+		/* XXX Debugging log playback issue. */
+		std::cerr << std::showbase << std::hex;
+		std::cerr << opcode << "\n";	
+		assert(false);
+	}
+	return true;
+
+	/*
 	size_t data_sz, locs_read; 
 	auto entry = get_next2(_log_client, &data_sz, &locs_read);		
 	
 	if (locs_read == 0) {
 		snapshot_colors(_log_client, _remote_colors);
-		return;
+		return false;
 	}	
 	
 	auto uint_buf = reinterpret_cast<const uint64_t*>(entry.data);	
@@ -54,11 +84,13 @@ void or_set::get_single_remote()
 		remote_remove(entry.data, data_sz);
 		break;
 	default:
-		/* XXX Shouldn't get here!!! */
 		std::cerr << std::showbase << std::hex;
 		std::cerr << opcode << "\n";
 		assert(false); 
 	}
+	assert(false);
+	return true;
+	*/
 }
 
 
