@@ -10,16 +10,21 @@
 #include <sstream>
 #include <iostream>
 #include <fstream> 
+#include <or_set_getter.h>
 
-void write_output(config cfg, const std::vector<double> &results, const std::vector<tester_request*> latencies)
+
+void write_throughput(config cfg, const std::vector<double> &results)
 {
-	std::ofstream result_file;	
-	result_file.open(std::to_string(cfg.server_id) + ".txt" , std::ios::trunc | std::ios::out);
+	std::ofstream result_file;
+	result_file.open(std::to_string(cfg.server_id) + ".txt", std::ios::trunc | std::ios::out);
 	for (auto v : results) {
 		result_file << v << "\n";
 	}
 	result_file.close();
-	
+}
+
+void write_latency(config cfg, const std::vector<tester_request*> &latencies)
+{
 	std::ofstream latency_file;
 	latency_file.open(std::to_string(cfg.server_id) + "_latency.txt", std::ios::trunc | std::ios::out);
 	for (auto rq : latencies) {
@@ -29,6 +34,17 @@ void write_output(config cfg, const std::vector<double> &results, const std::vec
 		latency_file << rq_duration.count() << "\n"; 
 	}
 	latency_file.close();
+}
+
+void write_put_output(config cfg, const std::vector<double> &results, const std::vector<tester_request*> latencies)
+{
+	write_throughput(cfg, results);
+	write_latency(cfg, latencies);
+}
+
+void write_get_output(config cfg, const std::vector<double> &results)
+{
+	write_throughput(cfg, results);	
 }
 
 void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*> &output)
@@ -98,7 +114,7 @@ void wait_signal(config cfg)
 	*/
 }
 
-void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<double> &throughput_samples)
+void run_putter(config cfg, std::vector<tester_request*> &inputs, std::vector<double> &throughput_samples)
 {
 	/* Colors for DAG Handle */
 	struct colors c;
@@ -153,12 +169,51 @@ void run_crdt(config cfg, std::vector<tester_request*> &inputs, std::vector<doub
 	close_dag_handle(handle);
 }
 
-void do_experiment(config cfg)
+void run_getter(config cfg, std::vector<double> &throughput_samples)
+{
+	assert(cfg.writer == false);
+	
+	/* Colors for DAG Handle */
+	struct colors c;
+	c.numcolors = cfg.num_clients;
+	c.mycolors = new ColorID[cfg.num_clients];
+	for (auto i = 0; i < cfg.num_clients; ++i) 
+		c.mycolors[i] = (uint8_t)(i+1);	
+	
+	/* Server ips for handle. */
+	size_t num_servers = cfg.log_addr.size();
+	assert(num_servers > 0);
+	const char *server_ips[num_servers];
+	std::cerr << "Num servers: " << num_servers << "\n";
+	std::cerr << "Server list:\n";
+	for (auto i = 0; i < num_servers; ++i) {
+		server_ips[i] = cfg.log_addr[i].c_str();
+		std::cerr << server_ips[i] << "\n";	
+	}
+
+	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
+	auto orset = new or_set(handle, NULL, &c, cfg.server_id, cfg.sync_duration);	
+	auto getter = new or_set_getter(orset);
+	
+	std::cerr << "Getter initialized!\n";
+	getter->run(throughput_samples, cfg.sample_interval, cfg.expt_duration); 
+	close_dag_handle(handle);
+
+}
+
+void do_put_experiment(config cfg)
 {
 	std::vector<tester_request*> inputs;
 	std::vector<double> throughput_samples;
-	run_crdt(cfg, inputs, throughput_samples);
-	write_output(cfg, throughput_samples, inputs);
+	run_putter(cfg, inputs, throughput_samples);
+	write_put_output(cfg, throughput_samples, inputs);
+}
+
+void do_get_experiment(config cfg)
+{
+	std::vector<double> throughput_samples;
+	run_getter(cfg, throughput_samples);	
+	write_get_output(cfg, throughput_samples);
 }
 
 int main(int argc, char **argv) 
@@ -167,6 +222,9 @@ int main(int argc, char **argv)
 	config_parser cfg_prser;			
 	config cfg = cfg_prser.get_config(argc, argv);
 	
-	do_experiment(cfg);	
+	if (cfg.writer == true) 
+		do_put_experiment(cfg);
+	else 
+		do_get_experiment(cfg);
 	return 0;
 }
