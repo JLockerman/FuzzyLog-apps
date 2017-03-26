@@ -73,30 +73,33 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*>
 
 void wait_signal(config cfg)
 {
-	assert(false);
-	
-	/*
 	char buffer[DELOS_MAX_DATA_SIZE];
 	size_t buf_sz;
 	struct colors c, depends, interested;	
 	auto num_received = 0;
 
 	ColorID sig_color[1];	
-	sig_color[0] = 1;
+	sig_color[0] = cfg.num_clients + 1;
 	c.mycolors = sig_color;
 	c.numcolors = 1;
 	buf_sz = 1;
 	
 	interested = c;
 
-	auto handle = new_dag_handle_for_single_server(cfg.log_addr.c_str(), &c);
+	/* Server ips for handle. */
+	size_t num_servers = cfg.log_addr.size();
+	assert(num_servers > 0);
+	const char *server_ips[num_servers];
+	for (auto i = 0; i < num_servers; ++i) {
+		server_ips[i] = cfg.log_addr[i].c_str();
+	}
 
 	depends.mycolors = NULL;
 	depends.numcolors = 0;
-		
+
+	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
 	append(handle, buffer, buf_sz, &c, &depends);
-	assert(c.numcolors == 1 && c.mycolors[0] == 1);
-	while (num_received < cfg.num_clients) {
+	while (num_received < cfg.num_clients + 1) {
 		snapshot(handle);
 		while (true) {
 			get_next(handle, buffer, &buf_sz, &c);
@@ -110,8 +113,7 @@ void wait_signal(config cfg)
 			}
 		}
 	}	
-	close_dag_handle(handle);	
-	*/
+	close_dag_handle(handle);
 }
 
 void run_putter(config cfg, std::vector<tester_request*> &inputs, std::vector<double> &throughput_samples)
@@ -159,11 +161,12 @@ void run_putter(config cfg, std::vector<tester_request*> &inputs, std::vector<do
 	}
 
 	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
+	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 
+	wait_signal(cfg);	
+
 	auto orset = new or_set(handle, &local_c, &remote_colors, cfg.server_id, cfg.sync_duration);	
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
-	
-	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 
-//	wait_signal(cfg);	
+
 	std::cerr << "Worker " << (uint64_t)cfg.server_id << " initialized!\n";
 	tester->do_run(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration);
 	close_dag_handle(handle);
@@ -196,6 +199,9 @@ void run_getter(config cfg, std::vector<double> &throughput_samples)
 	}
 
 	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
+
+	wait_signal(cfg);
+
 	auto orset = new or_set(handle, NULL, &c, cfg.server_id, cfg.sync_duration);	
 	auto getter = new or_set_getter(orset);
 	

@@ -33,7 +33,7 @@ def init_fuzzy_log():
 	
 # Start clients.
 def init_clients(start_clients, num_clients, window_sz, log_ip, duration, total_clients):
-	args = ['./build/or-set', '--log_addr', log_ip, '--expt_range', '1000000', 
+	args = ['./build/or-set', '--writer', '--log_addr', log_ip, '--expt_range', '1000000', 
 	 	'--num_rqs', '30000000', '--sample_interval', '1', '--sync_duration', '500', '--server_id'] 
 	client_procs = []
 	log_files = []
@@ -72,7 +72,7 @@ def single_expt(start_clients, num_clients, window_sz, log_ip, duration, total_c
 		c.wait()
 		f.close()
 	# log_proc.kill()
-	mv_results(num_clients, window_sz)
+#	mv_results(num_clients, window_sz)
 
 if __name__ == "__main__":
     main()
