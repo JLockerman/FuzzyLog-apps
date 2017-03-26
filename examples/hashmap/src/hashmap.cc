@@ -11,23 +11,23 @@ HashMap::HashMap(std::vector<std::string>* log_addr, uint8_t txn_version, std::v
         init_fuzzylog_client(log_addr, txn_version); 
 
         std::vector<ColorID> interesting_colors;
-        get_interesting_colors(workload, interesting_colors); 
-        init_synchronizer(log_addr, txn_version, interesting_colors); 
+        if (get_interesting_colors(workload, interesting_colors))
+                init_synchronizer(log_addr, txn_version, interesting_colors); 
 }
 
-void HashMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors) {
+bool HashMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors) {
+        bool found = false;
         uint32_t i;
         for (auto w : *workload) {
                 if (w.op_type == "get") {
-                        for (i = 0; i < w.color.numcolors; i++)
+                        for (i = 0; i < w.color.numcolors; i++) {
                                 interesting_colors.push_back(w.color.mycolors[i]);
+                        }
+                        found = true;
                         break;
                 }
         }
-        if (interesting_colors.size() == 0) {
-                // Make dummy interesting color (without this, synchronizer's get_next doesn't proceed) 
-                interesting_colors.push_back((ColorID)DUMMY_INTERESTING_COLOR);
-        }
+        return found;
 }
 
 void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr, uint8_t txn_version) {

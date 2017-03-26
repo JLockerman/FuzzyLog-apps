@@ -57,7 +57,7 @@ public:
         HashMap(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<workload_config>* workload);
         ~HashMap();
 
-        void get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors);
+        bool get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors);
         void init_fuzzylog_client(std::vector<std::string>* log_addr, uint8_t txn_version);
         void init_synchronizer(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<ColorID>& interesting_colors);
 
