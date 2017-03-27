@@ -68,6 +68,83 @@ void async_tester::do_run(const std::vector<tester_request*> &requests, std::vec
 	worker.join();
 }
 
+void async_tester::do_run_fix_throughput(const std::vector<tester_request*> &requests, std::vector<double> &samples,
+					 int interval, 	
+					 int duration, 		
+					 double low_throughput, 
+					 double high_throughput, 
+					 double spike_start, 
+					 double spike_duration)
+{
+	assert(_quit == true);
+	_quit = false;
+	
+	std::thread worker(&async_tester::run_throughput, this, requests, low_throughput, high_throughput, spike_start, spike_duration);
+	do_measurement(samples, interval, duration);
+	_quit = true;
+	worker.join();
+}
+
+void async_tester::run_throughput(const std::vector<tester_request*> &requests, 
+				  double low_throughput, double high_throughput, double spike_start, double spike_duration)
+{
+	auto low_diff = 1000.0 / low_throughput;
+	auto high_diff = 1000.0 / high_throughput;		
+	
+	auto i = 0;
+	auto start = std::chrono::system_clock::now(); 
+	auto exp_start = start;
+	auto phase = 0, num_pending = 0;
+	
+	while (_quit == false) {
+		auto rq = requests[i];
+		assert(rq->_executed == false);
+		
+		while (true) {
+			auto now = std::chrono::system_clock::now();
+			std::chrono::duration<double, std::milli> elapsed = now - start;
+			double diff;
+		
+			if (phase == 0 || phase == 2) 
+				diff = low_diff;
+			else if (phase == 1) 
+				diff = high_diff;			
+			else
+				assert(false);
+
+			if (elapsed.count() > diff) {
+				rq->_start_time = now;
+				issue_request(rq);
+				num_pending += 1;	
+				start = now;
+				std::chrono::duration<double, std::milli> elapsed_start = now - exp_start;
+	
+				if (phase == 0 && elapsed_start.count() >= spike_start*1000.0)
+					phase = 1; 				
+				else if (phase == 1 && elapsed_start.count() >= (spike_start + spike_duration)*1000.0)
+					phase  = 2;
+
+				break;
+			} else {
+				auto diff = try_get_pending();
+				num_pending -= diff;
+				_num_elapsed += diff;
+			}
+		}	
+		
+		i += 1;
+	}
+	
+	assert(i < requests.size()); 
+	while (num_pending != 0) {
+		use_idle_cycles();
+		auto diff = try_get_pending();
+		num_pending -= diff;
+		_num_elapsed += diff;
+	}
+
+}
+
 void async_tester::run(const std::vector<tester_request*> &requests) 
 {
 	auto num_pending = 0;

@@ -30,9 +30,19 @@ protected:
 			    int duration);
 
 	void run(const std::vector<tester_request*> &requests);
+	void run_throughput(const std::vector<tester_request*> &requests, double low_throughput, double high_throughput, double spike_start, double spike_duration); 
 	void wait_single();	
 	uint32_t try_get_pending();
+	
 public:
 	async_tester(uint32_t window_sz);
 	void do_run(const std::vector<tester_request*> &requests, std::vector<double> &samples, int interval, int duration);
+	void do_run_fix_throughput(const std::vector<tester_request*> &requests, std::vector<double> &samples,
+				 int interval, 	
+				 int duration, 		
+				 double low_throughput, 
+				 double high_throughput, 
+				 double spike_start, 
+	 			 	double spike_duration);
+
 };
