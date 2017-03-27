@@ -8,27 +8,26 @@
 
 HashMap::HashMap(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<workload_config>* workload) {
         // find interesting colors from get workload
-        m_synchronizer = NULL;
         init_fuzzylog_client(log_addr, txn_version); 
 
         std::vector<ColorID> interesting_colors;
-        if (get_interesting_colors(workload, interesting_colors))
-                init_synchronizer(log_addr, txn_version, interesting_colors); 
+        get_interesting_colors(workload, interesting_colors); 
+        init_synchronizer(log_addr, txn_version, interesting_colors); 
 }
 
-bool HashMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors) {
-        bool found = false;
+void HashMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors) {
         uint32_t i;
         for (auto w : *workload) {
                 if (w.op_type == "get") {
-                        for (i = 0; i < w.color.numcolors; i++) {
+                        for (i = 0; i < w.color.numcolors; i++)
                                 interesting_colors.push_back(w.color.mycolors[i]);
-                        }
-                        found = true;
                         break;
                 }
         }
-        return found;
+        if (interesting_colors.size() == 0) {
+                // Make dummy interesting color (without this, synchronizer's get_next doesn't proceed) 
+                interesting_colors.push_back((ColorID)DUMMY_INTERESTING_COLOR);
+        }
 }
 
 void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr, uint8_t txn_version) {
@@ -73,8 +72,7 @@ void HashMap::init_synchronizer(std::vector<std::string>* log_addr, uint8_t txn_
 }
 
 HashMap::~HashMap() {
-        if (m_synchronizer != NULL)
-                m_synchronizer->join();
+        m_synchronizer->join();
         close_dag_handle(m_fuzzylog_client_for_put);
 }
 
@@ -96,7 +94,7 @@ uint32_t HashMap::get(uint32_t key) {
         return val;
 }
 
-void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color, bool is_causal) {
+void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
         uint64_t data = ((uint64_t)key << 32) | value;
         // For latency measurement 
         append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
@@ -108,14 +106,10 @@ void HashMap::remove(uint32_t key, struct colors* op_color) {
         append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, NULL);
 }
 
-void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color, bool is_causal) {
+void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
         // Async append 
         uint64_t data = ((uint64_t)key << 32) | value;
-        if (is_causal) {
-                async_simple_causal_append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
-        } else {
-                async_append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
-        }
+        write_id wid = async_append(m_fuzzylog_client_for_put, (char *)&data, sizeof(data), op_color, dep_color);
 }
 
 void HashMap::flush_completed_puts() {
