@@ -35,12 +35,12 @@ def update_fuzzylog_binary(commit=None):
 def kill_fuzzylog():
     run('killall delos_tcp_server')
 
-def fuzzylog_proc(port, maxthreads):
+def fuzzylog_proc(port, maxthreads, index_in_group, total_num_servers_in_group):
     with cd('~/fuzzylog/delos-rust/servers/tcp_server'):
         if maxthreads == '-1':
-            run('target/release/delos_tcp_server %s' % port)
+            run('target/release/delos_tcp_server %s -ig %s:%s' % (port, index_in_group, total_num_servers_in_group))
         else:
-            run('target/release/delos_tcp_server %s -w %s' % (port, maxthreads))
+            run('target/release/delos_tcp_server %s -w %s -ig %s:%s' % (port, maxthreads, index_in_group, total_num_servers_in_group))
 
 def clean_fuzzymap():
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
