@@ -8,6 +8,7 @@
 
 HashMap::HashMap(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<workload_config>* workload) {
         // find interesting colors from get workload
+        m_synchronizer = NULL;
         init_fuzzylog_client(log_addr, txn_version); 
 
         std::vector<ColorID> interesting_colors;
@@ -72,7 +73,8 @@ void HashMap::init_synchronizer(std::vector<std::string>* log_addr, uint8_t txn_
 }
 
 HashMap::~HashMap() {
-        m_synchronizer->join();
+        if (m_synchronizer != NULL)
+                m_synchronizer->join();
         close_dag_handle(m_fuzzylog_client_for_put);
 }
 
