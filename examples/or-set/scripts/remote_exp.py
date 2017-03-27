@@ -14,7 +14,7 @@ import time
 # XXX Should probably go into a config file. 
 SUBNET_ID = 'subnet-95bce7b8' 
 SECURITY_GROUP = 'sg-1d531961' 
-IMAGE_ID='ami-31e95b27'
+IMAGE_ID='ami-1fda6509'
 KEYFILE = '~/.ssh/jmfaleiro.pem'
 REGION = 'us-east-1'
 SERVER_INSTANCE_TYPE = 'm4.16xlarge'
@@ -110,8 +110,8 @@ def stop_all_running_instances(region):
 	instance_list = get_running_instances(region)
 	stop_instances(region, instance_list)	
 
-def launch_client_controller(fabhost, keyfile, logaddr, start_clients, num_clients, window_sz, duration):
-	launch_str = 'run_crdt_clients:' + logaddr + ',' + str(start_clients) + ',' + str(num_clients) + ',' + str(window_sz) + ',' + str(duration)	
+def launch_client_controller(fabhost, keyfile, logaddr, start_clients, num_clients, window_sz, duration, total_clients):
+	launch_str = 'run_crdt_clients:' + logaddr + ',' + str(start_clients) + ',' + str(num_clients) + ',' + str(window_sz) + ',' + str(duration) + ',' + str(total_clients)	
 	return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])
 
 # Launch a CRDT applicatino process.
@@ -151,8 +151,8 @@ def check_statistics(server_ips, keyfile):
 		p.wait()
 
 # Launch fuzzy log. 
-def launch_fuzzylog(fabhost, keyfile, port, nthreads=-1):
-	launch_str = 'fuzzylog_proc:' + str(port) + ',' + str(nthreads)
+def launch_fuzzylog(fabhost, keyfile, port, server_index, numservers):
+	launch_str = 'fuzzylog_proc:' + str(port) + ',' + str(server_index) + ',' + str(numservers)
 	proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])  
 	return proc
 
@@ -187,14 +187,19 @@ def fuzzylog_exp(server_instances, client_instances, clients_per_instance, windo
 
 	log_procs = []
 	for i in range(0, len(server_instances)):
-		log_procs.append(launch_fuzzylog(fabhost_prefix+server_instances[i]['public'], keyfile, 3333))	
-	time.sleep(5)	
+		log_procs.append(launch_fuzzylog(fabhost_prefix+server_instances[i]['public'], keyfile, 3333, i, len(server_instances)))	
+	time.sleep(10)	
 
 	client_procs = []
-	for i in range(0, len(client_instances)):
+	for i in range(0, len(client_instances) - 1):
 		start_c = i * clients_per_instance
-		client_proc = launch_client_controller(fabhost_prefix+client_instances[i]['public'], keyfile, logaddr, start_c, clients_per_instance, window_sz, duration)	
+		client_proc = launch_client_controller(fabhost_prefix+client_instances[i]['public'], keyfile, logaddr, start_c, clients_per_instance, window_sz, duration, 4*(len(client_instances) - 1))	
 		client_procs.append(client_proc)
+	
+	last_client = len(client_instances)-1
+	getter_proc = launch_crdt(fabhost_prefix+client_instances[last_client]['public'], keyfile, logaddr, duration, 1000, 							len(client_procs)*clients_per_instance, 500, len(client_procs)*clients_per_instance,
+				  window_sz, 0, 1)  
+	client_procs.append(getter_proc)
 		
 	server_ips = list(map(lambda x: x['public'], server_instances))	
 
@@ -263,7 +268,7 @@ def test_instances(instance_list, keyfile):
 
 def do_expt():
 	# Start up instances for experiment. 
-	client_instances = launch_instances(4, CLIENT_INSTANCE_TYPE, REGION)
+	client_instances = launch_instances(5, CLIENT_INSTANCE_TYPE, REGION)
 	# instance_ids = get_stopped_instances(REGION)
 	# instances = start_instances(REGION, instance_ids)
 	server_instances = launch_instances(5, SERVER_INSTANCE_TYPE, REGION)
@@ -277,23 +282,25 @@ def do_expt():
 	os.system('mkdir results')
 	
 	num_clients = 4
-	num_warehouses = 48 
+	window_sz = 48 
 	duration = 90
+	
+	g = len(client_instance_ips)-1
+	
+	for i in range(4, 5):	
+		fuzzylog_exp(server_instance_ips[0:i+1], client_instance_ips, num_clients, window_sz, duration)	
 
-	for i in range(0, 5):	
-		fuzzylog_exp(server_instance_ips[0:i+1], client_instance_ips, num_clients, num_warehouses, duration)	
-
-		result_dir = 'c' + str(num_clients) + '_s' + str(i+1) + '_w' + str(num_warehouses)
+		result_dir = 'c' + str(num_clients) + '_s' + str(i+1) + '_w' + str(window_sz)
 		os.system('mkdir ' + result_dir)
 		for c in client_instance_ips:
-			os.system('scp -r -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ubuntu@' + c['public'] + ':~/fuzzylog/delos-apps/examples/or-set/results/* ' + result_dir)	
+			os.system('scp -r -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ubuntu@' + c['public'] + ':~/fuzzylog/delos-apps/examples/or-set/*.txt ' + result_dir)	
+
 
 	instances = client_instances + server_instances
 	terminate_instances(REGION, instances)	
 
 def main():
-	do_expt()
-
+	do_expt()	
 
 if __name__ == "__main__":
     main()

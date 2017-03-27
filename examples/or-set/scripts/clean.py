@@ -30,13 +30,13 @@ def vary_servers(clients_per_machine, num_machines, window, server_list):
 
 	for s in server_list:
 		outer_dir = outer_fmt.format(str(clients_per_machine), str(s), str(window))
-		inner_dir = inner_fmt.format(str(clients_per_machine), str(window))
+	#	inner_dir = inner_fmt.format(str(clients_per_machine), str(window))
 		
 		num_clients = clients_per_machine*num_machines
 		temp = []
 		for c in range(0, num_clients):
 			filename = file_fmt.format(str(c))			
-			temp.append(readfile(os.path.join(outer_dir, inner_dir, filename)))	
+			temp.append(readfile(os.path.join(outer_dir, filename)))	
 		
 		zipped = zip(*temp)								
 		summed = list(map(sum, zipped))

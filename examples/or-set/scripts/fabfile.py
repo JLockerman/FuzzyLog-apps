@@ -11,12 +11,9 @@ def kill_fuzzylog():
 def kill_crdts():
 	run('killall or-set')
 
-def fuzzylog_proc(port, maxthreads):
+def fuzzylog_proc(port, server_index, numservers):
 	with cd('fuzzylog/delos-rust/servers/tcp_server'):
-		if maxthreads == '-1':
-			run('target/release/delos_tcp_server ' + str(port))
-		else:
-			run('target/release/delos_tcp_server ' + str(port) + ' -w ' + str(maxthreads))
+		run('target/release/delos_tcp_server ' + str(port) + ' -ig ' + str(server_index) + ':' + str(numservers) + ' > log.txt 2>&1')
 
 def check_network_statistics():
 	run('netstat -i')
@@ -25,10 +22,10 @@ def clean_crdt():
 	with cd('fuzzylog/delos-apps/examples/or-set'):
 		run('rm *.txt')
 
-def run_crdt_clients(log_addr, start_clients, num_clients, window_sz, duration):
+def run_crdt_clients(log_addr, start_clients, num_clients, window_sz, duration, total_clients):
 	with cd('fuzzylog/delos-apps/examples/or-set'):
 		#with prefix('export RUST_LOG=fuzzy_log'):
-		args = 'scripts/exp.py ' + str(log_addr) + ' ' + str(start_clients) + ' ' + str(num_clients) + ' ' + str(window_sz) + ' ' + str(duration)
+		args = 'scripts/exp.py ' + str(log_addr) + ' ' + str(start_clients) + ' ' + str(num_clients) + ' ' + str(window_sz) + ' ' + str(duration) + ' ' + str(total_clients)
 		run(args)
 
 def enable_logging():
@@ -37,14 +34,17 @@ def enable_logging():
 def crdt_proc(log_addr, duration, exp_range, server_id, sync_duration,
 	      num_clients, window_sz, num_rqs, sample_interval):
 	with cd('fuzzylog/delos-apps/examples/or-set'):
+#		with prefix('export RUST_LOG=fuzzy_log; export RUST_BACKTRACE=1'):
 		args = 'build/or-set '
+		args += '--reader ' 
 		args += '--log_addr ' + str(log_addr) + ' '		
 		args += '--expt_duration ' + str(duration) + ' ' 
 		args += '--expt_range ' + str(exp_range) + ' ' 
 		args += '--server_id ' + str(server_id) + ' '
 		args += '--sync_duration ' + str(sync_duration) + ' '
-		args += '--num_clients ' + str(num_clients) + ' '
-		args += '--window_sz ' + str(window_sz) + ' ' 
 		args += '--num_rqs ' + str(num_rqs) + ' ' 
+		args += '--window_sz ' + str(window_sz) + ' ' 
 		args += '--sample_interval ' + str(sample_interval) + ' ' 
+		args += '--num_clients ' + str(num_clients) + ' '
+		args += ' > getter_log.txt 2>&1'
 		run(args)
