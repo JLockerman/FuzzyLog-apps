@@ -19,6 +19,28 @@ def postprocess_results(vals):
 	low_idx = int(len(vals)*0.05)
 	high_idx = int(len(vals)*0.95)
 	return [vals[median_idx]/float(1000), vals[low_idx]/float(1000), vals[high_idx]/float(1000)]
+
+def throughput_time(clients_per_machine, num_machines, window, server_count):
+	dir_fmt = 'c{0}_s{1}_w{2}'
+	file_fmt = '{0}.txt'
+	results = []
+	outfile = 'append_throughput.txt'
+	outline = '{0}\n'
+	
+	dirname = dir_fmt.format(str(clients_per_machine), str(server_count), str(window))
+	num_clients = clients_per_machine*num_machines
+	temp = []
+	for c in range(0, num_clients):
+		filename = file_fmt.format(str(c))
+		temp.append(readfile(os.path.join(dirname, filename)))	
+	
+	zipped = zip(*temp)
+	summed = list(map(sum, zipped))
+	
+	outhandle = open(outfile, 'w')
+	for s in summed:
+		outhandle.write(outline.format(str(s)))
+	outhandle.close()
 	
 def vary_servers(clients_per_machine, num_machines, window, server_list):
 	outer_fmt = 'c{0}_s{1}_w{2}'
