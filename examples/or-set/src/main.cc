@@ -99,7 +99,7 @@ void wait_signal(config cfg)
 
 	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
 	append(handle, buffer, buf_sz, &c, &depends);
-	while (num_received < cfg.num_clients) {
+	while (num_received < cfg.num_clients + 1) {
 		snapshot(handle);
 		while (true) {
 			get_next(handle, buffer, &buf_sz, &c);
