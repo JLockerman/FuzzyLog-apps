@@ -168,7 +168,16 @@ void run_putter(config cfg, std::vector<tester_request*> &inputs, std::vector<do
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
 
 	std::cerr << "Worker " << (uint64_t)cfg.server_id << " initialized!\n";
-	tester->do_run(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration);
+
+	void do_run_fix_throughput(const std::vector<tester_request*> &requests, std::vector<double> &samples,
+				 int interval, 	
+				 int duration, 		
+				 double low_throughput, 
+				 double high_throughput, 
+				 double spike_start, 
+	 			 	double spike_duration);
+
+	tester->do_run_fix_throughput(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration, 10000.0, 50000.0, 30.0, 10.0);
 	close_dag_handle(handle);
 }
 
