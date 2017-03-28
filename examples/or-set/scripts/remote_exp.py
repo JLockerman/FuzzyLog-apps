@@ -14,7 +14,7 @@ import time
 # XXX Should probably go into a config file. 
 SUBNET_ID = 'subnet-95bce7b8' 
 SECURITY_GROUP = 'sg-1d531961' 
-IMAGE_ID='ami-5d87394b'
+IMAGE_ID='ami-c48930d2'
 KEYFILE = '~/.ssh/jmfaleiro.pem'
 REGION = 'us-east-1'
 SERVER_INSTANCE_TYPE = 'm4.16xlarge'
@@ -110,8 +110,12 @@ def stop_all_running_instances(region):
 	instance_list = get_running_instances(region)
 	stop_instances(region, instance_list)	
 
-def launch_client_controller(fabhost, keyfile, logaddr, start_clients, num_clients, window_sz, duration, total_clients):
-	launch_str = 'run_crdt_clients:' + logaddr + ',' + str(start_clients) + ',' + str(num_clients) + ',' + str(window_sz) + ',' + str(duration) + ',' + str(total_clients)	
+def launch_client_controller(fabhost, keyfile, logaddr, start_clients, num_clients, window_sz, duration, total_clients,
+			     low_throughput,
+			     high_throughput,
+			     spike_start,
+			     spike_duration):
+	launch_str = 'run_crdt_clients:' + logaddr + ',' + str(start_clients) + ',' + str(num_clients) + ',' + str(window_sz) + ',' + str(duration) + ',' + str(total_clients) + ',' + str(low_throughput) + ',' + str(high_throughput) + ',' + str(spike_start) + ',' + str(spike_duration)	
 	return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])
 
 # Launch a CRDT applicatino process.
@@ -162,7 +166,8 @@ def launch_fuzzylog(fabhost, keyfile, port, server_index, numservers):
 # Fabric only supports synchronous calls to hosts. Create a process per-remote call, 
 # either corresponding to a client or server. Manage clients and servers by joining/killing
 # these processes.  
-def fuzzylog_exp(server_instances, client_instances, clients_per_instance, window_sz, duration):
+def fuzzylog_exp(server_instances, client_instances, clients_per_instance, window_sz, duration, low_throughput, high_throughput, 
+		 spike_start, spike_duration):
 	sync_duration = 300
 	exp_range = 1000000
 	num_rqs = 30000000
@@ -193,7 +198,7 @@ def fuzzylog_exp(server_instances, client_instances, clients_per_instance, windo
 	client_procs = []
 	for i in range(0, len(client_instances) - 1):
 		start_c = i * clients_per_instance
-		client_proc = launch_client_controller(fabhost_prefix+client_instances[i]['public'], keyfile, logaddr, start_c, clients_per_instance, window_sz, duration, 4*(len(client_instances) - 1))	
+		client_proc = launch_client_controller(fabhost_prefix+client_instances[i]['public'], keyfile, logaddr, start_c, clients_per_instance, window_sz, duration, 4*(len(client_instances) - 1), low_throughput, high_throughput, spike_start, spike_duration)	
 		client_procs.append(client_proc)
 	
 	last_client = len(client_instances)-1
@@ -281,6 +286,10 @@ def do_expt():
 	
 	os.system('mkdir results')
 	
+	low_throughput = 2000
+	high_throughput = 20000
+	spike_start = 30
+	spike_duration  = 10	
 	num_clients = 4
 	window_sz = 48 
 	duration = 90
@@ -288,7 +297,11 @@ def do_expt():
 	g = len(client_instance_ips)-1
 	
 	for i in range(4, 5):	
-		fuzzylog_exp(server_instance_ips[0:i+1], client_instance_ips, num_clients, window_sz, duration)	
+		fuzzylog_exp(server_instance_ips[0:i+1], client_instance_ips, num_clients, window_sz, duration, 
+			     low_throughput, 
+			     high_throughput, 
+			     spike_start,
+			     spike_duration)
 
 		result_dir = 'c' + str(num_clients) + '_s' + str(i+1) + '_w' + str(window_sz)
 		os.system('mkdir ' + result_dir)
@@ -300,8 +313,7 @@ def do_expt():
 	terminate_instances(REGION, instances)	
 
 def main():
-	do_expt()
-
+	do_expt()	
 
 if __name__ == "__main__":
     main()

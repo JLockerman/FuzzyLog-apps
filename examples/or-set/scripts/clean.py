@@ -3,7 +3,6 @@
 import exp
 import os
 import math
-
 def readfile(filename):
 	results = []
 	inpt_file = open(filename)
@@ -19,6 +18,17 @@ def postprocess_results(vals):
 	low_idx = int(len(vals)*0.05)
 	high_idx = int(len(vals)*0.95)
 	return [vals[median_idx]/float(1000), vals[low_idx]/float(1000), vals[high_idx]/float(1000)]
+
+def index_file(input_file, output_file):
+	results = readfile(input_file)
+	temp = list(map(lambda x: x / 1000.0, results))
+	indices = range(0, len(temp))		
+	zipped = zip(temp,indices)
+	
+	outf = open(output_file, 'w')
+	for r, i in zipped:
+		outf.write(str(i) + ' ' + str(r) + '\n')
+	outf.close()
 
 def throughput_time(clients_per_machine, num_machines, window, server_count):
 	dir_fmt = 'c{0}_s{1}_w{2}'
