@@ -41,25 +41,19 @@ namespace std {
 
 
 class HashMap {
-public:
-        typedef enum {
-                INIT = 1,
-                SKEENS = 2,
-        } txn_protocol;
-
 private:
-        DAGHandle*                                      m_fuzzylog_client_for_put;
+        DAGHandle*                                      m_fuzzylog_client;
        
         // Color synchronizer
         Synchronizer*                                   m_synchronizer; 
 
 public:
-        HashMap(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<workload_config>* workload);
+        HashMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload);
         ~HashMap();
 
         bool get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors);
-        void init_fuzzylog_client(std::vector<std::string>* log_addr, uint8_t txn_version);
-        void init_synchronizer(std::vector<std::string>* log_addr, uint8_t txn_version, std::vector<ColorID>& interesting_colors);
+        void init_fuzzylog_client(std::vector<std::string>* log_addr);
+        void init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
 
         // Synchronous operations
         uint32_t get(uint32_t key);

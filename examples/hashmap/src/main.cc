@@ -59,7 +59,7 @@ void do_experiment(config cfg) {
         Context ctx;    // Can be used to share info between Worker and Txns
 
         // Fuzzymap
-        map = new HashMap(&cfg.log_addr, cfg.txn_version, &cfg.workload);
+        map = new HashMap(&cfg.log_addr, &cfg.workload);
 
         // Generate append workloads: uniform distribution
         workload_gen = new workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);
