@@ -14,7 +14,7 @@ import time
 # XXX Should probably go into a config file. 
 SUBNET_ID = 'subnet-95bce7b8' 
 SECURITY_GROUP = 'sg-1d531961' 
-IMAGE_ID='ami-1fda6509'
+IMAGE_ID='ami-5d87394b'
 KEYFILE = '~/.ssh/jmfaleiro.pem'
 REGION = 'us-east-1'
 SERVER_INSTANCE_TYPE = 'm4.16xlarge'
@@ -300,7 +300,8 @@ def do_expt():
 	terminate_instances(REGION, instances)	
 
 def main():
-	do_expt()	
+	do_expt()
+
 
 if __name__ == "__main__":
     main()
