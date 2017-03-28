@@ -22,17 +22,25 @@ void or_set_getter::do_measurement(std::vector<double> &samples,
 	}	
 }
 
-void or_set_getter::do_run()
+void or_set_getter::do_run(std::vector<uint64_t> *gets_per_snapshot)
 {
+	uint64_t gets = 0;
 	while (_quit == false) {
-		if (_set->get_single_remote() == true)
+		if (_set->get_single_remote() == true) {
 			_num_elapsed += 1;
+			gets += 1;
+		} else {
+			gets_per_snapshot->push_back(gets);
+			gets = 0;
+		}
 	}
 }
 
-void or_set_getter::run(std::vector<double> &samples, int interval, int duration)
+void or_set_getter::run(std::vector<double> &samples, std::vector<uint64_t> &gets_per_snapshot, 
+			int interval, 
+			int duration)
 {
-	std::thread worker(&or_set_getter::do_run, this); 
+	std::thread worker(&or_set_getter::do_run, this, &gets_per_snapshot); 
 	do_measurement(samples, interval, duration);
 	_quit = true;
 	worker.join();

@@ -313,7 +313,9 @@ def do_expt():
 	terminate_instances(REGION, instances)	
 
 def main():
-	do_expt()	
-
+	client_instances = launch_instances(1, CLIENT_INSTANCE_TYPE, REGION)
+	client_instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, client_instances))
+	test_instances(client_instance_ips, KEYFILE)
+	
 if __name__ == "__main__":
     main()
