@@ -21,7 +21,11 @@ static struct option long_options[] = {
   {"sample_interval", required_argument, NULL, 8},
   {"writer", no_argument, NULL, 9},
   {"reader", no_argument, NULL, 10},
-  {NULL, no_argument, NULL, 11},
+  {"low_throughput", required_argument, NULL, 11},
+  {"high_throughput", required_argument, NULL, 12},
+  {"spike_start", required_argument, NULL, 13},
+  {"spike_duration", required_argument, NULL, 14},
+  {NULL, no_argument, NULL, 15},
 };
 
 struct config {
@@ -35,6 +39,10 @@ struct config {
 	uint64_t 				num_rqs;
 	int 					sample_interval;
 	bool 					writer;
+	double 					low_throughput;
+	double 					high_throughput;
+	double 					spike_start;
+	double 					spike_duration;
 }; 
 
 class config_parser {
@@ -51,6 +59,10 @@ private:
 		SAMPLE_INTERVAL=8,
 		WRITER=9,
 		READER=10,
+		LOW_THROUGHPUT=11,
+		HIGH_THROUGHPUT=12,
+		SPIKE_START=13,
+		SPIKE_DURATION=14,
 	};
 
 	bool 					_init;
@@ -88,7 +100,11 @@ private:
 		    _arg_map.count(NUM_CLIENTS) == 0 ||
 		    _arg_map.count(WINDOW_SZ) == 0 || 
 		    _arg_map.count(NUM_RQS) == 0  || 
-	       	    _arg_map.count(SAMPLE_INTERVAL) == 0) { 
+	       	    _arg_map.count(SAMPLE_INTERVAL) == 0 ||
+		    _arg_map.count(LOW_THROUGHPUT) == 0 ||
+		    _arg_map.count(HIGH_THROUGHPUT) == 0 ||
+		    _arg_map.count(SPIKE_START) == 0 ||	
+		    _arg_map.count(SPIKE_DURATION) == 0) { 
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_DURATION].name << "\n";
@@ -99,6 +115,10 @@ private:
 			std::cerr << "--" << long_options[WINDOW_SZ].name << "\n";
 			std::cerr << "--" << long_options[NUM_RQS].name << "\n";
 			std::cerr << "--" << long_options[SAMPLE_INTERVAL].name << "\n";
+			std::cerr << "--" << long_options[LOW_THROUGHPUT].name << "\n";
+			std::cerr << "--" << long_options[HIGH_THROUGHPUT].name << "\n";
+			std::cerr << "--" << long_options[SPIKE_START].name << "\n";
+			std::cerr << "--" << long_options[SPIKE_DURATION].name << "\n";
 			exit(-1);
 		}
 		
@@ -110,6 +130,10 @@ private:
 		ret.sync_duration = (uint64_t)atoi(_arg_map[SYNC_DURATION]);	
 		ret.num_rqs = (uint64_t)atoi(_arg_map[NUM_RQS]);
 		ret.sample_interval = atoi(_arg_map[SAMPLE_INTERVAL]);
+		ret.low_throughput = (double)atof(_arg_map[LOW_THROUGHPUT]);
+		ret.high_throughput = (double)atof(_arg_map[HIGH_THROUGHPUT]);
+		ret.spike_start = (double)atof(_arg_map[SPIKE_START]);
+		ret.spike_duration = (double)atof(_arg_map[SPIKE_DURATION]);	
 		
 		if (_arg_map.count(WRITER) != 0) {
 			assert(_arg_map.count(READER) == 0); 

@@ -99,7 +99,7 @@ void wait_signal(config cfg)
 
 	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
 	append(handle, buffer, buf_sz, &c, &depends);
-	while (num_received < cfg.num_clients + 1) {
+	while (num_received < cfg.num_clients) {
 		snapshot(handle);
 		while (true) {
 			get_next(handle, buffer, &buf_sz, &c);
@@ -177,7 +177,7 @@ void run_putter(config cfg, std::vector<tester_request*> &inputs, std::vector<do
 				 double spike_start, 
 	 			 	double spike_duration);
 
-	tester->do_run_fix_throughput(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration, 10000.0, 50000.0, 30.0, 10.0);
+	tester->do_run_fix_throughput(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration, cfg.low_throughput, cfg.high_throughput, cfg.spike_start, cfg.spike_duration); 
 	close_dag_handle(handle);
 }
 
