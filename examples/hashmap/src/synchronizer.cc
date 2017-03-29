@@ -16,7 +16,7 @@ Synchronizer::Synchronizer(std::vector<std::string>* log_addr, std::vector<Color
                 c->mycolors[i] = interesting_colors[i];
         }
         this->m_interesting_colors = c;
-
+        // Initialize fuzzylog connection
         size_t num_chain_servers = log_addr->size();
         const char *chain_server_ips[num_chain_servers]; 
         for (auto i = 0; i < num_chain_servers; i++) {

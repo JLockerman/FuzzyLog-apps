@@ -42,9 +42,9 @@ namespace std {
 
 class HashMap {
 private:
+        // Fuzzylog connection
         DAGHandle*                                      m_fuzzylog_client;
-       
-        // Color synchronizer
+        // Reader thread
         Synchronizer*                                   m_synchronizer; 
 
 public:

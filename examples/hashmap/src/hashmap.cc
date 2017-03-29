@@ -17,18 +17,18 @@ HashMap::HashMap(std::vector<std::string>* log_addr, std::vector<workload_config
 }
 
 bool HashMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors) {
-        bool found = false;
+        bool get_workload_found = false;
         uint32_t i;
         for (auto w : *workload) {
                 if (w.op_type == "get") {
                         for (i = 0; i < w.color.numcolors; i++) {
                                 interesting_colors.push_back(w.color.mycolors[i]);
                         }
-                        found = true;
+                        get_workload_found = true;
                         break;
                 }
         }
-        return found;
+        return get_workload_found;
 }
 
 void HashMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
@@ -78,12 +78,11 @@ uint32_t HashMap::get(uint32_t key) {
 
 void HashMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
         uint64_t data = ((uint64_t)key << 32) | value;
-        // For latency measurement 
         append(m_fuzzylog_client, (char *)&data, sizeof(data), op_color, dep_color);
 }
 
 void HashMap::remove(uint32_t key, struct colors* op_color) {
-        // Note: remove is the same as putting a zero value
+        // XXX: remove is the same as putting a zero value
         uint64_t data = (uint64_t)key << 32;
         append(m_fuzzylog_client, (char *)&data, sizeof(data), op_color, NULL);
 }
@@ -91,16 +90,16 @@ void HashMap::remove(uint32_t key, struct colors* op_color) {
 void HashMap::async_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
         // Async append 
         uint64_t data = ((uint64_t)key << 32) | value;
-        write_id wid = async_append(m_fuzzylog_client, (char *)&data, sizeof(data), op_color, dep_color);
+        async_append(m_fuzzylog_client, (char *)&data, sizeof(data), op_color, dep_color);
 }
 
 void HashMap::flush_completed_puts() {
-        // Flush completed requests best-effort
+        // Flush completed requests with best-effort
         flush_completed_appends(m_fuzzylog_client);
 }
 
 new_write_id HashMap::try_wait_for_any_put() {
-        // Wait for any append to completed
+        // Wait for any append to be completed (non-blocking)
         write_id wid = try_wait_for_any_append(m_fuzzylog_client);
         new_write_id nwid;
         nwid.id = wid; 
@@ -108,7 +107,7 @@ new_write_id HashMap::try_wait_for_any_put() {
 }
 
 new_write_id HashMap::wait_for_any_put() {
-        // Wait for any append to completed
+        // Wait for any append to be completed (blocking)
         write_id wid = wait_for_any_append(m_fuzzylog_client);
         new_write_id nwid;
         nwid.id = wid; 
