@@ -109,7 +109,7 @@ void wait_signal(config cfg)
 
 	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
 	append(handle, buffer, buf_sz, &c, &depends);
-	while (num_received < cfg.num_clients + 1) {
+	while (num_received < cfg.num_clients) {
 		snapshot(handle);
 		while (true) {
 			get_next(handle, buffer, &buf_sz, &c);
@@ -219,7 +219,7 @@ void run_getter(config cfg, std::vector<double> &throughput_samples, std::vector
 
 	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
 
-	wait_signal(cfg);
+	//wait_signal(cfg);
 
 	auto orset = new or_set(handle, NULL, &c, cfg.server_id, cfg.sync_duration);	
 	auto getter = new or_set_getter(orset);
@@ -230,11 +230,31 @@ void run_getter(config cfg, std::vector<double> &throughput_samples, std::vector
 
 }
 
+void validate_puts(config cfg, const std::vector<tester_request*> &inputs, const std::vector<double> throughput_samples)
+{
+	auto input_count = 0;
+	for (auto t : inputs) {
+		if (t->_executed == false)
+			break;
+		input_count += 1;	
+	}
+	
+	auto throughput_count = 0.0;
+	for (auto sample : throughput_samples) {
+		throughput_count += sample;
+	}	
+	
+	std::cerr << "Input count: " << input_count << "\n";
+	std::cerr << "Throughput count: " << throughput_count << "\n";
+}
+
+
 void do_put_experiment(config cfg)
 {
 	std::vector<tester_request*> inputs;
 	std::vector<double> throughput_samples;
 	run_putter(cfg, inputs, throughput_samples);
+	validate_puts(cfg, inputs, throughput_samples);
 	write_put_output(cfg, throughput_samples, inputs);
 }
 
