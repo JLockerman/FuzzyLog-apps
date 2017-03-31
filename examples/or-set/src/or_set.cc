@@ -163,8 +163,6 @@ write_id or_set::send_add_async(uint64_t e, uint64_t guid, char *buf)
 
 void or_set::serialize_remove(uint64_t e, const std::set<uint64_t> &guid_set, char **buf, size_t *sz)
 {
-	assert(guid_set.size() > 0);
-	
 	uint64_t *rbuf;	
 
 	if (*buf == NULL) {
@@ -302,12 +300,12 @@ write_id or_set::async_add(uint64_t e, char *buf)
 
 write_id or_set::async_remove(uint64_t e, char *buf)
 {
+	std::set<uint64_t> guid_set;
 	{
 		std::lock_guard<std::mutex> lck(_instance_mutex);
-		if (_state.count(e) == 0)
-			return WRITE_ID_NIL;	
+		if (_state.count(e) != 0)
+			guid_set = _state[e];
 
-		auto guid_set = _state[e];
 		do_remove(e, guid_set);
 		return send_remove_async(e, guid_set, buf);
 	}

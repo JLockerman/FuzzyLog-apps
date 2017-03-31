@@ -65,7 +65,6 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*>
 	std::vector<uint64_t> seen_keys; 	
 	for (i = 0; i < num_inputs; ++i) {
 		auto rq = static_cast<or_set_rq*>(malloc(sizeof(or_set_rq))); 
-		rq->_key = gen.gen_next();
 		if (i == 0 || rand() % 2 == 0) {
 			rq->_opcode = or_set::log_opcode::ADD;
 			rq->_key = gen.gen_next();
