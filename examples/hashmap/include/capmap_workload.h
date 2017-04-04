@@ -26,8 +26,11 @@ public:
         ~ycsb_cross_insert(){}
         virtual void Run();
         virtual void AsyncRun();
+        virtual void AsyncRemoteRun();
         virtual bool TryAsyncStronglyConsistentRun();
         virtual void AsyncWeaklyConsistentRun();
+        void AsyncPartitioningAppend();
+        void AsyncHealingAppend();
         virtual optype op_type() {
                 return m_op_type;
         }

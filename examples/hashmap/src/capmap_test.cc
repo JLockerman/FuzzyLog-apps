@@ -32,6 +32,11 @@ void measure_fn(CAPMap *m, CAPMapTester *w, uint64_t duration, std::vector<uint6
 {
         uint64_t start_iters, end_iters;
         
+        bool needs_to_be_aware_of_partition = 
+                                m->get_protocol_version() == CAPMap::ProtocolVersion::VERSION_1 || 
+                                (m->get_protocol_version() == CAPMap::ProtocolVersion::VERSION_2 && m->get_role() == "secondary");
+
+        
         end_iters = w->get_num_executed();
         for (auto i = 0; i < duration * 1000 / MEASUREMENT_INTERVAL; ++i) {
                 start_iters = end_iters; 
@@ -40,11 +45,15 @@ void measure_fn(CAPMap *m, CAPMapTester *w, uint64_t duration, std::vector<uint6
                 std::cout << i << " measured: " << end_iters << " - " << start_iters << " = " << end_iters - start_iters << std::endl;
                 results.push_back(end_iters - start_iters);
 
-                // XXX: emulate network partition (5~10s)
-                if (i == FAKE_NETWORK_PARTITION_STARTS_AT * 1000 / MEASUREMENT_INTERVAL)
-                        m->set_network_partition_status(CAPMap::PartitionStatus::PARTITIONED);
-                else if (i == FAKE_NETWORK_PARTITION_ENDS_AT * 1000 / MEASUREMENT_INTERVAL)
-                        m->set_network_partition_status(CAPMap::PartitionStatus::REORDER_WEAK_NODES);
+                if (needs_to_be_aware_of_partition) {
+                        // XXX: emulate network partition
+                        if (i == FAKE_NETWORK_PARTITION_STARTS_AT * 1000 / MEASUREMENT_INTERVAL) {
+                                m->set_network_partition_status(CAPMap::PartitionStatus::PARTITIONED);
+                        }
+                        else if (i == FAKE_NETWORK_PARTITION_ENDS_AT * 1000 / MEASUREMENT_INTERVAL) {
+                                m->set_network_partition_status(CAPMap::PartitionStatus::HEALING);
+                        }
+                }
         }
 }
 
@@ -65,7 +74,7 @@ void do_experiment(capmap_config cfg) {
         Context ctx;    // Can be used to share info between CAPMapTester and Txns
 
         // Fuzzymap
-        map = new CAPMap(&cfg.log_addr, &cfg.workload);
+        map = new CAPMap(&cfg.log_addr, &cfg.workload, (CAPMap::ProtocolVersion)cfg.protocol, cfg.role);
 
         // Generate append workloads: uniform distribution
         workload_gen = new capmap_workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);

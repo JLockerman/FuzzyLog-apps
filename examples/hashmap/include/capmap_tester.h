@@ -34,7 +34,8 @@ public:
         virtual void join();
         static void* bootstrap(void *arg);
         pthread_t* get_pthread_id();
-        void Execute(); 
+        void ExecuteProtocol1(); 
+        void ExecuteProtocol2(std::string& role); 
         uint64_t get_num_executed();
         uint32_t try_get_completed();
 };

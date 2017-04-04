@@ -9,7 +9,25 @@ void ycsb_cross_insert::Run() {
 }
 
 void ycsb_cross_insert::AsyncRun() {
-        assert(false);
+        uint32_t key, value;
+        assert(m_map != NULL);
+        assert(m_dep_color != NULL);
+
+        // key = (start, end)
+        key = rand() % (m_end - m_start);
+        value = rand();
+        return m_map->async_normal_put(key, value, m_color);
+}
+
+void ycsb_cross_insert::AsyncRemoteRun() {
+        uint32_t key, value;
+        assert(m_map != NULL);
+        assert(m_dep_color != NULL);
+
+        // key = (start, end)
+        key = rand() % (m_end - m_start);
+        value = rand();
+        return m_map->async_normal_put(key, value, m_dep_color);
 }
 
 bool ycsb_cross_insert::TryAsyncStronglyConsistentRun() {
@@ -31,7 +49,29 @@ void ycsb_cross_insert::AsyncWeaklyConsistentRun() {
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
-        m_map->async_weak_depend_put(key, value, m_color);
+        m_map->async_weak_put(key, value, m_color);
+}
+
+void ycsb_cross_insert::AsyncPartitioningAppend() {
+        uint32_t key, value;
+        assert(m_map != NULL);
+        assert(m_dep_color != NULL);
+
+        // key = (start, end)
+        key = rand() % (m_end - m_start);
+        value = rand();
+        m_map->async_partitioning_put(key, value, m_color, m_dep_color);     // XXX: append to remote color, weakly dependent on the local color
+}
+
+void ycsb_cross_insert::AsyncHealingAppend() {
+        uint32_t key, value;
+        assert(m_map != NULL);
+        assert(m_dep_color != NULL);
+
+        // key = (start, end)
+        key = rand() % (m_end - m_start);
+        value = rand();
+        m_map->async_healing_put(key, value, m_dep_color, m_color);     // XXX: append to remote color, weakly dependent on the local color
 }
 
 Txn** capmap_workload_generator::Gen() {

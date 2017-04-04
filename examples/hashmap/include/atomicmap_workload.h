@@ -28,6 +28,7 @@ public:
         ~ycsb_insert(){}
         virtual void Run();
         virtual void AsyncRun();
+        virtual void AsyncRemoteRun();
         virtual bool TryAsyncStronglyConsistentRun();
         virtual void AsyncWeaklyConsistentRun();
         virtual optype op_type() {
@@ -55,6 +56,7 @@ public:
         ~ycsb_read(){}
         virtual void Run();
         virtual void AsyncRun();
+        virtual void AsyncRemoteRun();
         virtual bool TryAsyncStronglyConsistentRun();
         virtual void AsyncWeaklyConsistentRun();
         virtual optype op_type() {
