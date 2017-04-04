@@ -17,10 +17,12 @@ static struct option long_options[] = {
         {"expt_range",          required_argument, NULL, 1},
         {"expt_duration",       required_argument, NULL, 2},
         {"client_id",           required_argument, NULL, 3},
-        {"workload",            required_argument, NULL, 4},
-        {"async",               optional_argument, NULL, 5},
-        {"window_size",         optional_argument, NULL, 6},
-        {NULL,                  no_argument,       NULL, 7},
+        {"protocol",            required_argument, NULL, 4},
+        {"role",                optional_argument, NULL, 5},
+        {"workload",            required_argument, NULL, 6},
+        {"async",               optional_argument, NULL, 7},
+        {"window_size",         optional_argument, NULL, 8},
+        {NULL,                  no_argument,       NULL, 9},
 };
 
 struct capmap_config {
@@ -28,6 +30,8 @@ struct capmap_config {
 	uint32_t 		        expt_range;
         uint32_t                        expt_duration;
 	uint8_t 		        client_id;
+        uint8_t                         protocol;
+        std::string                     role; 
 	std::vector<workload_config>    workload;
         bool                            async;
         uint32_t                        window_size;
@@ -40,9 +44,11 @@ private:
 		EXPT_RANGE      = 1,
 		EXPT_DURATION   = 2,
 		CLIENT_ID       = 3,
-		WORKLOAD        = 4,
-		ASYNC           = 5,
-		WINDOW_SIZE     = 6,
+		PROTOCOL        = 4,
+		ROLE            = 5,
+		WORKLOAD        = 6,
+		ASYNC           = 7,
+		WINDOW_SIZE     = 8,
 	};
 
 	bool 					_init;
@@ -76,12 +82,15 @@ private:
 		    _arg_map.count(EXPT_RANGE) == 0 ||
 		    _arg_map.count(EXPT_DURATION) == 0 ||
 		    _arg_map.count(CLIENT_ID) == 0 || 
+		    _arg_map.count(PROTOCOL) == 0 || 
 		    _arg_map.count(WORKLOAD) == 0) {
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_RANGE].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_DURATION].name << "\n";
 		        std::cerr << "--" << long_options[CLIENT_ID].name << "\n";
+		        std::cerr << "--" << long_options[PROTOCOL].name << "\n";
+		        std::cerr << "[--" << long_options[ROLE].name << "]\n";
 		        std::cerr << "--" << long_options[WORKLOAD].name << "\n";
 		        std::cerr << "[--" << long_options[ASYNC].name << "]\n";
 		        std::cerr << "[--" << long_options[WINDOW_SIZE].name << "]\n";
@@ -101,6 +110,17 @@ private:
 		ret.expt_duration = (uint32_t)atoi(_arg_map[EXPT_DURATION]);
                 // client_id
 		ret.client_id = (uint8_t)atoi(_arg_map[CLIENT_ID]);
+                // protocol 
+		ret.protocol = (uint8_t)atoi(_arg_map[PROTOCOL]);
+                if (ret.protocol == 2 && _arg_map.count(ROLE) == 0) {
+                        std::cerr << "Error. --" << long_options[ROLE].name << " should be set with protocol 2\n";
+                        exit(-1);
+                }
+                // role
+                if (_arg_map.count(ROLE) > 0) {
+                        ret.role = std::string(_arg_map[ROLE]);
+                }
+                  
                 // workload
                 std::vector<std::string> workloads = split(std::string(_arg_map[WORKLOAD]), ',');
                 for (auto w : workloads) {
