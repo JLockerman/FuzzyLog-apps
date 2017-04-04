@@ -42,7 +42,7 @@ void measure_fn(AtomicMapTester *w, uint64_t duration, std::vector<uint64_t> &re
         }
 }
 
-void do_experiment(config cfg) {
+void do_experiment(atomicmap_config cfg) {
         uint32_t total_op_count;
         AtomicMap *map;
         atomicmap_workload_generator *workload_gen;
@@ -97,8 +97,8 @@ void do_experiment(config cfg) {
 
 int main(int argc, char** argv) {
 
-        config_parser cfg_parser;
-        config cfg = cfg_parser.get_config(argc, argv);
+        atomicmap_config_parser cfg_parser;
+        atomicmap_config cfg = cfg_parser.get_config(argc, argv);
 
         do_experiment(cfg);
 

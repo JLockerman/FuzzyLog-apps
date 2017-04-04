@@ -2,7 +2,7 @@
 
 #include <capmap.h>
 #include <request.h>
-#include <config.h>
+#include <capmap_config.h>
 
 class ycsb_cross_insert : public Txn {
 private:

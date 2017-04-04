@@ -48,7 +48,7 @@ void measure_fn(CAPMap *m, CAPMapTester *w, uint64_t duration, std::vector<uint6
         }
 }
 
-void do_experiment(config cfg) {
+void do_experiment(capmap_config cfg) {
         uint32_t total_op_count;
         CAPMap *map;
         capmap_workload_generator *workload_gen;
@@ -103,8 +103,8 @@ void do_experiment(config cfg) {
 
 int main(int argc, char** argv) {
 
-        config_parser cfg_parser;
-        config cfg = cfg_parser.get_config(argc, argv);
+        capmap_config_parser cfg_parser;
+        capmap_config cfg = cfg_parser.get_config(argc, argv);
 
         do_experiment(cfg);
 

@@ -1,4 +1,5 @@
 #include <capmap.h>
+#include <cassert>
 
 char buf[DELOS_MAX_DATA_SIZE];
 

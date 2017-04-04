@@ -2,7 +2,7 @@
 
 #include <atomicmap.h>
 #include <request.h>
-#include <config.h>
+#include <atomicmap_config.h>
 
 class ycsb_insert : public Txn {
 private:
