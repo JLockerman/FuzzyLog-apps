@@ -55,11 +55,14 @@ public class Start {
 		assert(_pending_appends.size() == 0);
 	}
 	
-	public static void main(String[] args) throws IOException {
-		assert(args.length == 2);
-		int port = Integer.parseInt(args[1]);
+	public static void main(String[] args) {
+		int port = Integer.parseInt(args[0]);
 		
-		Start st = new Start(port, 32);
-		st.test_proxy();
+		try {
+			Start st = new Start(port, 32);
+			st.test_proxy();
+		} catch (IOException e) {
+			System.err.println("Network error!");
+		}
 	}
 }
