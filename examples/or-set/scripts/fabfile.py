@@ -1,6 +1,7 @@
 from fabric.api import run 
 from fabric.api import cd
 from fabric.api import prefix
+
 def ls_test(): run('ls')
 
 def kill_fuzzylog():
@@ -26,9 +27,15 @@ def run_crdt_clients(log_addr, start_clients, num_clients, window_sz, duration, 
 		     spike_start,
 		     spike_duration):
 	with cd('fuzzylog/delos-apps/examples/or-set'):
-		#with prefix('export RUST_LOG=fuzzy_log'):
-		args = 'scripts/exp.py ' + str(log_addr) + ' ' + str(start_clients) + ' ' + str(num_clients) + ' ' + str(window_sz) + ' ' + str(duration) + ' ' + str(total_clients) + ' ' + str(low_throughput) + ' ' + str(high_throughput) + ' ' + str(spike_start) + ' ' + str(spike_duration)
-		run(args)
+		with prefix('export RUST_BACKTRACE=1'):
+			args = 'scripts/exp.py ' + str(log_addr) + ' ' + str(start_clients) + ' ' + str(num_clients) + ' ' + str(window_sz) + ' ' + str(duration) + ' ' + str(total_clients) + ' ' + str(low_throughput) + ' ' + str(high_throughput) + ' ' + str(spike_start) + ' ' + str(spike_duration)
+			run(args)
+
+def compress_log_files():
+	with cd('fuzzylog/delos-apps/examples/or-set'):
+		run('mkdir logs')
+		run('mv *_log.txt logs')
+		run('tar czf logs.tar.gz logs')
 
 def enable_logging():
 	run('export RUST_LOG=fuzzy_log')

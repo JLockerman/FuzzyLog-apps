@@ -7,7 +7,7 @@ def readfile(filename):
 	results = []
 	inpt_file = open(filename)
 	for line in inpt_file:
-		val = float(line) 
+		val = float(line)  
 		results.append(val)
 	inpt_file.close()
 	return results
@@ -19,16 +19,69 @@ def postprocess_results(vals):
 	high_idx = int(len(vals)*0.95)
 	return [vals[median_idx]/float(1000), vals[low_idx]/float(1000), vals[high_idx]/float(1000)]
 
-def index_file(input_file, output_file):
-	results = readfile(input_file)
-	temp = list(map(lambda x: x / 1000.0, results))
-	indices = range(0, len(temp))		
-	zipped = zip(temp,indices)
+def index_file(input_file1, input_file2, output_file):
+	results1 = readfile(input_file1)
+	temp1 = list(map(lambda x: x / 1000.0, results1))
+		
+	results2 = readfile(input_file2)	
+	temp2 = list(map(lambda x: x / 1000.0, results2))
+	indices = range(0, len(temp1))		
+	zipped = zip(indices, temp1, temp2)
 	
 	outf = open(output_file, 'w')
-	for r, i in zipped:
-		outf.write(str(i) + ' ' + str(r) + '\n')
+	for  i, t1, t2 in zipped:
+		outf.write(str(i) + ' ' + str(t1) + ' ' + str(t2) + '\n')
 	outf.close()
+
+def calculate_outstanding(clients_per_machine, num_machines, window, server_count):
+	cumm_ops = accumulate_ops(clients_per_machine, num_machines, window, server_count)
+	cumm_playbacks = accumulate_playbacks(clients_per_machine, num_machines, window, server_count)
+	
+	outstanding = []
+	total = 0
+	zipped = zip(cumm_ops, cumm_playbacks)
+	for o, p in zipped:
+		total += o - p
+		outstanding.append(total)	
+
+	indices = range(0, len(outstanding))	
+	zipped = zip(indices, outstanding)
+	
+	outf = open('outstanding.txt', 'w')
+	for index, reading in zipped:
+		outf.write(str(reading) + '\n') 
+	outf.close()
+
+def accumulate_ops(clients_per_machine, num_machines, window, server_count):
+	dir_fmt = 'c{0}_s{1}_w{2}'
+	file_fmt = '{0}.txt'
+	results = []
+	outfile = 'cummulative_appends.txt'
+	outline = '{0}\n'
+	
+	dirname = dir_fmt.format(str(clients_per_machine), str(server_count), str(window))
+	num_clients = clients_per_machine*num_machines
+	temp = []
+	for c in range(0, num_clients):
+		filename = file_fmt.format(str(c))
+		temp.append(readfile(os.path.join(dirname, filename)))	
+	
+	zipped = zip(*temp)
+	summed = list(map(sum, zipped))
+	return summed
+
+def accumulate_playbacks(clients_per_machine, num_machines, window, server_count):
+	dir_fmt = 'c{0}_s{1}_w{2}'
+	file_fmt = '{0}.txt'
+	outfile = 'cummulative_playback.txt'
+	outline = '{0}\n'
+	
+	dirname = dir_fmt.format(str(clients_per_machine), str(server_count), str(window))
+	num_clients = clients_per_machine*num_machines
+	filename = file_fmt.format(str(num_clients))
+	results = readfile(os.path.join(dirname, filename))	
+	
+	return results	
 
 def throughput_time(clients_per_machine, num_machines, window, server_count):
 	dir_fmt = 'c{0}_s{1}_w{2}'
@@ -46,7 +99,7 @@ def throughput_time(clients_per_machine, num_machines, window, server_count):
 	
 	zipped = zip(*temp)
 	summed = list(map(sum, zipped))
-	
+		
 	outhandle = open(outfile, 'w')
 	for s in summed:
 		outhandle.write(outline.format(str(s)))
@@ -84,7 +137,7 @@ def vary_servers(clients_per_machine, num_machines, window, server_list):
 def latency_proc(results, filename):
 	outfile = open(filename, 'w')
 	results.sort()	
-	sorted_results = list(map(lambda x: x*1000, results))	 
+	sorted_results = list(map(lambda x: x, results))	 
 	diff = 1.0 / len(results)	
 	acc = 0.0	
 	for r in sorted_results:
