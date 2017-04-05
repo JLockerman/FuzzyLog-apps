@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/file.h>
-#include <worker.h>
+#include <atomicmap_tester.h>
 #include <signal.h>
 
 extern "C" {
@@ -28,7 +28,7 @@ void write_output(uint32_t client_id, std::vector<uint64_t>& results) {
         result_file.close();        
 }
 
-void measure_fn(Worker *w, uint64_t duration, std::vector<uint64_t> &results)
+void measure_fn(AtomicMapTester *w, uint64_t duration, std::vector<uint64_t> &results)
 {
         uint64_t start_iters, end_iters;
         
@@ -44,10 +44,10 @@ void measure_fn(Worker *w, uint64_t duration, std::vector<uint64_t> &results)
 
 void do_experiment(config cfg) {
         uint32_t total_op_count;
-        HashMap *map;
-        workload_generator *workload_gen;
+        AtomicMap *map;
+        atomicmap_workload_generator *workload_gen;
         Txn** txns;
-        Worker* worker;
+        AtomicMapTester* worker;
         std::atomic<bool> flag;
         std::vector<uint64_t> results;
 
@@ -56,18 +56,18 @@ void do_experiment(config cfg) {
         for (auto w : cfg.workload) { 
                 total_op_count += w.op_count;
         }
-        Context ctx;    // Can be used to share info between Worker and Txns
+        Context ctx;    // Can be used to share info between AtomicMapTester and Txns
 
         // Fuzzymap
-        map = new HashMap(&cfg.log_addr, cfg.txn_version, &cfg.workload);
+        map = new AtomicMap(&cfg.log_addr, &cfg.workload);
 
         // Generate append workloads: uniform distribution
-        workload_gen = new workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);
+        workload_gen = new atomicmap_workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);
         txns = workload_gen->Gen();
         
         // One worker thread
         flag = true;
-        worker = new Worker(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size);
+        worker = new AtomicMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size);
 
         // Run workers
         worker->run();

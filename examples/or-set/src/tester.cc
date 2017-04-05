@@ -20,8 +20,10 @@ uint32_t async_tester::try_get_pending()
 	wait_requests(done_rqs);
 	
 	auto end_time = std::chrono::system_clock::now();
-	for (auto rq : done_rqs) 
+	for (auto rq : done_rqs) {
 		rq->_end_time = end_time;
+		rq->_executed = true;
+	}
 	return done_rqs.size();
 }
 

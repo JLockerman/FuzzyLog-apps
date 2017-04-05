@@ -1,36 +1,36 @@
-#include <worker.h>
+#include <capmap_tester.h>
 #include <cstring>
 #include <cassert>
 
-Worker::~Worker() {
+CAPMapTester::~CAPMapTester() {
         for (size_t i = 0; i < m_num_txns; i++) {
-                ycsb_insert* txn = (ycsb_insert*)m_txns[i];
+                ycsb_cross_insert* txn = (ycsb_cross_insert*)m_txns[i];
                 delete txn;
         }
         delete m_txns;
 }
 
-void Worker::run() {
+void CAPMapTester::run() {
         int err;
         err = pthread_create(&m_thread, NULL, bootstrap, this);
         assert(err == 0);
 }
 
-void Worker::join() {
+void CAPMapTester::join() {
         pthread_join(m_thread, NULL);
 }
 
-void* Worker::bootstrap(void *arg) {
-        Worker *worker = (Worker*)arg;
+void* CAPMapTester::bootstrap(void *arg) {
+        CAPMapTester *worker = (CAPMapTester*)arg;
         worker->Execute();
         return NULL;
 }
 
-pthread_t* Worker::get_pthread_id() {
+pthread_t* CAPMapTester::get_pthread_id() {
         return &m_thread;
 }
 
-uint32_t Worker::try_get_completed() {
+uint32_t CAPMapTester::try_get_completed() {
         uint32_t num_completed = 0;
         while (true) {
                 new_write_id nwid = m_map->try_wait_for_any_put();
@@ -44,7 +44,7 @@ uint32_t Worker::try_get_completed() {
         return num_completed;
 }
 
-void Worker::Execute() {
+void CAPMapTester::Execute() {
         uint32_t i;
         uint32_t num_pending = 0; 
 
@@ -63,10 +63,21 @@ void Worker::Execute() {
                                 num_pending -= 1;
                                 m_context->inc_num_executed();
                         }
+                        assert(m_txns[i]->op_type() == Txn::optype::PUT);
+                        CAPMap::PartitionStatus partition_status = m_map->get_network_partition_status();
 
-                        m_txns[i]->AsyncRun();
-                        if (m_txns[i]->op_type() == Txn::optype::PUT) {
+                        if (partition_status == CAPMap::PartitionStatus::PARTITIONED) {
+                                // Append Weak node
+                                m_txns[i]->AsyncWeaklyConsistentRun();
                                 num_pending += 1;
+
+                        } else if (partition_status == CAPMap::PartitionStatus::NORMAL) {
+                                // Append Strong node
+                                m_txns[i]->TryAsyncStronglyConsistentRun();
+                                num_pending += 1;
+
+                        } else if (partition_status == CAPMap::PartitionStatus::REORDER_WEAK_NODES) {
+                                // TODO: do nothing. or sleep a bit?
                         }
                 }
                 m_map->wait_for_all_puts();
@@ -85,6 +96,6 @@ void Worker::Execute() {
         }
 }
 
-uint64_t Worker::get_num_executed() {
+uint64_t CAPMapTester::get_num_executed() {
         return m_context->get_num_executed();
 }

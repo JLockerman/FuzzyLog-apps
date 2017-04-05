@@ -1,53 +1,40 @@
-#include <workload.h>
+#include <capmap_workload.h>
 #include <cassert>
 #include <random>
 #include <iostream>
+#include <capmap.h>
 
-void ycsb_insert::Run() {
+void ycsb_cross_insert::Run() {
+        assert(false);
+}
+
+void ycsb_cross_insert::AsyncRun() {
+        assert(false);
+}
+
+bool ycsb_cross_insert::TryAsyncStronglyConsistentRun() {
         uint32_t key, value;
         assert(m_map != NULL);
-       
+        assert(m_dep_color != NULL);
+
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
-
-        m_map->put(key, value, m_color, m_dep_color);
-        // increment executed count
-        m_context->inc_num_executed();
+        return m_map->async_strong_depend_put(key, value, m_color, m_dep_color);
 }
 
-void ycsb_insert::AsyncRun() {
+void ycsb_cross_insert::AsyncWeaklyConsistentRun() {
         uint32_t key, value;
         assert(m_map != NULL);
-       
+        assert(m_dep_color != NULL);
+
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
-
-        m_map->async_put(key, value, m_color, m_dep_color);
+        m_map->async_weak_depend_put(key, value, m_color);
 }
 
-void ycsb_read::Run() {
-        uint32_t key;
-        assert(m_map != NULL);
-       
-        // key = (start, end)
-        key = rand() % (m_end - m_start);
-
-        m_map->get(key);
-}
-
-void ycsb_read::AsyncRun() {
-        uint32_t key;
-        assert(m_map != NULL);
-       
-        // key = (start, end)
-        key = rand() % (m_end - m_start);
-
-        m_map->get(key);
-}
-
-Txn** workload_generator::Gen() {
+Txn** capmap_workload_generator::Gen() {
         uint32_t i;
         uint32_t total_op_count;
         double r;
@@ -77,10 +64,16 @@ Txn** workload_generator::Gen() {
 
                 for (auto j = 0; j < proportions.size(); j++) {
                         if (proportions[j] > r && allocations[j] > 0) { 
-                                if ((*m_workload)[j].op_type == "get") {
-                                        txns[i] = new ycsb_read(m_map, &(*m_workload)[j].color, 0, m_range, m_context, Txn::optype::GET);
-                                } else if ((*m_workload)[j].op_type == "put") {
-                                        txns[i] = new ycsb_insert(m_map, &(*m_workload)[j].color, (*m_workload)[j].has_dependency ? &(*m_workload)[j].dep_color : NULL, 0, m_range, m_context, Txn::optype::PUT);
+                                std::string op_type = (*m_workload)[j].op_type; 
+                                struct colors* color = &(*m_workload)[j].color; 
+                                uint32_t start = 0; 
+                                uint32_t end = m_range; 
+
+                                if (op_type == "put") {
+                                        struct colors* dep_color = (*m_workload)[j].has_dependency ? &(*m_workload)[j].dep_color : NULL;
+                                        txns[i] = new ycsb_cross_insert(m_map, color, dep_color, start, end, m_context, Txn::optype::PUT);
+                                } else {
+                                        assert(false);
                                 }
                                 allocations[j] = allocations[j] - 1;
                                 i++;

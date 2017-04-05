@@ -23,6 +23,15 @@ void write_throughput(config cfg, const std::vector<double> &results)
 	result_file.close();
 }
 
+void write_gets_per_snapshot(config cfg, const std::vector<uint64_t> &results)
+{
+	std::ofstream result_file;
+	result_file.open("gets_per_snapshot.txt", std::ios::trunc | std::ios::out);
+	for (auto v : results) 
+		result_file << v << "\n";
+	result_file.close();
+}
+
 void write_latency(config cfg, const std::vector<tester_request*> &latencies)
 {
 	std::ofstream latency_file;
@@ -42,9 +51,10 @@ void write_put_output(config cfg, const std::vector<double> &results, const std:
 	write_latency(cfg, latencies);
 }
 
-void write_get_output(config cfg, const std::vector<double> &results)
+void write_get_output(config cfg, const std::vector<double> &throughput, const std::vector<uint64_t> &gets_snapshot)
 {
-	write_throughput(cfg, results);	
+	write_throughput(cfg, throughput);	
+	write_gets_per_snapshot(cfg, gets_snapshot);
 }
 
 void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*> &output)
@@ -99,7 +109,7 @@ void wait_signal(config cfg)
 
 	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
 	append(handle, buffer, buf_sz, &c, &depends);
-	while (num_received < cfg.num_clients + 1) {
+	while (num_received < cfg.num_clients) {
 		snapshot(handle);
 		while (true) {
 			get_next(handle, buffer, &buf_sz, &c);
@@ -181,7 +191,7 @@ void run_putter(config cfg, std::vector<tester_request*> &inputs, std::vector<do
 	close_dag_handle(handle);
 }
 
-void run_getter(config cfg, std::vector<double> &throughput_samples)
+void run_getter(config cfg, std::vector<double> &throughput_samples, std::vector<uint64_t> &gets_per_snapshot)
 {
 	assert(cfg.writer == false);
 	
@@ -209,30 +219,51 @@ void run_getter(config cfg, std::vector<double> &throughput_samples)
 
 	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
 
-	wait_signal(cfg);
+	//wait_signal(cfg);
 
 	auto orset = new or_set(handle, NULL, &c, cfg.server_id, cfg.sync_duration);	
 	auto getter = new or_set_getter(orset);
 	
 	std::cerr << "Getter initialized!\n";
-	getter->run(throughput_samples, cfg.sample_interval, cfg.expt_duration); 
+	getter->run(throughput_samples, gets_per_snapshot, cfg.sample_interval, cfg.expt_duration); 
 	close_dag_handle(handle);
 
 }
+
+void validate_puts(config cfg, const std::vector<tester_request*> &inputs, const std::vector<double> throughput_samples)
+{
+	auto input_count = 0;
+	for (auto t : inputs) {
+		if (t->_executed == false)
+			break;
+		input_count += 1;	
+	}
+	
+	auto throughput_count = 0.0;
+	for (auto sample : throughput_samples) {
+		throughput_count += sample;
+	}	
+	
+	std::cerr << "Input count: " << input_count << "\n";
+	std::cerr << "Throughput count: " << throughput_count << "\n";
+}
+
 
 void do_put_experiment(config cfg)
 {
 	std::vector<tester_request*> inputs;
 	std::vector<double> throughput_samples;
 	run_putter(cfg, inputs, throughput_samples);
+	validate_puts(cfg, inputs, throughput_samples);
 	write_put_output(cfg, throughput_samples, inputs);
 }
 
 void do_get_experiment(config cfg)
 {
 	std::vector<double> throughput_samples;
-	run_getter(cfg, throughput_samples);	
-	write_get_output(cfg, throughput_samples);
+	std::vector<uint64_t> gets_per_snapshot;
+	run_getter(cfg, throughput_samples, gets_per_snapshot);	
+	write_get_output(cfg, throughput_samples, gets_per_snapshot);
 }
 
 int main(int argc, char **argv) 
