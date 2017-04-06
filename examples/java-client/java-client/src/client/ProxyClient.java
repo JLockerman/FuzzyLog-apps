@@ -12,6 +12,10 @@ public class ProxyClient {
 	private DataInputStream 		_input;
 	
 	private void serialize_async_append(byte[] append_colors, byte[] payload) throws IOException {
+		
+		int msg_sz = 16 + append_colors.length + payload.length;
+		_output.writeInt(msg_sz);
+		
 		_output.writeInt(0);
 		_output.writeInt(append_colors.length);
 		_output.writeInt(0);
@@ -22,36 +26,37 @@ public class ProxyClient {
 	}
 	
 	private void deserialize_async_append_response(WriteID wid) throws IOException {
-		int part1 = _input.readInt();
-		int part2 = _input.readInt();
+		long part1 = _input.readLong();
+		long part2 = _input.readLong();
 		wid.initialize(part1, part2);
 	}
 	
 	private void serialize_wait_any() throws IOException {
-		_output.writeInt(1);
+		_output.writeInt(4);
+		_output.writeInt(2);
 	}
 	
 	private void deserialize_wait_any_response(WriteID wid) throws IOException {
-		int part1 = _input.readInt();
-		int part2 = _input.readInt();
+		long part1 = _input.readLong();
+		long part2 = _input.readLong();
 		wid.initialize(part1, part2);
 	}
 	
 	private void serialize_try_wait_any() throws IOException {
-		_output.writeInt(2);
+		_output.writeInt(4);
+		_output.writeInt(1);
 	}
 	
-	private void deserialize_try_wait_any_response(Queue<WriteID> freelist, 
-														   Queue<WriteID> output_list) throws IOException {
+	private void deserialize_try_wait_any_response(Queue<WriteID> wid_list) throws IOException {
+		wid_list.clear();
 		int num_acks = _input.readInt();
 		
 		for (int i = 0; i < num_acks; ++i) {
-			int part1 = _input.readInt();
-			int part2 = _input.readInt();
+			long part1 = _input.readLong();
+			long part2 = _input.readLong();
 			
-			WriteID cur_wid = freelist.remove();
-			cur_wid.initialize(part1, part2);
-			output_list.add(cur_wid);
+			WriteID wid = new WriteID(part1, part2);
+			wid_list.add(wid);
 		}
 	}
 	
@@ -85,9 +90,9 @@ public class ProxyClient {
 		deserialize_wait_any_response(ack_wid);
 	}
 	
-	public void try_wait_any_append(Queue<WriteID> freelist, Queue<WriteID> acks) throws IOException {
+	public void try_wait_any_append(Queue<WriteID> wid_list) throws IOException {
 		serialize_try_wait_any();
-		deserialize_try_wait_any_response(freelist, acks);
+		deserialize_try_wait_any_response(wid_list);
 	}
 	
 	public void snapshot() {

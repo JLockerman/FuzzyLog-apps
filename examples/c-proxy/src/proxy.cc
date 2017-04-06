@@ -1,5 +1,16 @@
 #include <proxy.h>
+#include <iostream>
 #include <cstring> 
+
+void fuzzy_proxy::receive_data_sz(int socket, char *buf, size_t sz)
+{
+	size_t received = 0;
+	while (received < sz) {
+		auto diff = recv(socket, &buf[received], sz - received, 0);	
+		received += diff;	
+	}
+	assert(received == sz);
+} 
 
 write_id fuzzy_proxy::do_async_append()
 {
@@ -42,13 +53,14 @@ void proxy_request::initialize(char *buf)
 	_depend_colors.clear();		
 	
 	uint32_t *int_buf = (uint32_t*)buf;
+	int num_append_colors, num_depend_colors;
 	
-	assert(int_buf[0] <= GET_NEXT);   	
+	assert(ntohl(int_buf[0]) <= GET_NEXT);   	
 	
-	_opcode = (opcode)(int_buf[0]);	
+	_opcode = (opcode)(ntohl(int_buf[0]));	
 	if (_opcode == ASYNC_APPEND) {
-		auto num_append_colors = int_buf[1];
-		auto num_depend_colors = int_buf[2]; 
+		num_append_colors = ntohl(int_buf[1]);
+		num_depend_colors = ntohl(int_buf[2]); 
 	
 		uint8_t *color_buf = (uint8_t*)(&int_buf[3]);
 		for (auto i = 0; i < num_append_colors; ++i) {
@@ -59,12 +71,18 @@ void proxy_request::initialize(char *buf)
 		for (auto i = 0; i < num_depend_colors; ++i) {
 			_depend_colors.insert(color_buf[i]);
 		}
+		auto offset = sizeof(uint32_t)*3 + (num_append_colors + num_depend_colors)*sizeof(uint8_t);	
+		uint32_t *payload_sz = (uint32_t*)&buf[offset];				
+		_payload_size = ntohl(payload_sz[0]);
+		_payload = (char *)&payload_sz[1];
 	}
+	
 }
 
 fuzzy_proxy::fuzzy_proxy(DAGHandle *handle, uint16_t port)
 {
 	_handle = handle;
+	_max_try_wait = 100;
 
 	/* Set up server's socket */
 	_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -102,17 +120,17 @@ void fuzzy_proxy::serialize_try_wait_any_response(const std::deque<write_id> &do
 {
 	uint32_t num_acks = done_set.size();
 	
-	uint32_t *buf = (uint32_t*)_buffer;	
-	buf[0] = num_acks;
+	uint32_t *buf = (uint32_t *)_buffer;	
+	buf[0] = htonl(num_acks);
 		
-	write_id *wid_buf = (write_id *)(&buf[1]);
+	uint64_t *long_buf = (uint64_t *)(&buf[1]);
 	auto i = 0;
 	for (auto wid : done_set) {
-		wid_buf[i] = wid;
-		i += 1;	
+		long_buf[i] = wid.p1;
+		long_buf[i+1] = wid.p2;
+		i += 2;	
 	}	
-	
-	_buffer_len = sizeof(uint32_t) + sizeof(write_id)*done_set.size();			
+	_buffer_len = sizeof(uint32_t) + 2*sizeof(uint64_t)*done_set.size();
 }
 
 void fuzzy_proxy::serialize_snapshot_response()
@@ -127,9 +145,10 @@ void fuzzy_proxy::serialize_get_next_response()
 
 void fuzzy_proxy::serialize_async_append_response(write_id wid)
 {
-	write_id *wid_buf = (write_id *)_buffer;
-	*wid_buf = wid;
-	_buffer_len = sizeof(write_id);	
+	auto int_buf = (uint64_t *)_buffer;
+	int_buf[0] = wid.p1;
+	int_buf[1] = wid.p2;
+	_buffer_len = 2*sizeof(uint64_t);
 }
 
 void fuzzy_proxy::run()
@@ -138,7 +157,12 @@ void fuzzy_proxy::run()
 	write_id wid;
 	
 	while (true) {
-		recv(_client_fd, _buffer, MAX_PROXY_BUF, 0);
+		int msg_len;
+		receive_data_sz(_client_fd, (char*)&msg_len, sizeof(int));	
+		msg_len = ntohl(msg_len);
+		receive_data_sz(_client_fd, _buffer, msg_len);
+		
+
 		_request.initialize(_buffer);
 		
 		switch(_request._opcode) {
@@ -173,7 +197,6 @@ void fuzzy_proxy::run()
 		default:
 			assert(false);
 		}								
-
 		send(_client_fd, _buffer, _buffer_len, 0);
 	}
 }

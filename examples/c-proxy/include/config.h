@@ -63,6 +63,8 @@ private:
 		    _arg_map.count(NUM_CLIENTS) == 0) {
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
+		        std::cerr << "--" << long_options[PROXY_PORT].name << "\n";
+		        std::cerr << "--" << long_options[NUM_CLIENTS].name << "\n";
 		        exit(-1);
 		}
 	

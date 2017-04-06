@@ -67,6 +67,7 @@ private:
 	void do_try_wait_any(std::deque<write_id> &wid_set);	
 	
 	/* Response serializers */
+	void receive_data_sz(int socket, char *buf, size_t sz);
 	void serialize_async_append_response(write_id wid);
 	void serialize_wait_any_response(write_id wid);
 	void serialize_try_wait_any_response(const std::deque<write_id> &wid_set);
