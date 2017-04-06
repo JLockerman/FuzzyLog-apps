@@ -10,8 +10,6 @@
 #include <stdlib.h>
 #include "util.h"
 
-#define DEFAULT_WINDOW_SIZE 32
-
 static struct option long_options[] = {
         {"log_addr",            required_argument, NULL, 0},
         {"expt_range",          required_argument, NULL, 1},
@@ -20,9 +18,10 @@ static struct option long_options[] = {
         {"protocol",            required_argument, NULL, 4},
         {"role",                optional_argument, NULL, 5},
         {"workload",            required_argument, NULL, 6},
-        {"async",               optional_argument, NULL, 7},
-        {"window_size",         optional_argument, NULL, 8},
-        {NULL,                  no_argument,       NULL, 9},
+        {"txn_rate",            optional_argument, NULL, 7},
+        {"async",               optional_argument, NULL, 8},
+        {"window_size",         optional_argument, NULL, 9},
+        {NULL,                  no_argument,       NULL, 10},
 };
 
 struct capmap_config {
@@ -33,6 +32,7 @@ struct capmap_config {
         uint8_t                         protocol;
         std::string                     role; 
 	std::vector<workload_config>    workload;
+        uint32_t                        txn_rate;
         bool                            async;
         uint32_t                        window_size;
 }; 
@@ -47,8 +47,9 @@ private:
 		PROTOCOL        = 4,
 		ROLE            = 5,
 		WORKLOAD        = 6,
-		ASYNC           = 7,
-		WINDOW_SIZE     = 8,
+                TXN_RATE        = 7,
+		ASYNC           = 8,
+		WINDOW_SIZE     = 9,
 	};
 
 	bool 					_init;
@@ -92,6 +93,7 @@ private:
 		        std::cerr << "--" << long_options[PROTOCOL].name << "\n";
 		        std::cerr << "[--" << long_options[ROLE].name << "]\n";
 		        std::cerr << "--" << long_options[WORKLOAD].name << "\n";
+		        std::cerr << "[--" << long_options[TXN_RATE].name << "]\n";
 		        std::cerr << "[--" << long_options[ASYNC].name << "]\n";
 		        std::cerr << "[--" << long_options[WINDOW_SIZE].name << "]\n";
 			exit(-1);
@@ -105,13 +107,13 @@ private:
                 // log_addr
                 ret.log_addr = split(std::string(_arg_map[LOG_ADDR]), ',');
                 // expt_range
-		ret.expt_range = (uint32_t)atoi(_arg_map[EXPT_RANGE]);
+		ret.expt_range = static_cast<uint32_t>(atoi(_arg_map[EXPT_RANGE]));
                 // expt_duration
-		ret.expt_duration = (uint32_t)atoi(_arg_map[EXPT_DURATION]);
+		ret.expt_duration = static_cast<uint32_t>(atoi(_arg_map[EXPT_DURATION]));
                 // client_id
-		ret.client_id = (uint8_t)atoi(_arg_map[CLIENT_ID]);
+		ret.client_id = static_cast<uint8_t>(atoi(_arg_map[CLIENT_ID]));
                 // protocol 
-		ret.protocol = (uint8_t)atoi(_arg_map[PROTOCOL]);
+		ret.protocol = static_cast<uint8_t>(atoi(_arg_map[PROTOCOL]));
                 if (ret.protocol == 2 && _arg_map.count(ROLE) == 0) {
                         std::cerr << "Error. --" << long_options[ROLE].name << " should be set with protocol 2\n";
                         exit(-1);
@@ -139,8 +141,8 @@ private:
                         }
 
                         // color scheme = color_name[{-|~}color_name]
-                        struct colors color;
-                        struct colors dep_color;
+                        struct colors local_color;
+                        struct colors remote_color;
                         bool is_strong = false;
                         std::string& color_scheme = op_type_and_color[1];
 
@@ -159,35 +161,40 @@ private:
                                 assert(color_dep.size() <= 2);
 
                                 // depedency color
-                                string_to_colors(color_dep[0], &color);
-                                string_to_colors(color_dep[1], &dep_color);
+                                string_to_colors(color_dep[0], &local_color);
+                                string_to_colors(color_dep[1], &remote_color);
 
                         } else {
                                 // no depedency color
-                                string_to_colors(color_scheme, &color);
+                                string_to_colors(color_scheme, &local_color);
                         }        
 
                         // op_count
-                        uint32_t op_count = (uint32_t)stoi(pair[1]);
+                        uint32_t op_count = static_cast<uint32_t>(stoi(pair[1]));
 
                         // workload
                         workload_config wc;
                         wc.op_type = op_type;
-                        wc.color = color;
-                        wc.dep_color = dep_color;
+                        wc.first_color = local_color;
+                        wc.second_color = remote_color;
                         wc.has_dependency = has_dependency; 
                         wc.is_strong = is_strong;
                         wc.op_count = op_count; 
                         ret.workload.push_back(wc);
                 }
+                // txn_rate
+                if (_arg_map.count(TXN_RATE) > 0)
+                        ret.txn_rate = static_cast<uint32_t>(atoi(_arg_map[TXN_RATE]));
+                else
+                        ret.txn_rate = 0;
 
                 // async
                 ret.async = _arg_map.count(ASYNC) > 0;
                 // window_size
                 if (ret.async && _arg_map.count(WINDOW_SIZE) > 0)
-                        ret.window_size = (uint32_t)atoi(_arg_map[WINDOW_SIZE]);
+                        ret.window_size = static_cast<uint32_t>(atoi(_arg_map[WINDOW_SIZE]));
                 else if (ret.async)
-                        ret.window_size = DEFAULT_WINDOW_SIZE;
+                        ret.window_size = DefaultWindowSize;
                 else
                         ret.window_size = 0;
 

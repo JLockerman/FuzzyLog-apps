@@ -94,14 +94,17 @@ class FuzzyMapTestCase(unittest.TestCase):
                 launch_str += ',' + str(window_size) 
                 return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])
 
-        def launch_capmap(self, fabhost, keyfile, logaddr, expt_duration, client_id, workload, async, window_size):
+        def launch_capmap(self, fabhost, keyfile, logaddr, expt_duration, client_id, workload, txn_rate, async, window_size, protocol, role=None):
                 launch_str = 'capmap_proc:' + logaddr
                 launch_str += ',' + str(self.expt_range)
                 launch_str += ',' + str(expt_duration)
                 launch_str += ',' + str(client_id)
                 launch_str += ',' + workload
+                launch_str += ',' + str(txn_rate)
                 launch_str += ',' + str(async)
                 launch_str += ',' + str(window_size)
+                launch_str += ',' + str(protocol)
+                launch_str += ',' + str(role)
                 return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])
  
         # ---------------
@@ -281,44 +284,110 @@ class ScalabilityTestCase(FuzzyMapTestCase):
 
 class ToleratingNetworkPartitionTestCase(FuzzyMapTestCase):
 
-        # (async, window_size, expt_duration, (site1, client1_idx, server1_idx), (site2, client2_idx, server2_idx), output_file_prefix)
+        def setUp(self):
+                for region in self.regions:
+                        servers, server_ips = ec2.start_and_test_fuzzylog_servers(region)
+                        self.servers[region] = servers
+                        self.server_ips[region] = server_ips
+                        
+                for region in self.regions:
+                        clients, client_ips = ec2.start_and_test_fuzzylog_clients(region)
+                        self.clients[region] = clients
+                        self.client_ips[region] = client_ips
+
+                # cleanup servers
+                for region in self.server_ips.keys():
+                        for s in self.server_ips[region]:
+                                self.kill_fuzzylog(s['public'], self.keyfile[region])
+
+                # cleanup clients
+                for region in self.client_ips.keys():
+                        for c in self.client_ips[region]:
+                                self.clean_fuzzymap(c['public'], self.keyfile[region])
+
+                # run funzzylog
+                server_procs = []
+                proc = self.launch_fuzzylog(self.server_ips[settings.US_EAST_2][0]['public'], self.keyfile[settings.US_EAST_2], 0, 2)
+                proc = self.launch_fuzzylog(self.server_ips[settings.AP_NORTHEAST_1][0]['public'], self.keyfile[settings.AP_NORTHEAST_1], 1, 2)
+                server_procs.append(proc) 
+                time.sleep(5)
+
+
+        # (async, protocol, 
+        #               (server1_region, server1_idx),
+        #               (server2_region, server2_idx),
+        #               (writer1_region, writer1_idx, writer1_window_size, writer1_txn_rate, writer1_duration),
+        #               (writer2_region, writer2_idx, writer2_window_size, writer2_txn_rate, writer2_duration),
+        #               (reader1_region, reader1_idx, reader1_duration),
+        #               (reader2_region, reader2_idx, reader2_duration),
+        # output_file_prefix)
         @parameterized.expand([
-                (True, 80, 50, (settings.REGIONS[0], 0, 0), (settings.REGIONS[0], 1, 1), 'same_site'),   # client1/server1 and client2/server2 are in the same site
-                (True, 80, 50, (settings.REGIONS[0], 0, 0), (settings.REGIONS[1], 0, 0), 'diff_site'),   # client1/server1 and client2/server2 are in different sites
+                (True, 2, 
+                        (settings.REGIONS[0], 0),                       # log server1 in site1
+                        (settings.REGIONS[1], 0),                       # log server2 in site2
+                        (settings.REGIONS[0], 0, 1, 100, 15),           # writer1 in site1
+                        (settings.REGIONS[1], 0, 1, 100, 15),           # writer2 in site2 
+                        (settings.REGIONS[0], 1, 15),                   # reader1 in site1 
+                        (settings.REGIONS[1], 1, 15),                   # reader2 in site2 
+                'diff_site'),                                           # client1/server1 and client2/server2 are in different sites
         ])
-        def test_network_partition(self, async, window_size, expt_duration, site1, site2, output_file_prefix):
-                # a pair of client/server at site 1, another pair of client/server at site 2 
-                site1_region, site1_client_idx, site1_server_idx = site1
-                site1_client_ip = self.client_ips[site1_region][site1_client_idx]
-                site1_server_ip = self.server_ips[site1_region][site1_server_idx]
+        def test_network_partition(self, async, protocol, server1, server2, writer1, writer2, reader1, reader2, output_file_prefix):
+                # log server
+                server1_region, server1_idx = server1
+                server2_region, server2_idx = server2
+                server1_ip = self.server_ips[server1_region][server1_idx]
+                server2_ip = self.server_ips[server2_region][server2_idx]
+                log_addr = self.get_log_addr([server1_ip, server2_ip])
 
-                site2_region, site2_client_idx, site2_server_idx = site2
-                site2_client_ip = self.client_ips[site2_region][site2_client_idx]
-                site2_server_ip = self.server_ips[site2_region][site2_server_idx]
+                # writer
+                writer1_region, writer1_idx, writer1_window_size, writer1_txn_rate, writer1_duration = writer1
+                writer1_ip = self.client_ips[writer1_region][writer1_idx]
 
-                log_addr = self.get_log_addr([site1_server_ip, site2_server_ip])
+                writer2_region, writer2_idx, writer2_window_size, writer2_txn_rate, writer2_duration = writer2
+                writer2_ip = self.client_ips[writer2_region][writer2_idx]
 
                 client_procs = []
                 # operation ratio
                 put_op_count = self.op_count
 
-                # client at site 1
+                # writer1 at site1
                 workload = "put@2-1\={put_op_count}".format(put_op_count=put_op_count)
-                proc = self.launch_capmap(site1_client_ip['public'], self.keyfile[site1_region], log_addr, expt_duration, 1, workload, async, window_size)
+                proc = self.launch_capmap(writer1_ip['public'], self.keyfile[writer1_region], log_addr, writer1_duration, 1, workload, writer1_txn_rate, async, writer1_window_size, protocol, 'primary')
                 client_procs.append(proc) 
                 time.sleep(0.1)
 
-                # client2
+                # writer2 at site2 
                 workload = "put@1-2\={put_op_count}".format(put_op_count=put_op_count)
-                proc = self.launch_capmap(site2_client_ip['public'], self.keyfile[site2_region], log_addr, expt_duration, 2, workload, async, window_size)
+                proc = self.launch_capmap(writer2_ip['public'], self.keyfile[writer2_region], log_addr, writer2_duration, 2, workload, writer2_txn_rate, async, writer2_window_size, protocol, 'secondary')
                 client_procs.append(proc) 
+
+                # reader
+                if reader1:
+                        reader1_region, reader1_idx, reader1_duration = reader1
+                        reader1_ip = self.client_ips[reader1_region][reader1_idx]
+                        workload = "get@2-1\=1"
+                        proc = self.launch_capmap(reader1_ip['public'], self.keyfile[reader1_region], log_addr, reader1_duration, 3, workload, 0, async, 1, protocol, 'primary')
+                        client_procs.append(proc) 
+                        time.sleep(0.1)
+
+                if reader2:
+                        reader2_region, reader2_idx, reader2_duration = reader2
+                        reader2_ip = self.client_ips[reader2_region][reader2_idx]
+                        workload = "get@1-2\=1"
+                        proc = self.launch_capmap(reader2_ip['public'], self.keyfile[reader2_region], log_addr, reader2_duration, 4, workload, 0, async, 1, protocol, 'secondary')
+                        client_procs.append(proc) 
 
                 for c in client_procs:
                         c.wait()
 
                 # gather statistics
                 outdir = 'tmp'
-                self.download_output_files([(site1_region, site1_client_idx), (site2_region, site2_client_idx)], outdir)
+                self.download_output_files([
+                                (writer1_region, writer1_idx), 
+                                (writer2_region, writer2_idx),
+                                (reader1_region, reader1_idx),
+                                (reader2_region, reader2_idx),
+                ], outdir)
                 self.copy_files(outdir, '../data/', output_file_prefix)
 
         def copy_files(self, src_dir, dest_dir, prefix):

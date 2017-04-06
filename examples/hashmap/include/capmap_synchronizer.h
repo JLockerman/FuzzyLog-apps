@@ -41,8 +41,9 @@ public:
         void ExecuteProtocol2Primary(); 
         void ExecuteProtocol2Secondary(); 
         uint32_t sync_with_log_ver1(uint32_t previous_flag, struct colors* interesting_color);
-        uint32_t sync_with_log_ver2(uint32_t previous_flag, struct colors* snapshot_color, struct colors* playback_color);
-        void sync_with_log_ver2_secondary(struct colors* snapshot_color, struct colors* playback_color);
+        uint32_t sync_with_log_ver2_primary();
+        uint32_t sync_with_log_ver2_secondary();
+        //void sync_with_log_ver2_secondary(struct colors* snapshot_color, struct colors* playback_color);
 
         void enqueue_get(std::condition_variable* cv, std::atomic_bool* cv_spurious_wake_up);
         void swap_queue();
@@ -50,8 +51,9 @@ public:
 
         uint32_t get(uint32_t key);
 
-        struct colors* get_local_color();
-        struct colors* get_remote_color();
+        struct colors* clone_local_color();
+        struct colors* clone_remote_color();
+        struct colors* clone_all_colors();
         struct colors* clone_color(struct colors* color);
         struct colors* get_protocol1_snapshot_color();
         struct colors* get_protocol1_playback_color();

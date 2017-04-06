@@ -8,7 +8,7 @@ void ycsb_cross_insert::Run() {
         assert(false);
 }
 
-void ycsb_cross_insert::AsyncRun() {
+write_id ycsb_cross_insert::AsyncRun() {
         uint32_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
@@ -16,10 +16,13 @@ void ycsb_cross_insert::AsyncRun() {
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
-        return m_map->async_normal_put(key, value, m_color);
+        auto start_time = std::chrono::system_clock::now();
+        write_id wid = m_map->async_normal_put(key, value, m_color);
+        m_context->mark_started(wid, start_time); 
+        return wid;
 }
 
-void ycsb_cross_insert::AsyncRemoteRun() {
+write_id ycsb_cross_insert::AsyncRemoteRun() {
         uint32_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
@@ -27,10 +30,13 @@ void ycsb_cross_insert::AsyncRemoteRun() {
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
-        return m_map->async_normal_put(key, value, m_dep_color);
+        auto start_time = std::chrono::system_clock::now();
+        write_id wid = m_map->async_normal_put(key, value, m_dep_color);
+        m_context->mark_started(wid, start_time); 
+        return wid;
 }
 
-bool ycsb_cross_insert::TryAsyncStronglyConsistentRun() {
+write_id ycsb_cross_insert::AsyncStronglyConsistentRun() {
         uint32_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
@@ -38,10 +44,13 @@ bool ycsb_cross_insert::TryAsyncStronglyConsistentRun() {
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
-        return m_map->async_strong_depend_put(key, value, m_color, m_dep_color);
+        auto start_time = std::chrono::system_clock::now();
+        write_id wid = m_map->async_strong_depend_put(key, value, m_color, m_dep_color);
+        m_context->mark_started(wid, start_time); 
+        return wid;
 }
 
-void ycsb_cross_insert::AsyncWeaklyConsistentRun() {
+write_id ycsb_cross_insert::AsyncWeaklyConsistentRun() {
         uint32_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
@@ -49,10 +58,13 @@ void ycsb_cross_insert::AsyncWeaklyConsistentRun() {
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
-        m_map->async_weak_put(key, value, m_color);
+        auto start_time = std::chrono::system_clock::now();
+        write_id wid = m_map->async_weak_put(key, value, m_color);
+        m_context->mark_started(wid, start_time); 
+        return wid;
 }
 
-void ycsb_cross_insert::AsyncPartitioningAppend() {
+write_id ycsb_cross_insert::AsyncPartitioningAppend() {
         uint32_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
@@ -60,10 +72,13 @@ void ycsb_cross_insert::AsyncPartitioningAppend() {
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
-        m_map->async_partitioning_put(key, value, m_color, m_dep_color);     // XXX: append to remote color, weakly dependent on the local color
+        auto start_time = std::chrono::system_clock::now();
+        write_id wid = m_map->async_partitioning_put(key, value, m_color, m_dep_color);     // XXX: append to remote color, weakly dependent on the local color
+        m_context->mark_started(wid, start_time); 
+        return wid;
 }
 
-void ycsb_cross_insert::AsyncHealingAppend() {
+write_id ycsb_cross_insert::AsyncHealingAppend() {
         uint32_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
@@ -71,8 +86,38 @@ void ycsb_cross_insert::AsyncHealingAppend() {
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
-        m_map->async_healing_put(key, value, m_dep_color, m_color);     // XXX: append to remote color, weakly dependent on the local color
+        auto start_time = std::chrono::system_clock::now();
+        write_id wid = m_map->async_healing_put(key, value, m_dep_color, m_color);     // XXX: append to remote color, weakly dependent on the local color
+        m_context->mark_started(wid, start_time); 
+        return wid;
 }
+
+void ycsb_cross_read::Run() {
+        uint32_t key;
+        assert(m_map != NULL);
+       
+        // key = (start, end)
+        key = rand() % (m_end - m_start);
+
+        m_map->get(key);
+}
+
+write_id ycsb_cross_read::AsyncRun() {
+        assert(false);
+}
+
+write_id ycsb_cross_read::AsyncRemoteRun() {
+        assert(false);
+}
+
+write_id ycsb_cross_read::AsyncStronglyConsistentRun() {
+        assert(false);
+}
+
+write_id ycsb_cross_read::AsyncWeaklyConsistentRun() {
+        assert(false);
+}
+
 
 Txn** capmap_workload_generator::Gen() {
         uint32_t i;
@@ -92,7 +137,7 @@ Txn** capmap_workload_generator::Gen() {
         uint32_t n = 0;
         for (auto w : *m_workload) {
                 n += w.op_count; 
-                double p = (double)n / total_op_count;
+                double p = static_cast<double>(n) / total_op_count;
                 proportions.push_back(p);
                 allocations.push_back(w.op_count);
         }
@@ -100,20 +145,22 @@ Txn** capmap_workload_generator::Gen() {
         i = 0;
         while (i < total_op_count) {
                 // dice
-                r = ((double) rand() / (RAND_MAX));
+                r = static_cast<double>(rand()) / (RAND_MAX);
 
                 for (auto j = 0; j < proportions.size(); j++) {
                         if (proportions[j] > r && allocations[j] > 0) { 
+                                assert((*m_workload)[j].has_dependency);
                                 std::string op_type = (*m_workload)[j].op_type; 
-                                struct colors* color = &(*m_workload)[j].color; 
+                                struct colors* local_color = &(*m_workload)[j].first_color; 
+                                struct colors* remote_color = &(*m_workload)[j].second_color;
                                 uint32_t start = 0; 
                                 uint32_t end = m_range; 
 
                                 if (op_type == "put") {
-                                        struct colors* dep_color = (*m_workload)[j].has_dependency ? &(*m_workload)[j].dep_color : NULL;
-                                        txns[i] = new ycsb_cross_insert(m_map, color, dep_color, start, end, m_context, Txn::optype::PUT);
-                                } else {
-                                        assert(false);
+                                        txns[i] = new ycsb_cross_insert(m_map, local_color, remote_color, start, end, m_context, Txn::optype::PUT);
+
+                                } else if (op_type == "get") {
+                                        txns[i] = new ycsb_cross_read(m_map, local_color, remote_color, start, end, m_context, Txn::optype::GET);
                                 }
                                 allocations[j] = allocations[j] - 1;
                                 i++;

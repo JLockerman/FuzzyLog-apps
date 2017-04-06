@@ -7,9 +7,9 @@
 AtomicMapSynchronizer::AtomicMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors) {
         uint32_t i;
         struct colors* c;
-        c = (struct colors*)malloc(sizeof(struct colors));
+        c = static_cast<struct colors*>(malloc(sizeof(struct colors)));
         c->numcolors = interesting_colors.size();
-        c->mycolors = (ColorID*)malloc(sizeof(ColorID) * c->numcolors);
+        c->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID) * c->numcolors));
         for (i = 0; i < c->numcolors; i++) {
                 c->mycolors[i] = interesting_colors[i];
         }
@@ -38,7 +38,7 @@ void AtomicMapSynchronizer::join() {
 }
 
 void* AtomicMapSynchronizer::bootstrap(void *arg) {
-        AtomicMapSynchronizer *synchronizer= (AtomicMapSynchronizer*)arg;
+        AtomicMapSynchronizer *synchronizer= static_cast<AtomicMapSynchronizer*>(arg);
         synchronizer->Execute();
         return NULL;
 }
@@ -61,9 +61,9 @@ void AtomicMapSynchronizer::Execute() {
                         snapshot(m_fuzzylog_client);
                         while ((get_next(m_fuzzylog_client, m_read_buf, &size, m_interesting_colors), 1)) {
                                 if (m_interesting_colors->numcolors == 0) break;
-                                data = *(uint64_t *)m_read_buf;
-                                key = (uint32_t)(data >> 32);
-                                val = (uint32_t)(data & 0xFFFFFFFF); 
+                                data = *reinterpret_cast<uint64_t*>(m_read_buf);
+                                key = static_cast<uint32_t>(data >> 32);
+                                val = static_cast<uint32_t>(data & 0xFFFFFFFF); 
 
                                 // update to local map
                                 m_local_map[key] = val;
