@@ -72,10 +72,12 @@ public class ProxyClient {
 		_output.flush();
 	}
 	
-	private boolean deserialize_get_next_response(byte[] data_buf, byte[] color_buf) throws IOException {
+	private boolean deserialize_get_next_response(byte[] data_buf, byte[] color_buf, int[] num_results) throws IOException {
 		int buf_sz = _input.readInt();
 		int colors_sz = _input.readInt();
 		
+		num_results[0] = buf_sz;
+		num_results[1] = colors_sz;
 		if (colors_sz == 0) {
 			return false;
 		}
@@ -113,8 +115,8 @@ public class ProxyClient {
 		deserialize_snapshot();
 	}
 	
-	public boolean get_next(byte[] data, byte[] colors) throws IOException {
+	public boolean get_next(byte[] data, byte[] colors, int[] num_results) throws IOException {
 		serialize_get_next();
-		return deserialize_get_next_response(data, colors);
+		return deserialize_get_next_response(data, colors, num_results);
 	}
 }
