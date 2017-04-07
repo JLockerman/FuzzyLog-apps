@@ -74,7 +74,7 @@ public class ProxyClient {
 		String ip = "127.0.0.1";
 		_server_port = server_port;
 		_socket = new Socket(ip, _server_port);
-		_input = new DataInputStream(_socket.getInputStream());
+		_input = new DataInputStream(new BufferedInputStream(_socket.getInputStream()));
 		_output = new DataOutputStream(new BufferedOutputStream(_socket.getOutputStream()));
 	}
 	
