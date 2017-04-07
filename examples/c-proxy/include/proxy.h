@@ -12,7 +12,7 @@ extern "C" {
 	#include <unistd.h>
 }
 
-#define MAX_PROXY_BUF	1024	
+#define MAX_PROXY_BUF		4096	
 
 class wid_equality {
 public:

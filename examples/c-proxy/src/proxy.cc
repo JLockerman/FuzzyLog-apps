@@ -157,11 +157,8 @@ void fuzzy_proxy::run()
 	write_id wid;
 	
 	while (true) {
-		int msg_len;
-		receive_data_sz(_client_fd, (char*)&msg_len, sizeof(int));	
-		msg_len = ntohl(msg_len);
-		receive_data_sz(_client_fd, _buffer, msg_len);
-		
+		if (recv(_client_fd, _buffer, MAX_PROXY_BUF, 0) <= 0)
+			break;
 
 		_request.initialize(_buffer);
 		

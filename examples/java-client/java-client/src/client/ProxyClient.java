@@ -12,10 +12,6 @@ public class ProxyClient {
 	private DataInputStream 		_input;
 	
 	private void serialize_async_append(byte[] append_colors, byte[] payload) throws IOException {
-		
-		int msg_sz = 16 + append_colors.length + payload.length;
-		_output.writeInt(msg_sz);
-		
 		_output.writeInt(0);
 		_output.writeInt(append_colors.length);
 		_output.writeInt(0);
@@ -34,7 +30,6 @@ public class ProxyClient {
 	}
 	
 	private void serialize_wait_any() throws IOException {
-		_output.writeInt(4);
 		_output.writeInt(2);
 		_output.flush();
 	}
@@ -46,7 +41,6 @@ public class ProxyClient {
 	}
 	
 	private void serialize_try_wait_any() throws IOException {
-		_output.writeInt(4);
 		_output.writeInt(1);
 		_output.flush();
 	}
