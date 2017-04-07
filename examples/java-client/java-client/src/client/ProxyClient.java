@@ -23,6 +23,8 @@ public class ProxyClient {
 		_output.write(append_colors);
 		_output.writeInt(payload.length);
 		_output.write(payload);
+		
+		_output.flush();
 	}
 	
 	private void deserialize_async_append_response(WriteID wid) throws IOException {
@@ -34,6 +36,7 @@ public class ProxyClient {
 	private void serialize_wait_any() throws IOException {
 		_output.writeInt(4);
 		_output.writeInt(2);
+		_output.flush();
 	}
 	
 	private void deserialize_wait_any_response(WriteID wid) throws IOException {
@@ -45,6 +48,7 @@ public class ProxyClient {
 	private void serialize_try_wait_any() throws IOException {
 		_output.writeInt(4);
 		_output.writeInt(1);
+		_output.flush();
 	}
 	
 	private void deserialize_try_wait_any_response(Queue<WriteID> wid_list) throws IOException {
@@ -77,7 +81,7 @@ public class ProxyClient {
 		_server_port = server_port;
 		_socket = new Socket(ip, _server_port);
 		_input = new DataInputStream(_socket.getInputStream());
-		_output = new DataOutputStream(_socket.getOutputStream());
+		_output = new DataOutputStream(new BufferedOutputStream(_socket.getOutputStream()));
 	}
 	
 	public void async_append(byte[] append_colors, byte[] buffer, WriteID wid)  throws IOException{
