@@ -29,7 +29,7 @@ private:
         std::mutex                                                              m_local_map_mtx;
 
         CAPMap*                                                                 m_map;
-        std::vector<struct Node*>                                               m_weak_nodes;
+        std::vector<struct Node*>                                               m_buffered_nodes;
 
 public:
         CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
@@ -37,8 +37,12 @@ public:
         virtual void run();
         virtual void join();
         static void* bootstrap(void *arg);
-        void Execute(); 
-        uint32_t sync_with_log(uint32_t previous_flag, struct colors* interesting_color);
+        void ExecuteProtocol1(); 
+        void ExecuteProtocol2Primary(); 
+        void ExecuteProtocol2Secondary(); 
+        uint32_t sync_with_log_ver1(uint32_t previous_flag, struct colors* interesting_color);
+        uint32_t sync_with_log_ver2(uint32_t previous_flag, struct colors* snapshot_color, struct colors* playback_color);
+        void sync_with_log_ver2_secondary(struct colors* snapshot_color, struct colors* playback_color);
 
         void enqueue_get(std::condition_variable* cv, std::atomic_bool* cv_spurious_wake_up);
         void swap_queue();
@@ -47,7 +51,20 @@ public:
         uint32_t get(uint32_t key);
 
         struct colors* get_local_color();
+        struct colors* get_remote_color();
+        struct colors* clone_color(struct colors* color);
+        struct colors* get_protocol1_snapshot_color();
+        struct colors* get_protocol1_playback_color();
+
+        struct colors* get_protocol2_primary_snapshot_color();
+        struct colors* get_protocol2_primary_playback_color();
+        struct colors* get_protocol2_secondary_snapshot_color();
+        struct colors* get_protocol2_secondary_playback_color();
+
+        bool is_local_color(struct colors* color);
+        bool is_remote_color(struct colors* color);
+
         // For weak nodes
-        void reorder_weak_nodes_if_any();
-        void buffer_weak_nodes(struct Node* node);
+        void apply_buffered_nodes(bool reorder);
+        void buffer_nodes(struct Node* node);
 };

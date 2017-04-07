@@ -1,8 +1,9 @@
 #include <capmap.h>
+#include <cassert>
 
 char buf[DELOS_MAX_DATA_SIZE];
 
-CAPMap::CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload): BaseMap(log_addr), m_network_partition_status(NORMAL), m_synchronizer(NULL) {
+CAPMap::CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, ProtocolVersion protocol, std::string& role): BaseMap(log_addr), m_protocol(protocol), m_role(role), m_network_partition_status(NORMAL), m_synchronizer(NULL) {
         // FIXME: m_map_type
         std::vector<ColorID> interesting_colors;
         get_interesting_colors(workload, interesting_colors);
@@ -30,12 +31,12 @@ void CAPMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<C
         m_synchronizer->run();
 }
 
-void CAPMap::get_payload(uint32_t key, uint32_t value, bool strong, char* out, size_t* out_size) {
+void CAPMap::get_payload(uint32_t key, uint32_t value, uint32_t flag, char* out, size_t* out_size) {
         struct Node* node = (struct Node*)out;
 
         node->key = key;
         node->value = value;
-        node->flag = strong ? STRONG_FLAG : WEAK_FLAG;
+        node->flag = flag;
         // timestamp
         using namespace std::chrono;
         auto now = system_clock::now();
@@ -46,19 +47,58 @@ void CAPMap::get_payload(uint32_t key, uint32_t value, bool strong, char* out, s
         *out_size = sizeof(struct Node);
 }
 
+void CAPMap::get_payload_for_strong_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+        get_payload(key, value, STRONG_NODE, out, out_size);
+}
+
+void CAPMap::get_payload_for_weak_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+        get_payload(key, value, WEAK_NODE, out, out_size);
+}
+
+void CAPMap::get_payload_for_normal_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+        get_payload(key, value, NORMAL_NODE, out, out_size);
+}
+
+void CAPMap::get_payload_for_healing_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+        get_payload(key, value, HEALING_NODE, out, out_size);
+}
+
+void CAPMap::get_payload_for_partitioning_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+        get_payload(key, value, PARTITIONING_NODE, out, out_size);
+}
+
+
 bool CAPMap::async_strong_depend_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color, bool force_fail) {
         if (force_fail)
                 return false;
 
         assert(dep_color != NULL);
         size_t size;
-        get_payload(key, value, true, buf, &size);
+        get_payload_for_strong_node(key, value, buf, &size);
         async_append(m_fuzzylog_client, buf, size, op_color, NULL);     // FIXME: dep_color should be set. not working for now
         return true;
 }
 
-void CAPMap::async_weak_depend_put(uint32_t key, uint32_t value, struct colors* op_color) {
+void CAPMap::async_weak_put(uint32_t key, uint32_t value, struct colors* op_color) {
         size_t size;
-        get_payload(key, value, false, buf, &size);
+        get_payload_for_weak_node(key, value, buf, &size);
         async_append(m_fuzzylog_client, buf, size, op_color, NULL);
+}
+
+void CAPMap::async_normal_put(uint32_t key, uint32_t value, struct colors* op_color) {
+        size_t size;
+        get_payload_for_normal_node(key, value, buf, &size);
+        async_append(m_fuzzylog_client, buf, size, op_color, NULL); 
+}
+
+void CAPMap::async_partitioning_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
+        size_t size;
+        get_payload_for_partitioning_node(key, value, buf, &size);
+        async_simple_causal_append(m_fuzzylog_client, buf, size, op_color, dep_color);
+}
+
+void CAPMap::async_healing_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
+        size_t size;
+        get_payload_for_healing_node(key, value, buf, &size);
+        async_simple_causal_append(m_fuzzylog_client, buf, size, op_color, dep_color);  // TODO: check if dep_color would depend on the latest node appended by the same machine
 }

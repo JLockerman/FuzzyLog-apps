@@ -7,6 +7,7 @@ import subprocess
 import time
 import random
 from collections import defaultdict, Counter
+import shutil
 
 class FuzzyMapTestCase(unittest.TestCase):
         results = []
@@ -280,42 +281,51 @@ class ScalabilityTestCase(FuzzyMapTestCase):
 
 class ToleratingNetworkPartitionTestCase(FuzzyMapTestCase):
 
-        # (async, window_size)
+        # (async, window_size, expt_duration, (site1, client1_idx, server1_idx), (site2, client2_idx, server2_idx), output_file_prefix)
         @parameterized.expand([
-                (True, 80),
+                (True, 80, 50, (settings.REGIONS[0], 0, 0), (settings.REGIONS[0], 1, 1), 'same_site'),   # client1/server1 and client2/server2 are in the same site
+                (True, 80, 50, (settings.REGIONS[0], 0, 0), (settings.REGIONS[1], 0, 0), 'diff_site'),   # client1/server1 and client2/server2 are in different sites
         ])
-        def test_causal(self, async, window_size):
+        def test_network_partition(self, async, window_size, expt_duration, site1, site2, output_file_prefix):
                 # a pair of client/server at site 1, another pair of client/server at site 2 
-                self.assertTrue(len(settings.REGIONS) >= 2, 'At least 2 regions should be set')
-                site_one = settings.REGIONS[0]
-                site_two = settings.REGIONS[1]
-                site_one_client_ips = self.client_ips[site_one]
-                site_two_client_ips = self.client_ips[site_two]
-                self.assertTrue(len(site_one_client_ips) >= 1, 'At least 1 client machines are required at %s' % site_one)
-                self.assertTrue(len(site_two_client_ips) >= 1, 'At least 1 client machines are required at %s' % site_two)
-                log_addr = self.get_log_addr([self.server_ips[site_one][0], self.server_ips[site_two][0]])
+                site1_region, site1_client_idx, site1_server_idx = site1
+                site1_client_ip = self.client_ips[site1_region][site1_client_idx]
+                site1_server_ip = self.server_ips[site1_region][site1_server_idx]
+
+                site2_region, site2_client_idx, site2_server_idx = site2
+                site2_client_ip = self.client_ips[site2_region][site2_client_idx]
+                site2_server_ip = self.server_ips[site2_region][site2_server_idx]
+
+                log_addr = self.get_log_addr([site1_server_ip, site2_server_ip])
 
                 client_procs = []
                 # operation ratio
                 put_op_count = self.op_count
-                expt_duration = 50
 
                 # client at site 1
                 workload = "put@2-1\={put_op_count}".format(put_op_count=put_op_count)
-                proc = self.launch_capmap(site_one_client_ips[0]['public'], self.keyfile[site_one], log_addr, expt_duration, 1, workload, async, window_size)
+                proc = self.launch_capmap(site1_client_ip['public'], self.keyfile[site1_region], log_addr, expt_duration, 1, workload, async, window_size)
                 client_procs.append(proc) 
                 time.sleep(0.1)
 
                 # client2
                 workload = "put@1-2\={put_op_count}".format(put_op_count=put_op_count)
-                proc = self.launch_capmap(site_two_client_ips[0]['public'], self.keyfile[site_two], log_addr, expt_duration, 2, workload, async, window_size)
+                proc = self.launch_capmap(site2_client_ip['public'], self.keyfile[site2_region], log_addr, expt_duration, 2, workload, async, window_size)
                 client_procs.append(proc) 
 
                 for c in client_procs:
                         c.wait()
 
                 # gather statistics
-                self.download_output_files([(site_one, 0), (site_two, 0)], 'tmp')
+                outdir = 'tmp'
+                self.download_output_files([(site1_region, site1_client_idx), (site2_region, site2_client_idx)], outdir)
+                self.copy_files(outdir, '../data/', output_file_prefix)
+
+        def copy_files(self, src_dir, dest_dir, prefix):
+                for f in os.listdir(src_dir):
+                        src = os.path.join(src_dir, f)
+                        dest = os.path.join(dest_dir, prefix + '_' + f)
+                        shutil.copyfile(src, dest)
 
 if __name__ == '__main__':
         #suite = unittest.defaultTestLoader.loadTestsFromTestCase(ScalabilityTestCase)

@@ -36,6 +36,7 @@ public:
         virtual ~Txn(){}
         virtual void Run() = 0;
         virtual void AsyncRun() = 0;
+        virtual void AsyncRemoteRun() = 0;
         virtual bool TryAsyncStronglyConsistentRun() = 0;
         virtual void AsyncWeaklyConsistentRun() = 0;
         virtual optype op_type() = 0; 

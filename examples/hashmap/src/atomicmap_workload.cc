@@ -29,6 +29,10 @@ void ycsb_insert::AsyncRun() {
         m_map->async_put(key, value, m_color);
 }
 
+void ycsb_insert::AsyncRemoteRun() {
+        assert(false);
+}
+
 bool ycsb_insert::TryAsyncStronglyConsistentRun() {
         assert(false);
 }
@@ -55,6 +59,10 @@ void ycsb_read::AsyncRun() {
         key = rand() % (m_end - m_start);
 
         m_map->get(key);
+}
+
+void ycsb_read::AsyncRemoteRun() {
+        assert(false);
 }
 
 bool ycsb_read::TryAsyncStronglyConsistentRun() {

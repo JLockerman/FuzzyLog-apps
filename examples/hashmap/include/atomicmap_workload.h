@@ -2,7 +2,7 @@
 
 #include <atomicmap.h>
 #include <request.h>
-#include <config.h>
+#include <atomicmap_config.h>
 
 class ycsb_insert : public Txn {
 private:
@@ -28,6 +28,7 @@ public:
         ~ycsb_insert(){}
         virtual void Run();
         virtual void AsyncRun();
+        virtual void AsyncRemoteRun();
         virtual bool TryAsyncStronglyConsistentRun();
         virtual void AsyncWeaklyConsistentRun();
         virtual optype op_type() {
@@ -55,6 +56,7 @@ public:
         ~ycsb_read(){}
         virtual void Run();
         virtual void AsyncRun();
+        virtual void AsyncRemoteRun();
         virtual bool TryAsyncStronglyConsistentRun();
         virtual void AsyncWeaklyConsistentRun();
         virtual optype op_type() {
