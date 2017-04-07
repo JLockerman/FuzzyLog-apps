@@ -9,11 +9,9 @@ DAGHandle* create_fuzzylog_handle(config cfg)
 	for (auto i = 0; i < num_servers; ++i) 
 		server_ips[i] = cfg.log_addr[i].c_str();
 	
-	auto num_colors = cfg.num_clients;
+	auto num_colors = 1;
 	ColorID colors[num_colors];
-	for (auto i = 0; i < num_colors; ++i) {
-		colors[i] = (uint8_t)i+1;
-	}
+	colors[0] = cfg.client_id;
 
 	struct colors app_colors;
 	app_colors.numcolors = num_colors;
