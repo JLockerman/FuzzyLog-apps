@@ -32,7 +32,7 @@ public class Start {
 		payload[3] = (byte)0xFF;
 		
 		byte[] colors = new byte[1];
-		colors[0] = (byte)0x1;
+		colors[0] = 1;
 		
 		long start_time = System.nanoTime();
 		
@@ -40,10 +40,6 @@ public class Start {
 		
 		Queue<WriteID> wid_list = new LinkedList<WriteID>();
 		for (int i = 0; i < num_requests; ++i) {
-			
-			if (num_requests % 1000 == 0) {
-				_client.snapshot();
-			}
 			
 			WriteID wid = new WriteID();
 			_client.async_append(colors, payload, wid);
@@ -64,12 +60,30 @@ public class Start {
 			_pending_appends.remove(ack_wid);
 			num_pending -= 1;
 		}
+		
 		assert(_pending_appends.size() == 0);
 		
 		long end_time = System.nanoTime();
 		
 		double throughput = num_requests*1000000000.0 / (end_time - start_time);
-		System.err.println("Throughput: " + throughput);
+		System.err.println("Append throughput: " + throughput);
+		
+		byte[] get_data = new byte[4096];
+		byte[] get_colors = new byte[512];
+		
+		int num_gets = 0;
+		
+		start_time = System.nanoTime();
+		
+		_client.snapshot();
+		while (_client.get_next(get_data, get_colors) == true) 
+			num_gets += 1;
+		
+		end_time = System.nanoTime();
+		
+		assert(num_gets == num_requests);
+		throughput = num_requests*1000000000.0 / (end_time - start_time);
+		System.err.println("Get throughput: " + throughput);
 	}
 	
 	public static void main(String[] args) {

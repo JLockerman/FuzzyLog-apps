@@ -67,12 +67,22 @@ public class ProxyClient {
 		_input.readInt();
 	}
 	
-	private void serialize_get_next() {
-		throw new UnsupportedOperationException();
+	private void serialize_get_next() throws IOException {
+		_output.writeInt(4);
+		_output.flush();
 	}
 	
-	private void deserialize_get_next_response() {
-		throw new UnsupportedOperationException();
+	private boolean deserialize_get_next_response(byte[] data_buf, byte[] color_buf) throws IOException {
+		int buf_sz = _input.readInt();
+		int colors_sz = _input.readInt();
+		
+		if (colors_sz == 0) {
+			return false;
+		}
+		
+		_input.read(data_buf, 0, buf_sz);
+		_input.read(color_buf, 0, colors_sz);
+		return true;
 	}
 	
 	public ProxyClient(int server_port) throws IOException {
@@ -103,8 +113,8 @@ public class ProxyClient {
 		deserialize_snapshot();
 	}
 	
-	public void get_next() {
+	public boolean get_next(byte[] data, byte[] colors) throws IOException {
 		serialize_get_next();
-		deserialize_get_next_response();
+		return deserialize_get_next_response(data, colors);
 	}
 }

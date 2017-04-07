@@ -12,7 +12,7 @@ DAGHandle* create_fuzzylog_handle(config cfg)
 	auto num_colors = cfg.num_clients;
 	ColorID colors[num_colors];
 	for (auto i = 0; i < num_colors; ++i) {
-		colors[i] = (uint8_t)i;
+		colors[i] = (uint8_t)i+1;
 	}
 
 	struct colors app_colors;

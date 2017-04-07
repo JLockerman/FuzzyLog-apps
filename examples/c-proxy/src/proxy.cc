@@ -16,7 +16,7 @@ write_id fuzzy_proxy::do_async_append()
 {
 	uint32_t num_colors = _request._append_colors.size();
 	ColorID colors[num_colors];	
-
+	assert(num_colors == 1);
 	struct colors append_colors;
 	append_colors.mycolors = colors;
 	append_colors.numcolors = num_colors;
@@ -25,8 +25,10 @@ write_id fuzzy_proxy::do_async_append()
 	for (auto c : _request._append_colors) {
 		colors[i] = (uint8_t)c;
 		i += 1;
+		assert(colors[i] == 1);
 	}
 
+	assert(_request._payload_size == 4);
 	return async_append(_handle, _request._payload, _request._payload_size, &append_colors, NULL);  
 }
 
@@ -50,6 +52,29 @@ write_id fuzzy_proxy::do_wait_any()
 void fuzzy_proxy::do_snapshot()
 {
 	snapshot(_handle);	
+}
+
+void fuzzy_proxy::do_get_next()
+{
+	size_t buf_sz;
+	struct colors c;
+	uint32_t *uint_buf;
+	
+	c.numcolors = 4;
+	get_next(_handle, &_buffer[2*sizeof(uint32_t)], &buf_sz, &c);
+	uint_buf = (uint32_t *)_buffer;
+	uint_buf[0] = htonl((uint32_t)buf_sz);
+	uint_buf[1] = htonl((uint32_t)c.numcolors);
+		
+	if (c.numcolors == 0) {
+		_buffer_len = 2*sizeof(uint32_t);
+	} else { 
+		assert(buf_sz == 4);
+		auto offset = 2*sizeof(uint32_t) + buf_sz;
+		memcpy(&_buffer[offset], c.mycolors, sizeof(uint8_t)*c.numcolors);
+		free(c.mycolors);
+		_buffer_len = 2*sizeof(uint32_t) + buf_sz + sizeof(uint8_t)*c.numcolors;
+	}
 }
 
 void proxy_request::initialize(char *buf)
@@ -190,12 +215,12 @@ void fuzzy_proxy::run()
 
 		case proxy_request::SNAPSHOT:	
 			do_snapshot();
-			send(_client_fd, _buffer, sizeof(uint32_t), 0);
+			send(_client_fd, _buffer, sizeof(int), 0);
 			break;
 
 		case proxy_request::GET_NEXT:
-			/* XXX Yet to be implemented. */
-			assert(false);
+			do_get_next();
+			send(_client_fd, _buffer, _buffer_len, 0);
 			break;
 		case proxy_request::QUIT:
 			return;
