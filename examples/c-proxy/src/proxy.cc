@@ -16,7 +16,6 @@ write_id fuzzy_proxy::do_async_append()
 {
 	uint32_t num_colors = _request._append_colors.size();
 	ColorID colors[num_colors];	
-	assert(num_colors == 1);
 	struct colors append_colors;
 	append_colors.mycolors = colors;
 	append_colors.numcolors = num_colors;
@@ -25,10 +24,8 @@ write_id fuzzy_proxy::do_async_append()
 	for (auto c : _request._append_colors) {
 		colors[i] = (uint8_t)c;
 		i += 1;
-		assert(colors[i] == 1);
 	}
 
-	assert(_request._payload_size == 4);
 	return async_append(_handle, _request._payload, _request._payload_size, &append_colors, NULL);  
 }
 
