@@ -58,8 +58,13 @@ public class ProxyClient {
 		}
 	}
 	
-	private void serialize_snapshot() {
-		throw new UnsupportedOperationException();
+	private void serialize_snapshot() throws IOException {
+		_output.writeInt(3);
+		_output.flush();
+	}
+	
+	private void deserialize_snapshot() throws IOException {
+		_input.readInt();
 	}
 	
 	private void serialize_get_next() {
@@ -93,8 +98,9 @@ public class ProxyClient {
 		deserialize_try_wait_any_response(wid_list);
 	}
 	
-	public void snapshot() {
+	public void snapshot() throws IOException {
 		serialize_snapshot();
+		deserialize_snapshot();
 	}
 	
 	public void get_next() {

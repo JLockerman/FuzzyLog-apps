@@ -65,6 +65,7 @@ private:
 	write_id do_async_append();
 	write_id do_wait_any();
 	void do_try_wait_any(std::deque<write_id> &wid_set);	
+	void do_snapshot();
 	
 	/* Response serializers */
 	void receive_data_sz(int socket, char *buf, size_t sz);

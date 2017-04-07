@@ -47,6 +47,11 @@ write_id fuzzy_proxy::do_wait_any()
 	return wait_for_any_append(_handle);
 }
 
+void fuzzy_proxy::do_snapshot()
+{
+	snapshot(_handle);	
+}
+
 void proxy_request::initialize(char *buf)
 {
 	_append_colors.clear();
@@ -167,22 +172,25 @@ void fuzzy_proxy::run()
 		case proxy_request::ASYNC_APPEND:
 			wid = do_async_append();
 			serialize_async_append_response(wid);
+			send(_client_fd, _buffer, _buffer_len, 0);
 			break;
 
 		case proxy_request::TRY_WAIT_ANY_APPEND:
 			write_id_set.clear();
 			do_try_wait_any(write_id_set);
 			serialize_try_wait_any_response(write_id_set);
+			send(_client_fd, _buffer, _buffer_len, 0);
 			break;
 
 		case proxy_request::WAIT_ANY_APPEND:
 			wid = do_wait_any();
 			serialize_wait_any_response(wid);			
+			send(_client_fd, _buffer, _buffer_len, 0);
 			break;
 
 		case proxy_request::SNAPSHOT:	
-			/* XXX Yet to be implemented. */
-			assert(false);
+			do_snapshot();
+			send(_client_fd, _buffer, sizeof(uint32_t), 0);
 			break;
 
 		case proxy_request::GET_NEXT:
@@ -194,7 +202,6 @@ void fuzzy_proxy::run()
 		default:
 			assert(false);
 		}								
-		send(_client_fd, _buffer, _buffer_len, 0);
 	}
 }
 

@@ -40,11 +40,17 @@ public class Start {
 		
 		Queue<WriteID> wid_list = new LinkedList<WriteID>();
 		for (int i = 0; i < num_requests; ++i) {
+			
+			if (num_requests % 1000 == 0) {
+				_client.snapshot();
+			}
+			
 			WriteID wid = new WriteID();
 			_client.async_append(colors, payload, wid);
 			
 			_pending_appends.put(wid,  i);
 			num_pending += 1;
+			
 			
 			if (num_pending == _window_sz) {
 				_client.wait_any_append(ack_wid);
@@ -70,7 +76,7 @@ public class Start {
 		int port = Integer.parseInt(args[0]);
 		
 		try {
-			Start st = new Start(port, 32);
+			Start st = new Start(port, 48);
 			st.test_proxy();
 		} catch (IOException e) {
 			System.err.println("Network error!");
