@@ -11,12 +11,15 @@ public class ProxyClient {
 	private DataOutputStream 		_output;
 	private DataInputStream 		_input;
 	
-	private void serialize_async_append(byte[] append_colors, byte[] payload) throws IOException {
+	private void serialize_async_append(int[] append_colors, byte[] payload) throws IOException {
 		_output.writeInt(0);
 		_output.writeInt(append_colors.length);
 		_output.writeInt(0);
 		
-		_output.write(append_colors);
+		for (int i = 0; i < append_colors.length; ++i) {
+			_output.writeInt(append_colors[i]);
+		}
+		
 		_output.writeInt(payload.length);
 		_output.write(payload);
 		
@@ -72,7 +75,7 @@ public class ProxyClient {
 		_output.flush();
 	}
 	
-	private boolean deserialize_get_next_response(byte[] data_buf, byte[] color_buf, int[] num_results) throws IOException {
+	private boolean deserialize_get_next_response(byte[] data_buf, int[] color_buf, int[] num_results) throws IOException {
 		int buf_sz = _input.readInt();
 		int colors_sz = _input.readInt();
 		
@@ -83,7 +86,10 @@ public class ProxyClient {
 		}
 		
 		_input.read(data_buf, 0, buf_sz);
-		_input.read(color_buf, 0, colors_sz);
+		
+		for (int i = 0; i < colors_sz; ++i) {
+			color_buf[i] = _input.readInt();
+		}
 		return true;
 	}
 	
@@ -95,7 +101,7 @@ public class ProxyClient {
 		_output = new DataOutputStream(new BufferedOutputStream(_socket.getOutputStream()));
 	}
 	
-	public void async_append(byte[] append_colors, byte[] buffer, WriteID wid)  throws IOException{
+	public void async_append(int[] append_colors, byte[] buffer, WriteID wid)  throws IOException{
 		serialize_async_append(append_colors, buffer);
 		deserialize_async_append_response(wid);
 	}
@@ -115,7 +121,7 @@ public class ProxyClient {
 		deserialize_snapshot();
 	}
 	
-	public boolean get_next(byte[] data, byte[] colors, int[] num_results) throws IOException {
+	public boolean get_next(byte[] data, int[] colors, int[] num_results) throws IOException {
 		serialize_get_next();
 		return deserialize_get_next_response(data, colors, num_results);
 	}

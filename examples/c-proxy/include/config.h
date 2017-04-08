@@ -20,7 +20,7 @@ static struct option long_options[] = {
 struct config {
 	std::vector<std::string> 		log_addr;
 	uint16_t				proxy_port;
-	uint8_t 				client_id;
+	uint32_t 				client_id;
 }; 
 
 class config_parser {
@@ -69,7 +69,7 @@ private:
 		}
 	
 		ret.proxy_port = (uint16_t)atoi(_arg_map[PROXY_PORT]);
-		ret.client_id = (uint8_t)atoi(_arg_map[CLIENT_ID]);
+		ret.client_id = (uint32_t)atoi(_arg_map[CLIENT_ID]);
 		assert(ret.client_id != 0);
 
 		std::string log_addresses;

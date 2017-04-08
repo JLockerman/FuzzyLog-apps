@@ -33,16 +33,16 @@ public:
 	} opcode;	
 
 	opcode			_opcode;
-	std::set<uint8_t> 	_append_colors;
-	std::set<uint8_t> 	_depend_colors;			
+	std::set<ColorID> 	_append_colors;
+	std::set<ColorID> 	_depend_colors;			
 	char 			*_payload;
 	size_t 			_payload_size;
 	
 	void initialize(char *buf);
 
 	opcode get_opcode();
-	const std::set<uint8_t>& get_append_colors();
-	const std::set<uint8_t>& get_depend_colors();
+	const std::set<ColorID>& get_append_colors();
+	const std::set<ColorID>& get_depend_colors();
 };
 
 class fuzzy_proxy {
