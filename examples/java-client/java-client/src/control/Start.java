@@ -16,11 +16,13 @@ public class Start {
 	private ProxyClient 					_client;
 	private Map<WriteID, Integer>			_pending_appends;
 	private int 							_window_sz;
+	private int								_num_requests;
 	
-	public Start(int port, int window_sz) throws IOException {
+	public Start(int port, int window_sz, int num_requests) throws IOException {
 		_client = new ProxyClient(port);
 		_pending_appends = new HashMap<WriteID, Integer>();
 		_window_sz = window_sz;
+		_num_requests = num_requests;
 	}
 	
 	public void multi_read() throws IOException {
@@ -30,14 +32,21 @@ public class Start {
 		int[] meta = new int[2];
 		int num_gets = 0;
 		
-		while (num_gets < 100000) {
+		long start_time = 0;
+		while (num_gets < _num_requests) {
 			if (_client.get_next(data, colors, meta) == false) {
 				_client.snapshot();
 			} else {
 				num_gets += 1;
-				assert meta[1] == 2;
+			}
+			if (num_gets == 1) {
+				start_time = System.nanoTime();
 			}
 		}
+		
+		long end_time = System.nanoTime();
+		double throughput = _num_requests*1000000000.0 / (end_time - start_time);
+		System.err.println("Throughput: " + throughput);
 	}
 	
 	public void multi_append() throws IOException {
@@ -51,11 +60,14 @@ public class Start {
 		colors[0] = 2;
 		colors[1] = 3;
 		
-		int num_requests = 100000;
 		int num_pending = 0;
 		WriteID ack_wid = new WriteID();
 				
-		for (int i = 0; i < num_requests; ++i) {
+		int[] num_results = new int[2];
+		
+		long start_time = System.nanoTime();
+		
+		for (int i = 0; i < _num_requests; ++i) {
 			
 			WriteID wid = new WriteID();
 			_client.async_append(colors, data, wid);
@@ -63,8 +75,15 @@ public class Start {
 			_pending_appends.put(wid,  i);
 			num_pending += 1;
 			
-			
 			if (num_pending == _window_sz) {
+				/*
+				while (true) {
+					if (_client.get_next(data, colors, num_results) == false) {
+						_client.snapshot();
+						break;
+					}
+				}
+				*/
 				_client.wait_any_append(ack_wid);
 				_pending_appends.remove(ack_wid);
 					num_pending -= 1;
@@ -76,6 +95,10 @@ public class Start {
 			_pending_appends.remove(ack_wid);
 			num_pending -= 1;
 		}
+		
+		long end_time = System.nanoTime();
+		double throughput = _num_requests*1000000000.0 / (end_time - start_time);
+		System.err.println("Throughput: " + throughput);
 	}
 	
 	public void test_values() throws IOException {
@@ -157,8 +180,7 @@ public class Start {
 			
 			_pending_appends.put(wid,  i);
 			num_pending += 1;
-			
-			
+					
 			if (num_pending == _window_sz) {
 				_client.wait_any_append(ack_wid);
 				_pending_appends.remove(ack_wid);
@@ -201,19 +223,20 @@ public class Start {
 	
 	public static void main(String[] args) {
 		int port = Integer.parseInt(args[0]);
-		//int expt = Integer.parseInt(args[1]);
+		int expt = Integer.parseInt(args[1]);
+		int num_requests = Integer.parseInt(args[2]);
 		
 		try {
-			Start st = new Start(port, 48);
-			/*
+			Start st = new Start(port, 48, num_requests);
+			
 			if (expt == 0)
 				st.multi_append();
 			else if (expt == 1)
 				st.multi_read();
-				*/
+				
 			
-			st.test_proxy();
-			st.test_values();
+			//st.test_proxy();
+			//st.test_values();
 		} catch (IOException e) {
 			System.err.println("Network error!");
 		}
