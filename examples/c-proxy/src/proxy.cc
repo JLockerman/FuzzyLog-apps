@@ -65,7 +65,6 @@ void fuzzy_proxy::do_get_next()
 	if (c.numcolors == 0) {
 		_buffer_len = 2*sizeof(uint32_t);
 	} else { 
-		assert(buf_sz == 4);
 		auto offset = 2*sizeof(uint32_t) + buf_sz;
 		for (auto i = 0; i < c.numcolors; ++i) {
 			_buffer[offset+i] = htonl(c.mycolors[i]);
