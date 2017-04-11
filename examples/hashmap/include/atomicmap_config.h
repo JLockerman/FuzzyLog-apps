@@ -14,18 +14,20 @@ static struct option long_options[] = {
         {"log_addr",            required_argument, NULL, 0},
         {"expt_range",          required_argument, NULL, 1},
         {"expt_duration",       required_argument, NULL, 2},
-        {"client_id",           required_argument, NULL, 3},
-        {"workload",            required_argument, NULL, 4},
-        {"async",               optional_argument, NULL, 5},
-        {"window_size",         optional_argument, NULL, 6},
-        {"replication",         optional_argument, NULL, 7},
-        {NULL,                  no_argument,       NULL, 8},
+        {"num_clients",         required_argument, NULL, 3},
+        {"client_id",           required_argument, NULL, 4},
+        {"workload",            required_argument, NULL, 5},
+        {"async",               optional_argument, NULL, 6},
+        {"window_size",         optional_argument, NULL, 7},
+        {"replication",         optional_argument, NULL, 8},
+        {NULL,                  no_argument,       NULL, 9},
 };
 
 struct atomicmap_config {
 	std::vector<std::string>        log_addr;
 	uint32_t 		        expt_range;
         uint32_t                        expt_duration;
+        uint8_t                         num_clients;
 	uint8_t 		        client_id;
 	std::vector<workload_config>    workload;
         bool                            async;
@@ -39,11 +41,12 @@ private:
 		LOG_ADDR        = 0,
 		EXPT_RANGE      = 1,
 		EXPT_DURATION   = 2,
-		CLIENT_ID       = 3,
-		WORKLOAD        = 4,
-		ASYNC           = 5,
-		WINDOW_SIZE     = 6,
-                REPLICATION     = 7,
+                NUM_CLIENTS     = 3,
+		CLIENT_ID       = 4,
+		WORKLOAD        = 5,
+		ASYNC           = 6,
+		WINDOW_SIZE     = 7,
+                REPLICATION     = 8,
 	};
 
 	bool 					_init;
@@ -76,12 +79,14 @@ private:
 		if (_arg_map.count(LOG_ADDR) == 0 || 
 		    _arg_map.count(EXPT_RANGE) == 0 ||
 		    _arg_map.count(EXPT_DURATION) == 0 ||
+		    _arg_map.count(NUM_CLIENTS) == 0 || 
 		    _arg_map.count(CLIENT_ID) == 0 || 
 		    _arg_map.count(WORKLOAD) == 0) {
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_RANGE].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_DURATION].name << "\n";
+		        std::cerr << "--" << long_options[NUM_CLIENTS].name << "\n";
 		        std::cerr << "--" << long_options[CLIENT_ID].name << "\n";
 		        std::cerr << "--" << long_options[WORKLOAD].name << "\n";
 		        std::cerr << "[--" << long_options[ASYNC].name << "]\n";
@@ -101,6 +106,8 @@ private:
 		ret.expt_range = static_cast<uint32_t>(atoi(_arg_map[EXPT_RANGE]));
                 // expt_duration
 		ret.expt_duration = static_cast<uint32_t>(atoi(_arg_map[EXPT_DURATION]));
+                // num_clients 
+		ret.num_clients = static_cast<uint8_t>(atoi(_arg_map[NUM_CLIENTS]));
                 // client_id
 		ret.client_id = static_cast<uint8_t>(atoi(_arg_map[CLIENT_ID]));
                 // workload

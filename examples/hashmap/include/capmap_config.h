@@ -14,21 +14,23 @@ static struct option long_options[] = {
         {"log_addr",            required_argument, NULL, 0},
         {"expt_range",          required_argument, NULL, 1},
         {"expt_duration",       required_argument, NULL, 2},
-        {"client_id",           required_argument, NULL, 3},
-        {"protocol",            required_argument, NULL, 4},
-        {"role",                optional_argument, NULL, 5},
-        {"workload",            required_argument, NULL, 6},
-        {"txn_rate",            optional_argument, NULL, 7},
-        {"async",               optional_argument, NULL, 8},
-        {"window_size",         optional_argument, NULL, 9},
-        {"replication",         optional_argument, NULL, 10},
-        {NULL,                  no_argument,       NULL, 11},
+        {"num_clients",         required_argument, NULL, 3},
+        {"client_id",           required_argument, NULL, 4},
+        {"protocol",            required_argument, NULL, 5},
+        {"role",                optional_argument, NULL, 6},
+        {"workload",            required_argument, NULL, 7},
+        {"txn_rate",            optional_argument, NULL, 8},
+        {"async",               optional_argument, NULL, 9},
+        {"window_size",         optional_argument, NULL, 10},
+        {"replication",         optional_argument, NULL, 11},
+        {NULL,                  no_argument,       NULL, 12},
 };
 
 struct capmap_config {
 	std::vector<std::string>        log_addr;
 	uint32_t 		        expt_range;
         uint32_t                        expt_duration;
+	uint8_t 		        num_clients;
 	uint8_t 		        client_id;
         uint8_t                         protocol;
         std::string                     role; 
@@ -45,14 +47,15 @@ private:
 		LOG_ADDR        = 0,
 		EXPT_RANGE      = 1,
 		EXPT_DURATION   = 2,
-		CLIENT_ID       = 3,
-		PROTOCOL        = 4,
-		ROLE            = 5,
-		WORKLOAD        = 6,
-                TXN_RATE        = 7,
-		ASYNC           = 8,
-		WINDOW_SIZE     = 9,
-                REPLICATION     = 10,
+		NUM_CLIENTS     = 3,
+		CLIENT_ID       = 4,
+		PROTOCOL        = 5,
+		ROLE            = 6,
+		WORKLOAD        = 7,
+                TXN_RATE        = 8,
+		ASYNC           = 9,
+		WINDOW_SIZE     = 10,
+                REPLICATION     = 11,
 	};
 
 	bool 					_init;
@@ -85,6 +88,7 @@ private:
 		if (_arg_map.count(LOG_ADDR) == 0 || 
 		    _arg_map.count(EXPT_RANGE) == 0 ||
 		    _arg_map.count(EXPT_DURATION) == 0 ||
+		    _arg_map.count(NUM_CLIENTS) == 0 || 
 		    _arg_map.count(CLIENT_ID) == 0 || 
 		    _arg_map.count(PROTOCOL) == 0 || 
 		    _arg_map.count(WORKLOAD) == 0) {
@@ -92,6 +96,7 @@ private:
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_RANGE].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_DURATION].name << "\n";
+		        std::cerr << "--" << long_options[NUM_CLIENTS].name << "\n";
 		        std::cerr << "--" << long_options[CLIENT_ID].name << "\n";
 		        std::cerr << "--" << long_options[PROTOCOL].name << "\n";
 		        std::cerr << "[--" << long_options[ROLE].name << "]\n";
@@ -114,6 +119,8 @@ private:
 		ret.expt_range = static_cast<uint32_t>(atoi(_arg_map[EXPT_RANGE]));
                 // expt_duration
 		ret.expt_duration = static_cast<uint32_t>(atoi(_arg_map[EXPT_DURATION]));
+                // num_clients 
+		ret.num_clients = static_cast<uint8_t>(atoi(_arg_map[NUM_CLIENTS]));
                 // client_id
 		ret.client_id = static_cast<uint8_t>(atoi(_arg_map[CLIENT_ID]));
                 // protocol 
