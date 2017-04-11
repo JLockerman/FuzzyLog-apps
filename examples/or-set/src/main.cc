@@ -65,6 +65,7 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*>
 	std::vector<uint64_t> seen_keys; 	
 	for (i = 0; i < num_inputs; ++i) {
 		auto rq = static_cast<or_set_rq*>(malloc(sizeof(or_set_rq))); 
+		rq->_key = gen.gen_next();
 		if (i == 0 || rand() % 2 == 0) {
 			rq->_opcode = or_set::log_opcode::ADD;
 			rq->_key = gen.gen_next();
@@ -96,17 +97,20 @@ void wait_signal(config cfg)
 	interested = c;
 
 	/* Server ips for handle. */
-	size_t num_servers = cfg.log_addr.size();
+	size_t num_servers = cfg.head_log_addr.size();
 	assert(num_servers > 0);
-	const char *server_ips[num_servers];
+	const char *head_server_ips[num_servers];
+	const char *tail_server_ips[num_servers];
 	for (auto i = 0; i < num_servers; ++i) {
-		server_ips[i] = cfg.log_addr[i].c_str();
+		head_server_ips[i] = cfg.head_log_addr[i].c_str();
+		tail_server_ips[i] = cfg.tail_log_addr[i].c_str();
 	}
 
 	depends.mycolors = NULL;
 	depends.numcolors = 0;
 
-	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
+	auto handle = new_dag_handle_with_replication(num_servers, head_server_ips, tail_server_ips, &c);
+
 	append(handle, buffer, buf_sz, &c, &depends);
 	while (num_received < cfg.num_clients + 1) {
 		snapshot(handle);
@@ -159,17 +163,18 @@ void run_putter(config cfg, std::vector<tester_request*> &inputs, std::vector<do
 	}
 
 	/* Server ips for handle. */
-	size_t num_servers = cfg.log_addr.size();
+	size_t num_servers = cfg.head_log_addr.size();
 	assert(num_servers > 0);
-	const char *server_ips[num_servers];
+	const char *head_server_ips[num_servers];
+	const char *tail_server_ips[num_servers];
 	std::cerr << "Num servers: " << num_servers << "\n";
-	std::cerr << "Server list:\n";
 	for (auto i = 0; i < num_servers; ++i) {
-		server_ips[i] = cfg.log_addr[i].c_str();
-		std::cerr << server_ips[i] << "\n";	
+		head_server_ips[i] = cfg.head_log_addr[i].c_str();
+		tail_server_ips[i] = cfg.tail_log_addr[i].c_str();
+		std::cerr << "<" << head_server_ips[i] << "," << tail_server_ips[i] << ">" << "\n";
 	}
 
-	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
+	auto handle = new_dag_handle_with_replication(num_servers, head_server_ips, tail_server_ips, &c);
 	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 
 	wait_signal(cfg);	
 
@@ -177,14 +182,6 @@ void run_putter(config cfg, std::vector<tester_request*> &inputs, std::vector<do
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
 
 	std::cerr << "Worker " << (uint64_t)cfg.server_id << " initialized!\n";
-
-	void do_run_fix_throughput(const std::vector<tester_request*> &requests, std::vector<double> &samples,
-				 int interval, 	
-				 int duration, 		
-				 double low_throughput, 
-				 double high_throughput, 
-				 double spike_start, 
-	 			 	double spike_duration);
 
 	tester->do_run_fix_throughput(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration, cfg.low_throughput, cfg.high_throughput, cfg.spike_start, cfg.spike_duration); 
 	close_dag_handle(handle);
@@ -206,18 +203,19 @@ void run_getter(config cfg, std::vector<double> &throughput_samples, std::vector
 	}
 	
 	/* Server ips for handle. */
-	size_t num_servers = cfg.log_addr.size();
+	size_t num_servers = cfg.head_log_addr.size();
 	assert(num_servers > 0);
-	const char *server_ips[num_servers];
+	const char *head_server_ips[num_servers];
+	const char *tail_server_ips[num_servers];
 	std::cerr << "Num servers: " << num_servers << "\n";
-	std::cerr << "Server list:\n";
 	for (auto i = 0; i < num_servers; ++i) {
-		server_ips[i] = cfg.log_addr[i].c_str();
-		std::cerr << server_ips[i] << "\n";	
+		head_server_ips[i] = cfg.head_log_addr[i].c_str();
+		tail_server_ips[i] = cfg.tail_log_addr[i].c_str();
+		std::cerr << "<" << head_server_ips[i] << "," << tail_server_ips[i] << ">" << "\n";
 	}
 
-	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
-
+	auto handle = new_dag_handle_with_replication(num_servers, head_server_ips, tail_server_ips, &c);
+	
 	wait_signal(cfg);
 
 	auto orset = new or_set(handle, NULL, &c, cfg.server_id, cfg.sync_duration);	
@@ -229,11 +227,31 @@ void run_getter(config cfg, std::vector<double> &throughput_samples, std::vector
 
 }
 
+void validate_puts(config cfg, const std::vector<tester_request*> &inputs, const std::vector<double> throughput_samples)
+{
+	auto input_count = 0;
+	for (auto t : inputs) {
+		if (t->_executed == false)
+			break;
+		input_count += 1;	
+	}
+	
+	auto throughput_count = 0.0;
+	for (auto sample : throughput_samples) {
+		throughput_count += sample;
+	}	
+	
+	std::cerr << "Input count: " << input_count << "\n";
+	std::cerr << "Throughput count: " << throughput_count << "\n";
+}
+
+
 void do_put_experiment(config cfg)
 {
 	std::vector<tester_request*> inputs;
 	std::vector<double> throughput_samples;
 	run_putter(cfg, inputs, throughput_samples);
+	validate_puts(cfg, inputs, throughput_samples);
 	write_put_output(cfg, throughput_samples, inputs);
 }
 

@@ -10,7 +10,7 @@
 #include <stdlib.h>
 
 static struct option long_options[] = {
-  {"log_addr", required_argument, NULL, 0},
+  {"head_log_addr", required_argument, NULL, 0},
   {"expt_duration", required_argument, NULL, 1},
   {"expt_range", required_argument, NULL, 2},
   {"server_id", required_argument, NULL, 3},
@@ -25,11 +25,13 @@ static struct option long_options[] = {
   {"high_throughput", required_argument, NULL, 12},
   {"spike_start", required_argument, NULL, 13},
   {"spike_duration", required_argument, NULL, 14},
-  {NULL, no_argument, NULL, 15},
+  {"tail_log_addr", required_argument, NULL, 15},
+  {NULL, no_argument, NULL, 16},
 };
 
 struct config {
-	std::vector<std::string> 		log_addr;
+	std::vector<std::string> 		head_log_addr;
+	std::vector<std::string> 		tail_log_addr;
 	int			 		expt_duration;
 	uint64_t 				expt_range;
 	uint8_t 				server_id;		
@@ -48,7 +50,7 @@ struct config {
 class config_parser {
 private:
 	enum OptionCode {
-		LOG_ADDR = 0,
+		HEAD_LOG_ADDR = 0,
 		EXPT_DURATION = 1,
 		EXPT_RANGE = 2,
 		SERVER_ID = 3,
@@ -63,6 +65,7 @@ private:
 		HIGH_THROUGHPUT=12,
 		SPIKE_START=13,
 		SPIKE_DURATION=14,
+		TAIL_LOG_ADDR=15,
 	};
 
 	bool 					_init;
@@ -92,7 +95,8 @@ private:
 		assert(_init == true);
 		config ret;
 
-		if (_arg_map.count(LOG_ADDR) == 0 || 
+		if (_arg_map.count(HEAD_LOG_ADDR) == 0 || 
+		    _arg_map.count(TAIL_LOG_ADDR) == 0 || 
 		    _arg_map.count(EXPT_DURATION) == 0 ||
 		    _arg_map.count(EXPT_RANGE) == 0 ||
 		    _arg_map.count(SERVER_ID) == 0 || 
@@ -106,7 +110,8 @@ private:
 		    _arg_map.count(SPIKE_START) == 0 ||	
 		    _arg_map.count(SPIKE_DURATION) == 0) { 
 		        std::cerr << "Missing one or more params\n";
-		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
+		        std::cerr << "--" << long_options[HEAD_LOG_ADDR].name << "\n";
+			std::cerr << "--" << long_options[TAIL_LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_DURATION].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_RANGE].name << "\n";
 		        std::cerr << "--" << long_options[SERVER_ID].name << "\n";
@@ -146,14 +151,22 @@ private:
 			assert(false);
 		}
 		
-		std::string log_addresses;
-		log_addresses.assign(_arg_map[LOG_ADDR]);
-		std::stringstream addr_s(log_addresses);	
+		std::string head_log_addresses;
+		head_log_addresses.assign(_arg_map[HEAD_LOG_ADDR]);
+		std::stringstream head_addr_s(head_log_addresses);	
 		std::string item;
 			
-		while (getline(addr_s, item, ',')) 
-			ret.log_addr.push_back(item);
+		while (getline(head_addr_s, item, ',')) 
+			ret.head_log_addr.push_back(item);
 		
+		std::string tail_log_addresses;
+		tail_log_addresses.assign(_arg_map[TAIL_LOG_ADDR]);
+		std::stringstream tail_addr_s(tail_log_addresses);
+		
+		while (getline(tail_addr_s, item, ','))
+			ret.tail_log_addr.push_back(item);
+
+		assert(ret.tail_log_addr.size() == ret.head_log_addr.size());
 		return ret;
 	}
 
