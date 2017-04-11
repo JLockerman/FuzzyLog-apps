@@ -6,17 +6,18 @@ import time
 import sys
 
 def main():
-	log_ips = sys.argv[1]
-	start_clients = int(sys.argv[2])
-	clients_on_machine = int(sys.argv[3])
-	window_sz = int(sys.argv[4])
-	duration = int(sys.argv[5])
-	total_clients = int(sys.argv[6])
-	low_throughput = float(sys.argv[7])
-	high_throughput = float(sys.argv[8])
-	spike_start = float(sys.argv[9])
-	spike_duration = float(sys.argv[10])
-	single_expt(start_clients, clients_on_machine, window_sz, log_ips, duration, total_clients, 
+	head_log_ips = sys.argv[1]
+	tail_log_ips = sys.argv[2]
+	start_clients = int(sys.argv[3])
+	clients_on_machine = int(sys.argv[4])
+	window_sz = int(sys.argv[5])
+	duration = int(sys.argv[6])
+	total_clients = int(sys.argv[7])
+	low_throughput = float(sys.argv[8])
+	high_throughput = float(sys.argv[9])
+	spike_start = float(sys.argv[10])
+	spike_duration = float(sys.argv[11])
+	single_expt(start_clients, clients_on_machine, window_sz, head_log_ips, tail_log_ips, duration, total_clients, 
 		   low_throughput, 
 	  	   high_throughput, 
 		   spike_start,
@@ -40,9 +41,9 @@ def init_fuzzy_log():
 	return proc
 	
 # Start clients.
-def init_clients(start_clients, num_clients, window_sz, log_ip, duration, total_clients, low_throughput,
+def init_clients(start_clients, num_clients, window_sz, head_log_ip, tail_log_ip, duration, total_clients, low_throughput,
 		 high_throughput, spike_start, spike_duration):
-	args = ['./build/or-set', '--writer', '--log_addr', log_ip, '--expt_range', '1000000', 
+	args = ['./build/or-set', '--writer', '--head_log_addr', head_log_ip, '--tail_log_addr', tail_log_ip, '--expt_range', '1000000', 
 	 	'--num_rqs', '30000000', '--sample_interval', '1', '--sync_duration', '500', '--server_id'] 
 	client_procs = []
 	log_files = []
@@ -81,11 +82,11 @@ def mv_results(num_clients, window_sz):
 	os.system('mv *.txt ' + result_dir)
 
 # Single experiment. 
-def single_expt(start_clients, num_clients, window_sz, log_ip, duration, total_clients, 
+def single_expt(start_clients, num_clients, window_sz, head_log_ip, tail_log_ip, duration, total_clients, 
 		low_throughput, high_throughput, spike_start, spike_duration):
 	os.system('rm *.txt')
 	# log_proc = init_fuzzy_log()
-	client_procs = init_clients(start_clients, num_clients, window_sz, log_ip, duration, total_clients, 
+	client_procs = init_clients(start_clients, num_clients, window_sz, head_log_ip, tail_log_ip, duration, total_clients, 
 				   low_throughput, high_throughput, spike_start, spike_duration)
 	for c, f in client_procs:
 		c.wait()

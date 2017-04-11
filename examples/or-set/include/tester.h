@@ -5,7 +5,7 @@
 #include <vector>
 #include <set>
 
-#define MAX_ASYNC_REQUESTS 1024
+#define MAX_ASYNC_REQUESTS 40000 
 
 struct tester_request {
 	std::chrono::system_clock::time_point 		_start_time;

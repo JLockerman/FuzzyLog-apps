@@ -125,13 +125,12 @@ void async_tester::run_throughput(const std::vector<tester_request*> &requests,
 					phase  = 2;
 
 				break;
-			} else {
-				auto diff = try_get_pending();
-				num_pending -= diff;
-				_num_elapsed += diff;
-			}
+			} 
 		}	
-		
+		auto temp = try_get_pending();
+		num_pending -= temp;
+		_num_elapsed += temp;
+		std::cerr << num_pending << "\n";	
 		i += 1;
 	}
 	

@@ -112,7 +112,7 @@ void wait_signal(config cfg)
 	auto handle = new_dag_handle_with_replication(num_servers, head_server_ips, tail_server_ips, &c);
 
 	append(handle, buffer, buf_sz, &c, &depends);
-	while (num_received < cfg.num_clients + 1) {
+	while (num_received < cfg.num_clients) {
 		snapshot(handle);
 		while (true) {
 			get_next(handle, buffer, &buf_sz, &c);

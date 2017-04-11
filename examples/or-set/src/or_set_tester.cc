@@ -8,6 +8,7 @@ or_set_tester::or_set_tester(uint32_t window_sz, or_set *set, DAGHandle *fuzzylo
 	_or_set = set;
 	_fuzzylog = fuzzylog;
 	_freelist = static_cast<fuzzylog_buf*>(malloc(sizeof(fuzzylog_buf)*MAX_ASYNC_REQUESTS)); 
+	std::cerr << "Freelist sz: " << MAX_ASYNC_REQUESTS << "\n";
 	for (auto i = 0; i < MAX_ASYNC_REQUESTS; ++i) 
 		_freelist[i]._next = &_freelist[i+1];
 	_freelist[MAX_ASYNC_REQUESTS-1]._next = NULL;	
@@ -73,6 +74,7 @@ tester_request* or_set_tester::wait_single_request()
 void or_set_tester::wait_requests(std::set<tester_request*> &done_set) 
 {
 	while (_done_requests.size() > 0) {
+		assert(false);
 		auto rq = _done_requests.front();
 		_done_requests.pop_front();
 	

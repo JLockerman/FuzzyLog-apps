@@ -40,6 +40,7 @@ private:
 	std::unordered_map<write_id, or_set_rq*, wid_hasher, wid_equality> 	_request_map;
 	std::deque<or_set_rq*> 							_done_requests;
 	fuzzylog_buf 								*_freelist;
+	char _buf[DELOS_MAX_DATA_SIZE];
 	
 protected:
 	void issue_request(tester_request *rq);
