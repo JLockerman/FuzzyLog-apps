@@ -44,7 +44,7 @@ private:
         CAPMapSynchronizer*                     m_synchronizer; 
 
 public:
-        CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, ProtocolVersion protocol, std::string& role);
+        CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, ProtocolVersion protocol, std::string& role, bool replication);
         ~CAPMap();
 
         ProtocolVersion get_protocol_version() {
@@ -55,7 +55,7 @@ public:
         }
 
         bool get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors);
-        void init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
+        void init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication);
 
         void set_network_partition_status(PartitionStatus status) {
                 switch (status) {

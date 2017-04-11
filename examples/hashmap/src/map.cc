@@ -1,4 +1,5 @@
 #include <map.h>
+#include <cassert>
 
 #define DUMMY_INTERESTING_COLOR         100000
 
@@ -10,12 +11,27 @@ void BaseMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
         c->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
         c->mycolors[0] = static_cast<ColorID>(DUMMY_INTERESTING_COLOR);
         // Initialize fuzzylog connection
-        size_t num_chain_servers = log_addr->size();
-        const char *chain_server_ips[num_chain_servers]; 
-        for (auto i = 0; i < num_chain_servers; i++) {
-                chain_server_ips[i] = log_addr->at(i).c_str();
+        if (m_replication) {
+                assert (log_addr->size() > 0 && log_addr->size() % 2 == 0);
+                size_t num_chain_servers = log_addr->size() / 2;
+                const char *chain_server_head_ips[num_chain_servers]; 
+                for (auto i = 0; i < num_chain_servers; i++) {
+                        chain_server_head_ips[i] = log_addr->at(i).c_str();
+                }
+                const char *chain_server_tail_ips[num_chain_servers]; 
+                for (auto i = 0; i < num_chain_servers; i++) {
+                        chain_server_tail_ips[i] = log_addr->at(num_chain_servers+i).c_str();
+                }
+                m_fuzzylog_client = new_dag_handle_with_replication(num_chain_servers, chain_server_head_ips, chain_server_tail_ips, c);
+
+        } else {
+                size_t num_chain_servers = log_addr->size();
+                const char *chain_server_ips[num_chain_servers]; 
+                for (auto i = 0; i < num_chain_servers; i++) {
+                        chain_server_ips[i] = log_addr->at(i).c_str();
+                }
+                m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, c);
         }
-        m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, c);
 }
 
 void BaseMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {

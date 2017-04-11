@@ -21,7 +21,8 @@ static struct option long_options[] = {
         {"txn_rate",            optional_argument, NULL, 7},
         {"async",               optional_argument, NULL, 8},
         {"window_size",         optional_argument, NULL, 9},
-        {NULL,                  no_argument,       NULL, 10},
+        {"replication",         optional_argument, NULL, 10},
+        {NULL,                  no_argument,       NULL, 11},
 };
 
 struct capmap_config {
@@ -35,6 +36,7 @@ struct capmap_config {
         uint32_t                        txn_rate;
         bool                            async;
         uint32_t                        window_size;
+        bool                            replication;
 }; 
 
 class capmap_config_parser {
@@ -50,6 +52,7 @@ private:
                 TXN_RATE        = 7,
 		ASYNC           = 8,
 		WINDOW_SIZE     = 9,
+                REPLICATION     = 10,
 	};
 
 	bool 					_init;
@@ -96,6 +99,7 @@ private:
 		        std::cerr << "[--" << long_options[TXN_RATE].name << "]\n";
 		        std::cerr << "[--" << long_options[ASYNC].name << "]\n";
 		        std::cerr << "[--" << long_options[WINDOW_SIZE].name << "]\n";
+		        std::cerr << "[--" << long_options[REPLICATION].name << "]\n";
 			exit(-1);
 		}
 
@@ -197,6 +201,9 @@ private:
                         ret.window_size = DefaultWindowSize;
                 else
                         ret.window_size = 0;
+
+                // replication
+                ret.replication = _arg_map.count(REPLICATION) > 0;
 
 		return ret;
 	}

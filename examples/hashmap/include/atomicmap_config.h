@@ -18,7 +18,8 @@ static struct option long_options[] = {
         {"workload",            required_argument, NULL, 4},
         {"async",               optional_argument, NULL, 5},
         {"window_size",         optional_argument, NULL, 6},
-        {NULL,                  no_argument,       NULL, 7},
+        {"replication",         optional_argument, NULL, 7},
+        {NULL,                  no_argument,       NULL, 8},
 };
 
 struct atomicmap_config {
@@ -29,6 +30,7 @@ struct atomicmap_config {
 	std::vector<workload_config>    workload;
         bool                            async;
         uint32_t                        window_size;
+        bool                            replication;
 }; 
 
 class atomicmap_config_parser {
@@ -41,6 +43,7 @@ private:
 		WORKLOAD        = 4,
 		ASYNC           = 5,
 		WINDOW_SIZE     = 6,
+                REPLICATION     = 7,
 	};
 
 	bool 					_init;
@@ -83,6 +86,7 @@ private:
 		        std::cerr << "--" << long_options[WORKLOAD].name << "\n";
 		        std::cerr << "[--" << long_options[ASYNC].name << "]\n";
 		        std::cerr << "[--" << long_options[WINDOW_SIZE].name << "]\n";
+		        std::cerr << "[--" << long_options[REPLICATION].name << "]\n";
 			exit(-1);
 		}
 
@@ -168,6 +172,9 @@ private:
                         ret.window_size = DefaultWindowSize;
                 else
                         ret.window_size = 0;
+
+                // replication
+                ret.replication = _arg_map.count(REPLICATION) > 0;
 
 		return ret;
 	}

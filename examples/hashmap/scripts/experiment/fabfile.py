@@ -35,18 +35,28 @@ def update_fuzzylog_binary(commit=None):
 def kill_fuzzylog():
     run('killall delos_tcp_server')
 
-def fuzzylog_proc(port, maxthreads, index_in_group, total_num_servers_in_group):
+def fuzzylog_proc(port, maxthreads, index_in_group, total_num_servers_in_group, up=None, down=None):
+    if up == "None":
+        up = None
+
+    if down == "None":
+        down = None
+
     with cd('~/fuzzylog/delos-rust/servers/tcp_server'):
-        if maxthreads == '-1':
-            run('cargo run --release %s -- -ig %s:%s' % (port, index_in_group, total_num_servers_in_group))
-        else:
-            run('cargo run --release %s -- -w %s -ig %s:%s' % (port, maxthreads, index_in_group, total_num_servers_in_group))
+        cmd = 'cargo run --release %s -- -ig %s:%s' % (port, index_in_group, total_num_servers_in_group)
+        if maxthreads != '-1':
+            cmd += ' -w %s' % maxthreads
+        if up:
+            cmd += ' -up %s' % up
+        if down:
+            cmd += ' -dwn %s' % down
+        run(cmd)
 
 def clean_fuzzymap():
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         run('rm *.txt')
 
-def atomicmap_proc(log_addr, exp_range, exp_duration, client_id, workload, async, window_size):
+def atomicmap_proc(log_addr, exp_range, exp_duration, client_id, workload, async, window_size, replication):
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         args = 'build/atomicmap '
         args += '--log_addr=' + str(log_addr) + ' '
@@ -57,9 +67,11 @@ def atomicmap_proc(log_addr, exp_range, exp_duration, client_id, workload, async
         if async == "True":
             args += '--async '
             args += '--window_size=' + str(window_size)
+        if replication == "True":
+            args += ' --replication'
         run(args)
 
-def capmap_proc(log_addr, exp_range, exp_duration, client_id, workload, txn_rate, async, window_size, protocol, role):
+def capmap_proc(log_addr, exp_range, exp_duration, client_id, workload, txn_rate, async, window_size, protocol, role, replication):
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         args = 'build/capmap '
         args += '--log_addr=' + str(log_addr) + ' '
@@ -75,4 +87,6 @@ def capmap_proc(log_addr, exp_range, exp_duration, client_id, workload, txn_rate
         args += ' --protocol=' + str(protocol)
         if role == "primary" or role == "secondary":
             args += ' --role=' + str(role)
+        if replication == "True":
+            args += ' --replication'
         run(args)

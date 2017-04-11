@@ -3,11 +3,11 @@
 
 char buf[DELOS_MAX_DATA_SIZE];
 
-CAPMap::CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, ProtocolVersion protocol, std::string& role): BaseMap(log_addr), m_protocol(protocol), m_role(role), m_network_partition_status(NORMAL), m_synchronizer(NULL) {
+CAPMap::CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, ProtocolVersion protocol, std::string& role, bool replication): BaseMap(log_addr, replication), m_protocol(protocol), m_role(role), m_network_partition_status(NORMAL), m_synchronizer(NULL) {
         // FIXME: m_map_type
         std::vector<ColorID> interesting_colors;
         if (get_interesting_colors(workload, interesting_colors))
-                init_synchronizer(log_addr, interesting_colors); 
+                init_synchronizer(log_addr, interesting_colors, replication);
 }
 
 CAPMap::~CAPMap() {
@@ -33,8 +33,8 @@ bool CAPMap::get_interesting_colors(std::vector<workload_config>* workload, std:
 
 }
 
-void CAPMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors) {
-        m_synchronizer = new CAPMapSynchronizer(this, log_addr, interesting_colors);
+void CAPMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication) {
+        m_synchronizer = new CAPMapSynchronizer(this, log_addr, interesting_colors, replication);
         m_synchronizer->run();
 }
 

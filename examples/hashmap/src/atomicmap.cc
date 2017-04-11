@@ -4,10 +4,10 @@
 #include <cassert>
 #include <unistd.h>
 
-AtomicMap::AtomicMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload): BaseMap(log_addr), m_synchronizer(NULL) {
+AtomicMap::AtomicMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, bool replication): BaseMap(log_addr, replication), m_synchronizer(NULL) {
         std::vector<ColorID> interesting_colors;
         if (get_interesting_colors(workload, interesting_colors))
-                init_synchronizer(log_addr, interesting_colors); 
+                init_synchronizer(log_addr, interesting_colors, replication);
 }
 
 AtomicMap::~AtomicMap() {
@@ -31,8 +31,8 @@ bool AtomicMap::get_interesting_colors(std::vector<workload_config>* workload, s
         return get_workload_found;
 }
 
-void AtomicMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors) {
-        m_synchronizer = new AtomicMapSynchronizer(log_addr, interesting_colors);
+void AtomicMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication) {
+        m_synchronizer = new AtomicMapSynchronizer(log_addr, interesting_colors, replication);
         m_synchronizer->run();
 }
 

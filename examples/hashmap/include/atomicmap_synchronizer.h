@@ -25,9 +25,11 @@ private:
         std::atomic_bool                                                        m_running;
         std::unordered_map<uint32_t, uint32_t>                                  m_local_map; 
         std::mutex                                                              m_local_map_mtx;
+
+        bool                                                                    m_replication;
         
 public:
-        AtomicMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
+        AtomicMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication);
         ~AtomicMapSynchronizer() {}
         virtual void run();
         virtual void join();

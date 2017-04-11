@@ -59,7 +59,7 @@ void do_experiment(atomicmap_config cfg) {
         Context ctx;    // Can be used to share info between AtomicMapTester and Txns
 
         // Fuzzymap
-        map = new AtomicMap(&cfg.log_addr, &cfg.workload);
+        map = new AtomicMap(&cfg.log_addr, &cfg.workload, cfg.replication);
 
         // Generate append workloads: uniform distribution
         workload_gen = new atomicmap_workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);

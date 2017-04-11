@@ -34,9 +34,11 @@ public:
 protected:
         // Fuzzylog connection
         DAGHandle*                                      m_fuzzylog_client;
+        bool                                            m_replication;
 
 public:
-        BaseMap(std::vector<std::string>* log_addr) {
+        BaseMap(std::vector<std::string>* log_addr, bool replication) {
+                this->m_replication = replication;
                 init_fuzzylog_client(log_addr);
         }
         //MapType get_map_type() { return m_map_type; }

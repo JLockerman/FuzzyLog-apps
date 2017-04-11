@@ -101,7 +101,7 @@ void do_experiment(capmap_config cfg) {
         Context ctx;    // Can be used to share info between CAPMapTester and Txns
 
         // Fuzzymap
-        map = new CAPMap(&cfg.log_addr, &cfg.workload, (CAPMap::ProtocolVersion)cfg.protocol, cfg.role);
+        map = new CAPMap(&cfg.log_addr, &cfg.workload, (CAPMap::ProtocolVersion)cfg.protocol, cfg.role, cfg.replication);
 
         // Generate append workloads: uniform distribution
         workload_gen = new capmap_workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);

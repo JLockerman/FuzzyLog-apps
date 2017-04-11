@@ -31,8 +31,10 @@ private:
         CAPMap*                                                                 m_map;
         std::vector<struct Node*>                                               m_buffered_nodes;
 
+        bool                                                                    m_replication;
+
 public:
-        CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors);
+        CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication);
         ~CAPMapSynchronizer() {}
         virtual void run();
         virtual void join();

@@ -5,7 +5,7 @@
 #include <thread>
 #include <capmap.h>
 
-CAPMapSynchronizer::CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors): m_map(map) {
+CAPMapSynchronizer::CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication): m_map(map), m_replication(replication) {
         uint32_t i;
         struct colors* c;
         c = static_cast<struct colors*>(malloc(sizeof(struct colors)));
@@ -16,12 +16,27 @@ CAPMapSynchronizer::CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* lo
         }
         this->m_interesting_colors = c;
         // Initialize fuzzylog connection
-        size_t num_chain_servers = log_addr->size();
-        const char *chain_server_ips[num_chain_servers]; 
-        for (auto i = 0; i < num_chain_servers; i++) {
-                chain_server_ips[i] = log_addr->at(i).c_str();
+        if (m_replication) {
+                assert (log_addr->size() > 0 && log_addr->size() % 2 == 0);
+                size_t num_chain_servers = log_addr->size() / 2;
+                const char *chain_server_head_ips[num_chain_servers]; 
+                for (auto i = 0; i < num_chain_servers; i++) {
+                        chain_server_head_ips[i] = log_addr->at(i).c_str();
+                }
+                const char *chain_server_tail_ips[num_chain_servers]; 
+                for (auto i = 0; i < num_chain_servers; i++) {
+                        chain_server_tail_ips[i] = log_addr->at(num_chain_servers+i).c_str();
+                }
+                m_fuzzylog_client = new_dag_handle_with_replication(num_chain_servers, chain_server_head_ips, chain_server_tail_ips, c);
+
+        } else {
+                size_t num_chain_servers = log_addr->size();
+                const char *chain_server_ips[num_chain_servers]; 
+                for (auto i = 0; i < num_chain_servers; i++) {
+                        chain_server_ips[i] = log_addr->at(i).c_str();
+                }
+                m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, m_interesting_colors);
         }
-        m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, m_interesting_colors);
 
         this->m_running = true;
 }
