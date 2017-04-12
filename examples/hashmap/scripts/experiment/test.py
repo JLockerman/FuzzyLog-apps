@@ -8,6 +8,7 @@ import time
 import random
 from collections import defaultdict, Counter
 import shutil
+import pprint
 
 class FuzzyMapTestCase(unittest.TestCase):
         results = []
@@ -100,10 +101,11 @@ class FuzzyMapTestCase(unittest.TestCase):
                 launch_str += ',' + str(replication) 
                 return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])
 
-        def launch_capmap(self, fabhost, keyfile, logaddr, expt_duration, client_id, workload, txn_rate, async, window_size, protocol, role=None, replication=False):
+        def launch_capmap(self, fabhost, keyfile, logaddr, expt_duration, num_clients, client_id, workload, txn_rate, async, window_size, protocol, role=None, replication=False):
                 launch_str = 'capmap_proc:' + logaddr
                 launch_str += ',' + str(self.expt_range)
                 launch_str += ',' + str(expt_duration)
+                launch_str += ',' + str(num_clients)
                 launch_str += ',' + str(client_id)
                 launch_str += ',' + workload
                 launch_str += ',' + str(txn_rate)
@@ -345,13 +347,13 @@ class NetworkPartitionTestCase(FuzzyMapTestCase):
 
                 # writer1 at site1
                 workload = "put@2-1\={put_op_count}".format(put_op_count=put_op_count)
-                proc = self.launch_capmap(writer1_ip['public'], self.keyfile[writer1_region], log_addr, writer1_duration, 1, workload, writer1_txn_rate, async, writer1_window_size, protocol, 'primary', self.replication)
+                proc = self.launch_capmap(writer1_ip['public'], self.keyfile[writer1_region], log_addr, writer1_duration, 4, 1, workload, writer1_txn_rate, async, writer1_window_size, protocol, 'primary', self.replication)
                 client_procs.append(proc) 
                 time.sleep(0.1)
 
                 # writer2 at site2 
                 workload = "put@1-2\={put_op_count}".format(put_op_count=put_op_count)
-                proc = self.launch_capmap(writer2_ip['public'], self.keyfile[writer2_region], log_addr, writer2_duration, 2, workload, writer2_txn_rate, async, writer2_window_size, protocol, 'secondary', self.replication)
+                proc = self.launch_capmap(writer2_ip['public'], self.keyfile[writer2_region], log_addr, writer2_duration, 4, 2, workload, writer2_txn_rate, async, writer2_window_size, protocol, 'secondary', self.replication)
                 client_procs.append(proc) 
 
                 # reader
@@ -359,7 +361,7 @@ class NetworkPartitionTestCase(FuzzyMapTestCase):
                         reader1_region, reader1_idx, reader1_duration = reader1
                         reader1_ip = self.client_ips[reader1_region][reader1_idx]
                         workload = "get@2-1\=1"
-                        proc = self.launch_capmap(reader1_ip['public'], self.keyfile[reader1_region], log_addr, reader1_duration, 3, workload, 0, async, 1, protocol, 'primary', self.replication)
+                        proc = self.launch_capmap(reader1_ip['public'], self.keyfile[reader1_region], log_addr, reader1_duration, 4, 3, workload, 0, async, 1, protocol, 'primary', self.replication)
                         client_procs.append(proc) 
                         time.sleep(0.1)
 
@@ -367,7 +369,7 @@ class NetworkPartitionTestCase(FuzzyMapTestCase):
                         reader2_region, reader2_idx, reader2_duration = reader2
                         reader2_ip = self.client_ips[reader2_region][reader2_idx]
                         workload = "get@1-2\=1"
-                        proc = self.launch_capmap(reader2_ip['public'], self.keyfile[reader2_region], log_addr, reader2_duration, 4, workload, 0, async, 1, protocol, 'secondary', self.replication)
+                        proc = self.launch_capmap(reader2_ip['public'], self.keyfile[reader2_region], log_addr, reader2_duration, 4, 4, workload, 0, async, 1, protocol, 'secondary', self.replication)
                         client_procs.append(proc) 
 
                 for c in client_procs:
@@ -403,38 +405,51 @@ class ReplicatedNetworkPartitionTestCase(NetworkPartitionTestCase):
                 proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])  
                 return proc
 		
-        def run_chain(self, region, idx_in_logical_partition):
-                servers = self.server_ips[region][:self.replication_length]
-                for i, log_server in enumerate(servers):
+        def run_chain(self, region, chain_servers, idx_in_logical_partition):
+                head = None
+                tail = None
+                for i, log_server in enumerate(chain_servers):
                         if i == 0:
                                 # head: down
-                                down = servers[i+1]['public']
+                                down = chain_servers[i+1]['private']
                                 proc = self.launch_fuzzylog_replication(log_server['public'], self.keyfile[region], idx_in_logical_partition, self.num_chain_servers, upstream_server=None, downstream_server=down)
                                 # add head to param
-                                self.target_log_servers.append(log_server)
+                                head = log_server
 
                         elif i == self.replication_length - 1:
                                 # tail: up
-                                up = servers[i-1]['public'] + ':' + str(self.fuzzylog_port)
+                                up = chain_servers[i-1]['private'] + ':' + str(self.fuzzylog_port)
                                 proc = self.launch_fuzzylog_replication(log_server['public'], self.keyfile[region], idx_in_logical_partition, self.num_chain_servers, upstream_server=up, downstream_server=None)
                                 # add tail to param
-                                self.target_log_servers.append(log_server)
+                                tail = log_server
 
                         else:
                                 # middle: up, down
-                                down = servers[i+1]['public']
-                                up = servers[i-1]['public'] + ':' + str(self.fuzzylog_port)
+                                down = chain_servers[i+1]['private']
+                                up = chain_servers[i-1]['private'] + ':' + str(self.fuzzylog_port)
                                 proc = self.launch_fuzzylog_replication(log_server['public'], self.keyfile[region], idx_in_logical_partition, self.num_chain_servers, upstream_server=up, downstream_server=down)
+                return head, tail
 
         def setUp(self):
                 # run instances
                 self.up_and_running_instances()
+                pprint.pprint(self.server_ips)
 
                 self.assertTrue(len(self.server_ips[settings.US_EAST_2]) >= self.replication_length) 
                 self.assertTrue(len(self.server_ips[settings.AP_NORTHEAST_1]) >= self.replication_length) 
 
-                self.run_chain(settings.US_EAST_2, 0)
-                self.run_chain(settings.AP_NORTHEAST_1, 1)
+                region1 = settings.US_EAST_2
+                chain_servers = self.server_ips[region1][:self.replication_length]
+                head1, tail1 = self.run_chain(region1, chain_servers, 0)
+
+                region2 = settings.AP_NORTHEAST_1
+                chain_servers = self.server_ips[region2][:self.replication_length]
+                head2, tail2 = self.run_chain(region2, chain_servers, 1)
+                
+                self.target_log_servers.append(head1)
+                self.target_log_servers.append(head2)
+                self.target_log_servers.append(tail1)
+                self.target_log_servers.append(tail2)
 
                 time.sleep(5)
 

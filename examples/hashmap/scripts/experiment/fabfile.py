@@ -71,12 +71,13 @@ def atomicmap_proc(log_addr, exp_range, exp_duration, client_id, workload, async
             args += ' --replication'
         run(args)
 
-def capmap_proc(log_addr, exp_range, exp_duration, client_id, workload, txn_rate, async, window_size, protocol, role, replication):
+def capmap_proc(log_addr, exp_range, exp_duration, num_clients, client_id, workload, txn_rate, async, window_size, protocol, role, replication):
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         args = 'build/capmap '
         args += '--log_addr=' + str(log_addr) + ' '
         args += '--expt_range=' + str(exp_range) + ' '
         args += '--expt_duration=' + str(exp_duration) + ' '
+        args += '--num_clients=' + str(num_clients) + ' '
         args += '--client_id=' + str(client_id) + ' '
         args += '--workload=' + str(workload) + ' '
         if int(txn_rate) > 0: 

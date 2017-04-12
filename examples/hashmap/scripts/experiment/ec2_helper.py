@@ -178,4 +178,4 @@ def to_ip(instances):
 
 def addr_to_str(ips, port): 
         # escape comma
-        return "\,".join(["{0}:{1}".format(s['public'], port) for s in ips]) 
+        return "\,".join(["{0}:{1}".format(s['private'], port) for s in ips]) 
