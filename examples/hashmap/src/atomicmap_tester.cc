@@ -80,7 +80,10 @@ void AtomicMapTester::Execute() {
                 // Repeat request while flag = true
                 for (i = 0; *m_flag; i++, i = i % m_num_txns) {
                         if (!is_duration_based_run() && is_all_executed()) break;
+
+                        auto start_time = std::chrono::system_clock::now();
                         m_txns[i]->Run();
+                        add_put_latency(start_time);
                 }
                 m_context->set_finished();
 

@@ -2,11 +2,11 @@
 
 #include <pthread.h>
 #include <atomicmap_workload.h>
-#include <runnable.h>
+#include <tester.h>
 #include <iostream>
 
 // AtomicMapTester class which should be unaware of AtomicMap 
-class AtomicMapTester : public Runnable {
+class AtomicMapTester : public Tester {
 public:
         Context*                        m_context;
         AtomicMap*                      m_map;  // FIXME: hacky way for calling fuzzylog api...
@@ -20,7 +20,7 @@ public:
         std::atomic<uint64_t>           m_num_executed; 
         
 public:
-        AtomicMapTester(Context* context, AtomicMap* map, std::atomic<bool>* flag, Txn** txns, uint32_t num_txns, bool async, uint32_t window_size, uint32_t expt_duration): Runnable() {
+        AtomicMapTester(Context* context, AtomicMap* map, std::atomic<bool>* flag, Txn** txns, uint32_t num_txns, bool async, uint32_t window_size, uint32_t expt_duration): Tester() {
                 this->m_context = context;
                 this->m_map = map;
                 this->m_flag = flag;

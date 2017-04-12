@@ -14,12 +14,12 @@ build/%.o: src/%.cc
 	@mkdir -p build
 	@$(CC) -c -o $@ $< $(INCLUDE) $(LIBPATH) $(CFLAGS) $(LIBS)
 
-ATOMICMAP_OBJECTS = build/atomicmap_workload.o build/atomicmap_tester.o build/atomicmap_synchronizer.o build/map.o build/atomicmap.o build/atomicmap_test.o
+ATOMICMAP_OBJECTS = build/atomicmap_workload.o build/tester.o build/atomicmap_tester.o build/atomicmap_synchronizer.o build/map.o build/atomicmap.o build/atomicmap_test.o
 
 build/atomicmap: $(ATOMICMAP_OBJECTS)
 	$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)
 
-CAPMAP_OBJECTS = build/capmap_workload.o build/capmap_tester.o build/capmap_synchronizer.o build/map.o build/capmap.o build/capmap_test.o
+CAPMAP_OBJECTS = build/capmap_workload.o build/tester.o build/capmap_tester.o build/capmap_synchronizer.o build/map.o build/capmap.o build/capmap_test.o
 
 build/capmap: $(CAPMAP_OBJECTS)
 	$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)

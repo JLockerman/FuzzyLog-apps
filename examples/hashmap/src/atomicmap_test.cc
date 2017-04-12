@@ -19,11 +19,20 @@ using ns = chrono::nanoseconds;
 using get_time = chrono::system_clock;
 
 
-void write_output(uint32_t client_id, std::vector<uint64_t>& results) {
+void write_throughput(uint32_t client_id, std::vector<uint64_t>& results) {
         std::ofstream result_file; 
         result_file.open(std::to_string(client_id) + ".txt", std::ios::app | std::ios::out);
         for (auto r : results) {
                 result_file << r << "\n"; 
+        }
+        result_file.close();        
+}
+
+void write_latency(uint32_t client_id, std::string& suffix, std::vector<latency_footprint>& latencies) {
+        std::ofstream result_file; 
+        result_file.open(std::to_string(client_id) + suffix, std::ios::app | std::ios::out);
+        for (auto l : latencies) {
+                result_file << l.m_issue_time.time_since_epoch().count() << " " << l.m_latency << "\n"; 
         }
         result_file.close();        
 }
@@ -111,6 +120,8 @@ void do_experiment(atomicmap_config cfg) {
         AtomicMapTester* worker;
         std::atomic<bool> flag;
         std::vector<uint64_t> results;
+        std::vector<latency_footprint> put_latencies;
+        std::vector<latency_footprint> get_latencies;
 
         // Total operation count
         total_op_count = 0;
@@ -140,9 +151,6 @@ void do_experiment(atomicmap_config cfg) {
         if (cfg.expt_duration > 0) {
                 std::this_thread::sleep_for(std::chrono::seconds(5));  
                 measure_fn(worker, cfg.expt_duration, results);
-
-                // Write to output file
-                write_output(cfg.client_id, results);
                 // Stop worker
                 flag = false;
         }
@@ -153,7 +161,25 @@ void do_experiment(atomicmap_config cfg) {
 
         // Wait until worker finishes
         worker->join();
-        
+ 
+        // Write throughput to output file
+        if (results.size() > 0)
+                write_throughput(cfg.client_id, results);
+
+        // Write latency to output file
+        worker->get_put_latencies(put_latencies);
+        std::cout << "put latencies:" << put_latencies.size() << std::endl;
+        if (put_latencies.size() > 0) {
+                std::string put_latency_output_suffix = "_put_latency.txt";
+                write_latency(cfg.client_id, put_latency_output_suffix, put_latencies);
+        }
+        worker->get_get_latencies(get_latencies);
+        std::cout << "get latencies:" << get_latencies.size() << std::endl;
+        if (get_latencies.size() > 0) {
+                std::string get_latency_output_suffix = "_get_latency.txt";
+                write_latency(cfg.client_id, get_latency_output_suffix, get_latencies);
+        }
+       
         // Free
         delete worker;
         delete map;

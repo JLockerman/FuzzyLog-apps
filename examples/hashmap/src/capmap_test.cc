@@ -38,8 +38,7 @@ void write_latency(uint32_t client_id, std::string& suffix, std::vector<latency_
 }
 
 
-void measure_fn(CAPMap *m, CAPMapTester *w, uint64_t duration, std::vector<workload_config>& workload, std::vector<uint64_t> &results,
-                std::vector<latency_footprint> &put_latencies, std::vector<latency_footprint> &get_latencies)
+void measure_fn(CAPMap *m, CAPMapTester *w, uint64_t duration, std::vector<workload_config>& workload, std::vector<uint64_t> &results)
 {
         uint64_t start_iters, end_iters;
         
@@ -75,11 +74,6 @@ void measure_fn(CAPMap *m, CAPMapTester *w, uint64_t duration, std::vector<workl
                         }
                 }
         }
-        w->get_put_latencies(put_latencies);
-        w->get_get_latencies(get_latencies);
-
-        std::cout << "put latencies:" << put_latencies.size() << std::endl;
-        std::cout << "get latencies:" << get_latencies.size() << std::endl;
 }
 
 void wait_signal(capmap_config cfg)
@@ -180,7 +174,7 @@ void do_experiment(capmap_config cfg) {
         
         // Measure
         //std::this_thread::sleep_for(std::chrono::seconds(5));
-        measure_fn(map, worker, cfg.expt_duration, cfg.workload, results, put_latencies, get_latencies);
+        measure_fn(map, worker, cfg.expt_duration, cfg.workload, results);
 
         // Stop worker
         flag = false;
@@ -192,11 +186,15 @@ void do_experiment(capmap_config cfg) {
         // Wait until worker finishes
         worker->join();
  
-        // Write to output file
+        // Write latency to output file
+        worker->get_put_latencies(put_latencies);
+        std::cout << "put latencies:" << put_latencies.size() << std::endl;
         if (put_latencies.size() > 0) {
                 std::string put_latency_output_suffix = "_put_latency.txt";
                 write_latency(cfg.client_id, put_latency_output_suffix, put_latencies);
         }
+        worker->get_get_latencies(get_latencies);
+        std::cout << "get latencies:" << get_latencies.size() << std::endl;
         if (get_latencies.size() > 0) {
                 std::string get_latency_output_suffix = "_get_latency.txt";
                 write_latency(cfg.client_id, get_latency_output_suffix, get_latencies);
