@@ -21,8 +21,8 @@ bool AtomicMap::get_interesting_colors(std::vector<workload_config>* workload, s
         uint32_t i;
         for (auto w : *workload) {
                 if (w.op_type == "get") {
-                        for (i = 0; i < w.color.numcolors; i++) {
-                                interesting_colors.push_back(w.color.mycolors[i]);
+                        for (i = 0; i < w.first_color.numcolors; i++) {
+                                interesting_colors.push_back(w.first_color.mycolors[i]);
                         }
                         get_workload_found = true;
                         break;

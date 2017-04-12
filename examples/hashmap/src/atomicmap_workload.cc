@@ -17,7 +17,7 @@ void ycsb_insert::Run() {
         m_context->inc_num_executed();
 }
 
-void ycsb_insert::AsyncRun() {
+write_id ycsb_insert::AsyncRun() {
         uint32_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color == NULL);            // XXX: in AtomicMap, do not support cross-color put at the moment
@@ -26,18 +26,18 @@ void ycsb_insert::AsyncRun() {
         key = rand() % (m_end - m_start);
         value = rand();
 
-        m_map->async_put(key, value, m_color);
+        return m_map->async_put(key, value, m_color);
 }
 
-void ycsb_insert::AsyncRemoteRun() {
+write_id ycsb_insert::AsyncRemoteRun() {
         assert(false);
 }
 
-bool ycsb_insert::TryAsyncStronglyConsistentRun() {
+write_id ycsb_insert::AsyncStronglyConsistentRun() {
         assert(false);
 }
 
-void ycsb_insert::AsyncWeaklyConsistentRun() {
+write_id ycsb_insert::AsyncWeaklyConsistentRun() {
         assert(false);
 }
 
@@ -51,7 +51,7 @@ void ycsb_read::Run() {
         m_map->get(key);
 }
 
-void ycsb_read::AsyncRun() {
+write_id ycsb_read::AsyncRun() {
         uint32_t key;
         assert(m_map != NULL);
        
@@ -59,17 +59,18 @@ void ycsb_read::AsyncRun() {
         key = rand() % (m_end - m_start);
 
         m_map->get(key);
+        return WRITE_ID_NIL;
 }
 
-void ycsb_read::AsyncRemoteRun() {
+write_id ycsb_read::AsyncRemoteRun() {
         assert(false);
 }
 
-bool ycsb_read::TryAsyncStronglyConsistentRun() {
+write_id ycsb_read::AsyncStronglyConsistentRun() {
         assert(false);
 }
 
-void ycsb_read::AsyncWeaklyConsistentRun() {
+write_id ycsb_read::AsyncWeaklyConsistentRun() {
         assert(false);
 }
 
@@ -91,7 +92,7 @@ Txn** atomicmap_workload_generator::Gen() {
         uint32_t n = 0;
         for (auto w : *m_workload) {
                 n += w.op_count; 
-                double p = (double)n / total_op_count;
+                double p = static_cast<double>(n) / total_op_count;
                 proportions.push_back(p);
                 allocations.push_back(w.op_count);
         }
@@ -99,12 +100,12 @@ Txn** atomicmap_workload_generator::Gen() {
         i = 0;
         while (i < total_op_count) {
                 // dice
-                r = ((double) rand() / (RAND_MAX));
+                r = static_cast<double>(rand()) / (RAND_MAX);
 
                 for (auto j = 0; j < proportions.size(); j++) {
                         if (proportions[j] > r && allocations[j] > 0) { 
                                 std::string op_type = (*m_workload)[j].op_type; 
-                                struct colors* color = &(*m_workload)[j].color; 
+                                struct colors* color = &(*m_workload)[j].first_color; 
                                 uint32_t start = 0; 
                                 uint32_t end = m_range; 
 
@@ -112,7 +113,7 @@ Txn** atomicmap_workload_generator::Gen() {
                                         txns[i] = new ycsb_read(m_map, color, start, end, m_context, Txn::optype::GET);
 
                                 } else if (op_type == "put") {
-                                        struct colors* dep_color = (*m_workload)[j].has_dependency ? &(*m_workload)[j].dep_color : NULL;
+                                        struct colors* dep_color = (*m_workload)[j].has_dependency ? &(*m_workload)[j].second_color : NULL;
                                         bool is_strong = (*m_workload)[j].is_strong;
                                         txns[i] = new ycsb_insert(m_map, color, dep_color, start, end, m_context, Txn::optype::PUT, is_strong);
                                 }

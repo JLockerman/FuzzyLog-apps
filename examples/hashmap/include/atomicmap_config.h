@@ -10,8 +10,6 @@
 #include <stdlib.h>
 #include "util.h"
 
-#define DEFAULT_WINDOW_SIZE 32
-
 static struct option long_options[] = {
         {"log_addr",            required_argument, NULL, 0},
         {"expt_range",          required_argument, NULL, 1},
@@ -96,11 +94,11 @@ private:
                 // log_addr
                 ret.log_addr = split(std::string(_arg_map[LOG_ADDR]), ',');
                 // expt_range
-		ret.expt_range = (uint32_t)atoi(_arg_map[EXPT_RANGE]);
+		ret.expt_range = static_cast<uint32_t>(atoi(_arg_map[EXPT_RANGE]));
                 // expt_duration
-		ret.expt_duration = (uint32_t)atoi(_arg_map[EXPT_DURATION]);
+		ret.expt_duration = static_cast<uint32_t>(atoi(_arg_map[EXPT_DURATION]));
                 // client_id
-		ret.client_id = (uint8_t)atoi(_arg_map[CLIENT_ID]);
+		ret.client_id = static_cast<uint8_t>(atoi(_arg_map[CLIENT_ID]));
                 // workload
                 std::vector<std::string> workloads = split(std::string(_arg_map[WORKLOAD]), ',');
                 for (auto w : workloads) {
@@ -148,13 +146,13 @@ private:
                         }        
 
                         // op_count
-                        uint32_t op_count = (uint32_t)stoi(pair[1]);
+                        uint32_t op_count = static_cast<uint32_t>(stoi(pair[1]));
 
                         // workload
                         workload_config wc;
                         wc.op_type = op_type;
-                        wc.color = color;
-                        wc.dep_color = dep_color;
+                        wc.first_color = color;
+                        wc.second_color = dep_color;
                         wc.has_dependency = has_dependency; 
                         wc.is_strong = is_strong;
                         wc.op_count = op_count; 
@@ -165,9 +163,9 @@ private:
                 ret.async = _arg_map.count(ASYNC) > 0;
                 // window_size
                 if (ret.async && _arg_map.count(WINDOW_SIZE) > 0)
-                        ret.window_size = (uint32_t)atoi(_arg_map[WINDOW_SIZE]);
+                        ret.window_size = static_cast<uint32_t>(atoi(_arg_map[WINDOW_SIZE]));
                 else if (ret.async)
-                        ret.window_size = DEFAULT_WINDOW_SIZE;
+                        ret.window_size = DefaultWindowSize;
                 else
                         ret.window_size = 0;
 

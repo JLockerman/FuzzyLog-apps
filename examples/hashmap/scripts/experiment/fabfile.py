@@ -38,9 +38,9 @@ def kill_fuzzylog():
 def fuzzylog_proc(port, maxthreads, index_in_group, total_num_servers_in_group):
     with cd('~/fuzzylog/delos-rust/servers/tcp_server'):
         if maxthreads == '-1':
-            run('target/release/delos_tcp_server %s -ig %s:%s' % (port, index_in_group, total_num_servers_in_group))
+            run('cargo run --release %s -- -ig %s:%s' % (port, index_in_group, total_num_servers_in_group))
         else:
-            run('target/release/delos_tcp_server %s -w %s -ig %s:%s' % (port, maxthreads, index_in_group, total_num_servers_in_group))
+            run('cargo run --release %s -- -w %s -ig %s:%s' % (port, maxthreads, index_in_group, total_num_servers_in_group))
 
 def clean_fuzzymap():
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
@@ -59,7 +59,7 @@ def atomicmap_proc(log_addr, exp_range, exp_duration, client_id, workload, async
             args += '--window_size=' + str(window_size)
         run(args)
 
-def capmap_proc(log_addr, exp_range, exp_duration, client_id, workload, async, window_size):
+def capmap_proc(log_addr, exp_range, exp_duration, client_id, workload, txn_rate, async, window_size, protocol, role):
     with cd('~/fuzzylog/delos-apps/examples/hashmap'):
         args = 'build/capmap '
         args += '--log_addr=' + str(log_addr) + ' '
@@ -67,7 +67,12 @@ def capmap_proc(log_addr, exp_range, exp_duration, client_id, workload, async, w
         args += '--expt_duration=' + str(exp_duration) + ' '
         args += '--client_id=' + str(client_id) + ' '
         args += '--workload=' + str(workload) + ' '
+        if int(txn_rate) > 0: 
+            args += '--txn_rate=' + str(txn_rate) + ' '
         if async == "True":
             args += '--async '
             args += '--window_size=' + str(window_size)
+        args += ' --protocol=' + str(protocol)
+        if role == "primary" or role == "secondary":
+            args += ' --role=' + str(role)
         run(args)

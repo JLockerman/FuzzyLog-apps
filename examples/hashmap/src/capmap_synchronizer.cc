@@ -8,9 +8,9 @@
 CAPMapSynchronizer::CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors): m_map(map) {
         uint32_t i;
         struct colors* c;
-        c = (struct colors*)malloc(sizeof(struct colors));
+        c = static_cast<struct colors*>(malloc(sizeof(struct colors)));
         c->numcolors = interesting_colors.size();
-        c->mycolors = (ColorID*)malloc(sizeof(ColorID) * c->numcolors);
+        c->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID) * c->numcolors));
         for (i = 0; i < c->numcolors; i++) {
                 c->mycolors[i] = interesting_colors[i];
         }
@@ -39,7 +39,7 @@ void CAPMapSynchronizer::join() {
 }
 
 void* CAPMapSynchronizer::bootstrap(void *arg) {
-        CAPMapSynchronizer *synchronizer= (CAPMapSynchronizer*)arg;
+        CAPMapSynchronizer *synchronizer= static_cast<CAPMapSynchronizer*>(arg);
         CAPMap::ProtocolVersion protocol = synchronizer->m_map->get_protocol_version();
         if (protocol == CAPMap::ProtocolVersion::VERSION_1) {
                 synchronizer->ExecuteProtocol1();
@@ -64,7 +64,7 @@ void CAPMapSynchronizer::ExecuteProtocol1() {
         uint32_t previous_flag = 0;
         CAPMap::PartitionStatus partition_status;
         struct colors* normal_playback_color = get_protocol1_playback_color();
-        struct colors* partition_playback_color = get_local_color();
+        struct colors* partition_playback_color = clone_local_color();
 
         while (m_running) {
                 partition_status = m_map->get_network_partition_status();
@@ -98,16 +98,14 @@ void CAPMapSynchronizer::ExecuteProtocol1() {
                         cv->notify_one();
                         m_current_queue.pop();
                 } 
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         delete partition_playback_color;
 }
 
 void CAPMapSynchronizer::ExecuteProtocol2Primary() {
         std::cout << "Start CAPMap synchronizer protocol 2 for primary..." << std::endl;
-        uint32_t previous_flag = 0;
-        struct colors* snapshot_color = get_protocol2_primary_snapshot_color();
-        struct colors* playback_color = get_protocol2_primary_playback_color();
+        uint32_t read_count = 0;
+        uint32_t total_read_count = 0;
 
         while (m_running) {
                 swap_queue();
@@ -115,8 +113,9 @@ void CAPMapSynchronizer::ExecuteProtocol2Primary() {
                 // Update local map
                 {
                         std::lock_guard<std::mutex> lock(m_local_map_mtx);
-                        previous_flag = sync_with_log_ver2(previous_flag, snapshot_color, playback_color);
-                //        std::cout << "playback color numbers after sync:" << playback_color->numcolors << std::endl;
+                        read_count = sync_with_log_ver2_primary();
+                        total_read_count += read_count;
+                        //std::cout << "read_count: " << read_count << ", total_read_count: " << total_read_count << std::endl;
                 }
                 // Wake up all waiting worker threads
                 while (!m_current_queue.empty()) {
@@ -127,41 +126,24 @@ void CAPMapSynchronizer::ExecuteProtocol2Primary() {
                         cv->notify_one();
                         m_current_queue.pop();
                 } 
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                std::this_thread::sleep_for(std::chrono::nanoseconds(1));
         }
-        delete snapshot_color;
 }
 
 void CAPMapSynchronizer::ExecuteProtocol2Secondary() {
         std::cout << "Start CAPMap synchronizer protocol 2 for secondary..." << std::endl;
-        CAPMap::PartitionStatus partition_status;
-        struct colors* snapshot_color = get_protocol2_secondary_snapshot_color();
-        struct colors* partition_snapshot_color = get_local_color();
-        struct colors* playback_color = get_protocol2_secondary_playback_color();
-        struct colors* partition_playback_color = get_local_color();
+        uint32_t read_count = 0;
+        uint32_t total_read_count = 0;
 
         while (m_running) {
-                partition_status = m_map->get_network_partition_status();
-                // Wait until partition heals
-                while (partition_status == CAPMap::PartitionStatus::PARTITIONED) {
-                        sync_with_log_ver2_secondary(partition_snapshot_color, partition_playback_color);
-                        partition_status = m_map->get_network_partition_status();
-                }
-
-                // If it's right after partition goes away, reorder any weakly appended nodes. Any gets would be served after this
-                if (partition_status == CAPMap::PartitionStatus::HEALING) {
-                        // TODO: logic: playback primary color until it sees healing node 
-                        sync_with_log_ver2_secondary(snapshot_color, playback_color);
-                        // Set partition status back to normal
-                        m_map->set_network_partition_status(CAPMap::PartitionStatus::NORMAL);
-                }
-
                 swap_queue();
 
                 // Update local map
                 {
                         std::lock_guard<std::mutex> lock(m_local_map_mtx);
-                        sync_with_log_ver2_secondary(snapshot_color, playback_color);
+                        read_count = sync_with_log_ver2_secondary();
+                        total_read_count += read_count;
+                        //std::cout << "read_count: " << read_count << ", total_read_count: " << total_read_count << std::endl;
                 }
                 // Wake up all waiting worker threads
                 while (!m_current_queue.empty()) {
@@ -172,11 +154,8 @@ void CAPMapSynchronizer::ExecuteProtocol2Secondary() {
                         cv->notify_one();
                         m_current_queue.pop();
                 } 
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                std::this_thread::sleep_for(std::chrono::nanoseconds(1));
         }
-        delete snapshot_color;
-        delete partition_snapshot_color;
-        delete partition_playback_color;
 }
 
 uint32_t CAPMapSynchronizer::sync_with_log_ver1(uint32_t previous_flag, struct colors* interesting_color) {
@@ -194,18 +173,18 @@ uint32_t CAPMapSynchronizer::sync_with_log_ver1(uint32_t previous_flag, struct c
                 if (mutable_playback_color->numcolors == 0) break;
                 // Read node
                 assert(size == sizeof(struct Node));
-                struct Node* data = (struct Node*)m_read_buf;
+                struct Node* data = reinterpret_cast<struct Node*>(m_read_buf);
                 key = data->key;
                 val = data->value;
                 flag = data->flag;
                 ts = data->ts;
 
                 if (previous_flag != flag) {                            // Transition
-                        if (flag == STRONG_NODE) {                      // W->S
+                        if (flag == CAPMap::StrongNode) {                      // W->S
                                 apply_buffered_nodes(true);             //   Reorder weak nodes and apply updates
                                 m_local_map[key] = val;                 //   Apply update
 
-                        } else if (flag == WEAK_NODE) {                 // S->W
+                        } else if (flag == CAPMap::WeakNode) {                 // S->W
                                 new_node = data->clone();
                                 buffer_nodes(new_node);                 //   Buffer weak nodes
 
@@ -215,10 +194,10 @@ uint32_t CAPMapSynchronizer::sync_with_log_ver1(uint32_t previous_flag, struct c
                         previous_flag = flag;
 
                 } else {                                                // Continuous nodes
-                        if (flag == STRONG_NODE) {                      // S->S 
+                        if (flag == CAPMap::StrongNode) {                      // S->S 
                                 m_local_map[key] = val;                 //   Apply update
 
-                        } else if (flag == WEAK_NODE) {                 // W->W
+                        } else if (flag == CAPMap::WeakNode) {                 // W->W
                                 new_node = data->clone();
                                 buffer_nodes(new_node);                 //   Buffer weak nodes
 
@@ -234,117 +213,146 @@ uint32_t CAPMapSynchronizer::sync_with_log_ver1(uint32_t previous_flag, struct c
         return flag;
 }
 
-uint32_t CAPMapSynchronizer::sync_with_log_ver2(uint32_t previous_flag, struct colors* snapshot_color, struct colors* playback_color) {
+uint32_t CAPMapSynchronizer::sync_with_log_ver2_primary() {
         uint32_t key, val, flag;
-        long ts;
-        size_t size;
-        val = 0;
-        size = 0;
-        struct colors* mutable_playback_color = clone_color(playback_color);
+        size_t size = 0;
+        struct colors* snapshot_color = NULL;
+        struct colors* playback_color = NULL;
+        struct colors* mutable_playback_color = NULL;
 
-        assert(snapshot_color->numcolors == 1);
-        assert(playback_color->numcolors == 2);
-
+        snapshot_color = clone_local_color();
+        playback_color = clone_all_colors();
         snapshot_colors(m_fuzzylog_client, snapshot_color);
-        while((get_next(m_fuzzylog_client, m_read_buf, &size, mutable_playback_color), 1)) {
+        uint32_t read_count = 0;
+
+        while (true) {
+                mutable_playback_color = clone_color(playback_color);
+                get_next(m_fuzzylog_client, m_read_buf, &size, mutable_playback_color);
                 if (mutable_playback_color->numcolors == 0) break;
+                read_count++;
 
                 assert(mutable_playback_color->numcolors == 1);
                 assert(size == sizeof(struct Node));
-                struct Node* data = (struct Node*)m_read_buf;
+
+                struct Node* data = reinterpret_cast<struct Node*>(m_read_buf);
                 key = data->key;
                 val = data->value;
                 flag = data->flag;
-                ts = data->ts;
-                if (flag == NORMAL_NODE) {
-                        if (is_local_color(mutable_playback_color)) {
-                                // update to local map
-                                m_local_map[key] = val;
-
-                        } else if (is_remote_color(mutable_playback_color)) {
+                
+                if (is_remote_color(mutable_playback_color)) {
+                        switch (flag) {
+                        case CAPMap::PartitioningNode:
+                                std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " Partitioning node found in primary" << std::endl;
+                                // XXX: no break
+                        case CAPMap::NormalNode:
                                 buffer_nodes(data->clone());
+                                break;
+                        default:
+                                assert(false);
                         }
-
-                } else if (flag == HEALING_NODE) {
-                        std::cout << "healing node found" << std::endl;
-                        assert(m_map->get_network_partition_status() == CAPMap::PartitionStatus::NORMAL);
-                        // Start healing
-                        m_map->set_network_partition_status(CAPMap::PartitionStatus::HEALING);
-                        apply_buffered_nodes(false);
-                        m_map->set_network_partition_status(CAPMap::PartitionStatus::NORMAL);
-
-                        // update to local map
-                        m_local_map[key] = val;
-
-                } else if (flag == PARTITIONING_NODE) {
-                        std::cout << "partitioning node found" << std::endl;
-                        buffer_nodes(data->clone());
+                } else if (is_local_color(mutable_playback_color)) {
+                        switch (flag) {
+                        case CAPMap::HealingNode:
+                                std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " Healing node found in primary" << std::endl;
+                                assert(m_map->get_network_partition_status() == CAPMap::PartitionStatus::NORMAL);
+                                m_map->set_network_partition_status(CAPMap::PartitionStatus::HEALING);
+                                apply_buffered_nodes(false);
+                                m_local_map[key] = val;
+                                m_map->set_network_partition_status(CAPMap::PartitionStatus::NORMAL);
+                                break;
+                        case CAPMap::NormalNode:
+                                m_local_map[key] = val;
+                                break;
+                        default:
+                                assert(false);
+                        }
                 }
                 delete mutable_playback_color;
-                mutable_playback_color = clone_color(playback_color);
         }
+        delete snapshot_color;
+        delete playback_color;
         delete mutable_playback_color;
-        return flag;
+        return read_count;
 }
 
-void CAPMapSynchronizer::sync_with_log_ver2_secondary(struct colors* snapshot_color, struct colors* playback_color) {
+uint32_t CAPMapSynchronizer::sync_with_log_ver2_secondary() {
         uint32_t key, val, flag;
-        long ts;
-        size_t size;
-        val = 0;
-        size = 0;
-        struct colors* mutable_playback_color = clone_color(playback_color);
+        size_t size = 0;
+        struct colors* snapshot_color = NULL;
+        struct colors* playback_color = NULL;
+        struct colors* mutable_playback_color = NULL;
+        CAPMap::PartitionStatus previous_status, current_status;
+        previous_status = CAPMap::PartitionStatus::UNINITIALIZED;
+        uint32_t read_count = 0;
+        
+        while (true) {
+                current_status = m_map->get_network_partition_status();
 
-        assert(snapshot_color->numcolors == 1);
-        assert(playback_color->numcolors == 2);
+                if (previous_status != current_status) {
+                        // Deallocate memory
+                        if (snapshot_color != NULL) delete snapshot_color;
+                        if (playback_color != NULL) delete playback_color;
 
-        snapshot_colors(m_fuzzylog_client, snapshot_color);
-        while((get_next(m_fuzzylog_client, m_read_buf, &size, mutable_playback_color), 1)) {
+                        // Take new colors
+                        if (current_status == CAPMap::PartitionStatus::PARTITIONED) {
+                                snapshot_color = clone_local_color();
+                                snapshot_colors(m_fuzzylog_client, snapshot_color);
+
+                                playback_color = clone_local_color();
+
+                        } else {
+                                snapshot_color = clone_remote_color();
+                                snapshot_colors(m_fuzzylog_client, snapshot_color);
+
+                                playback_color = clone_all_colors();
+                        }
+                }
+                mutable_playback_color = clone_color(playback_color);
+                get_next(m_fuzzylog_client, m_read_buf, &size, mutable_playback_color);
                 if (mutable_playback_color->numcolors == 0) break;
+                read_count++;
 
                 assert(mutable_playback_color->numcolors == 1);
                 assert(size == sizeof(struct Node));
-                struct Node* data = (struct Node*)m_read_buf;
+
+                struct Node* data = reinterpret_cast<struct Node*>(m_read_buf);
                 key = data->key;
                 val = data->value;
                 flag = data->flag;
-                ts = data->ts;
-                CAPMap::PartitionStatus status = m_map->get_network_partition_status();
                 
-                if (flag == NORMAL_NODE) {
-                        if (is_local_color(mutable_playback_color)) {
-                                // update to local map
+                if (is_remote_color(mutable_playback_color)) {
+                        switch (flag) {
+                        case CAPMap::NormalNode:
                                 m_local_map[key] = val;
-
-                        } else if (is_remote_color(mutable_playback_color)) {
-                                if (status == CAPMap::PartitionStatus::NORMAL) {
-                                        // update to local map
-                                        m_local_map[key] = val;
-
-                                } else if (status == CAPMap::PartitionStatus::PARTITIONED
-                                           || status == CAPMap::PartitionStatus::HEALING) {
-                                        buffer_nodes(data->clone());
-                                }
+                                break;
+                        case CAPMap::HealingNode:
+                                std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " Healing node found in secondary" << std::endl;
+                                apply_buffered_nodes(false);
+                                m_local_map[key] = val;
+                                m_map->set_network_partition_status(CAPMap::PartitionStatus::NORMAL);
+                                break;
+                        default:
+                                assert(false);
                         }
-
-                } else if (flag == HEALING_NODE) {
-                        std::cout << "healing node found" << std::endl;
-                        assert(m_map->get_network_partition_status() == CAPMap::PartitionStatus::HEALING);
-                        // Start healing
-                        apply_buffered_nodes(false);
-                        m_map->set_network_partition_status(CAPMap::PartitionStatus::NORMAL);
-
-                        // update to local map
-                        m_local_map[key] = val;
-
-                } else if (flag == PARTITIONING_NODE) {
-                        std::cout << "partitioning node found" << std::endl;
-                        buffer_nodes(data->clone());
+                } else if (is_local_color(mutable_playback_color)) {
+                        switch (flag) {
+                        case CAPMap::PartitioningNode:
+                                std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " Partitioning node found in secondary" << std::endl;
+                                // XXX: no break
+                        case CAPMap::NormalNode:
+                                buffer_nodes(data->clone());
+                                break;
+                        default:
+                                assert(false);
+                        }
                 }
+                previous_status = current_status;
                 delete mutable_playback_color;
-                mutable_playback_color = clone_color(playback_color);
         }
+        delete snapshot_color;
+        delete playback_color;
         delete mutable_playback_color;
+        return read_count;
 }
 
 
@@ -366,26 +374,30 @@ uint32_t CAPMapSynchronizer::get(uint32_t key) {
         return m_local_map[key];
 }
 
-struct colors* CAPMapSynchronizer::get_local_color() {
-        struct colors* local_color = (struct colors*)malloc(sizeof(struct colors));
+struct colors* CAPMapSynchronizer::clone_local_color() {
+        struct colors* local_color = static_cast<struct colors*>(malloc(sizeof(struct colors)));
         local_color->numcolors = 1;
-        local_color->mycolors = (ColorID*)malloc(sizeof(ColorID));
+        local_color->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
         local_color->mycolors[0] = m_interesting_colors->mycolors[0];
         return local_color;
 }
 
-struct colors* CAPMapSynchronizer::get_remote_color() {
-        struct colors* remote_color = (struct colors*)malloc(sizeof(struct colors));
+struct colors* CAPMapSynchronizer::clone_remote_color() {
+        struct colors* remote_color = static_cast<struct colors*>(malloc(sizeof(struct colors)));
         remote_color->numcolors = 1;
-        remote_color->mycolors = (ColorID*)malloc(sizeof(ColorID));
+        remote_color->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
         remote_color->mycolors[0] = m_interesting_colors->mycolors[1];
         return remote_color;
 }
 
+struct colors* CAPMapSynchronizer::clone_all_colors() {
+        return clone_color(m_interesting_colors);
+}
+
 struct colors* CAPMapSynchronizer::clone_color(struct colors* color) {
-        struct colors* cloned_color = (struct colors*)malloc(sizeof(struct colors));
+        struct colors* cloned_color = static_cast<struct colors*>(malloc(sizeof(struct colors)));
         cloned_color->numcolors = color->numcolors;
-        cloned_color->mycolors = (ColorID*)malloc(sizeof(ColorID) * color->numcolors);
+        cloned_color->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID) * color->numcolors));
         for (size_t i = 0; i < color->numcolors; i++) {
                 cloned_color->mycolors[i] = color->mycolors[i];
         }
@@ -401,7 +413,7 @@ struct colors* CAPMapSynchronizer::get_protocol1_playback_color() {
 }
 
 struct colors* CAPMapSynchronizer::get_protocol2_primary_snapshot_color() {
-        return get_local_color();
+        return clone_local_color();
 }
 
 struct colors* CAPMapSynchronizer::get_protocol2_primary_playback_color() {
@@ -409,7 +421,7 @@ struct colors* CAPMapSynchronizer::get_protocol2_primary_playback_color() {
 }
 
 struct colors* CAPMapSynchronizer::get_protocol2_secondary_snapshot_color() {
-        return get_remote_color();
+        return clone_remote_color();
 }
 
 struct colors* CAPMapSynchronizer::get_protocol2_secondary_playback_color() {

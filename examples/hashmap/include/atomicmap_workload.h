@@ -27,10 +27,10 @@ public:
         }
         ~ycsb_insert(){}
         virtual void Run();
-        virtual void AsyncRun();
-        virtual void AsyncRemoteRun();
-        virtual bool TryAsyncStronglyConsistentRun();
-        virtual void AsyncWeaklyConsistentRun();
+        virtual write_id AsyncRun();
+        virtual write_id AsyncRemoteRun();
+        virtual write_id AsyncStronglyConsistentRun();
+        virtual write_id AsyncWeaklyConsistentRun();
         virtual optype op_type() {
                 return m_op_type;
         }
@@ -55,10 +55,10 @@ public:
         }
         ~ycsb_read(){}
         virtual void Run();
-        virtual void AsyncRun();
-        virtual void AsyncRemoteRun();
-        virtual bool TryAsyncStronglyConsistentRun();
-        virtual void AsyncWeaklyConsistentRun();
+        virtual write_id AsyncRun();
+        virtual write_id AsyncRemoteRun();
+        virtual write_id AsyncStronglyConsistentRun();
+        virtual write_id AsyncWeaklyConsistentRun();
         virtual optype op_type() {
                 return m_op_type;
         }

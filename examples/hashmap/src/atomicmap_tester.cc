@@ -4,7 +4,7 @@
 
 AtomicMapTester::~AtomicMapTester() {
         for (size_t i = 0; i < m_num_txns; i++) {
-                ycsb_insert* txn = (ycsb_insert*)m_txns[i];
+                ycsb_insert* txn = dynamic_cast<ycsb_insert*>(m_txns[i]);
                 delete txn;
         }
         delete m_txns;
@@ -21,7 +21,7 @@ void AtomicMapTester::join() {
 }
 
 void* AtomicMapTester::bootstrap(void *arg) {
-        AtomicMapTester *worker = (AtomicMapTester*)arg;
+        AtomicMapTester *worker = static_cast<AtomicMapTester*>(arg);
         worker->Execute();
         return NULL;
 }
@@ -33,9 +33,9 @@ pthread_t* AtomicMapTester::get_pthread_id() {
 uint32_t AtomicMapTester::try_get_completed() {
         uint32_t num_completed = 0;
         while (true) {
-                new_write_id nwid = m_map->try_wait_for_any_put();
+                write_id wid = m_map->try_wait_for_any_put();
                 //std::cout << "try_wait:" << nwid.id.p1 << std::endl; 
-                if (nwid == NEW_WRITE_ID_NIL)
+                if (wid_equality{}(wid, WRITE_ID_NIL))
                         break; 
                 m_context->inc_num_executed();
                 num_completed += 1;
@@ -55,8 +55,8 @@ void AtomicMapTester::Execute() {
                                                 
                         // issue
                         if (num_pending == m_window_size) {
-                                new_write_id nwid = m_map->wait_for_any_put();
-                                if (nwid == NEW_WRITE_ID_NIL) {
+                                write_id wid = m_map->wait_for_any_put();
+                                if (wid_equality{}(wid, WRITE_ID_NIL)) { 
                                         std::cout << "no pending writes. terminate" << std::endl; 
                                         break;
                                 }
