@@ -128,7 +128,7 @@ void do_experiment(atomicmap_config cfg) {
         
         // One worker thread
         flag = true;
-        worker = new AtomicMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size);
+        worker = new AtomicMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size, cfg.expt_duration);
 
         // Synchronize clients
         wait_signal(cfg);
@@ -137,11 +137,15 @@ void do_experiment(atomicmap_config cfg) {
         worker->run();
         
         // Measure
-        std::this_thread::sleep_for(std::chrono::seconds(5));  
-        measure_fn(worker, cfg.expt_duration, results);
+        if (cfg.expt_duration > 0) {
+                std::this_thread::sleep_for(std::chrono::seconds(5));  
+                measure_fn(worker, cfg.expt_duration, results);
 
-        // Stop worker
-        flag = false;
+                // Write to output file
+                write_output(cfg.client_id, results);
+                // Stop worker
+                flag = false;
+        }
 
         while (!ctx.is_finished()) {
                 std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -149,9 +153,6 @@ void do_experiment(atomicmap_config cfg) {
 
         // Wait until worker finishes
         worker->join();
-
-        // Write to output file
-        write_output(cfg.client_id, results);
         
         // Free
         delete worker;

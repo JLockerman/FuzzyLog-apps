@@ -13,7 +13,7 @@
 static struct option long_options[] = {
         {"log_addr",            required_argument, NULL, 0},
         {"expt_range",          required_argument, NULL, 1},
-        {"expt_duration",       required_argument, NULL, 2},
+        {"expt_duration",       optional_argument, NULL, 2},
         {"num_clients",         required_argument, NULL, 3},
         {"client_id",           required_argument, NULL, 4},
         {"workload",            required_argument, NULL, 5},
@@ -78,14 +78,13 @@ private:
 
 		if (_arg_map.count(LOG_ADDR) == 0 || 
 		    _arg_map.count(EXPT_RANGE) == 0 ||
-		    _arg_map.count(EXPT_DURATION) == 0 ||
 		    _arg_map.count(NUM_CLIENTS) == 0 || 
 		    _arg_map.count(CLIENT_ID) == 0 || 
 		    _arg_map.count(WORKLOAD) == 0) {
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_RANGE].name << "\n";
-		        std::cerr << "--" << long_options[EXPT_DURATION].name << "\n";
+		        std::cerr << "[--" << long_options[EXPT_DURATION].name << "]\n";
 		        std::cerr << "--" << long_options[NUM_CLIENTS].name << "\n";
 		        std::cerr << "--" << long_options[CLIENT_ID].name << "\n";
 		        std::cerr << "--" << long_options[WORKLOAD].name << "\n";
@@ -105,7 +104,10 @@ private:
                 // expt_range
 		ret.expt_range = static_cast<uint32_t>(atoi(_arg_map[EXPT_RANGE]));
                 // expt_duration
-		ret.expt_duration = static_cast<uint32_t>(atoi(_arg_map[EXPT_DURATION]));
+                if (_arg_map.count(EXPT_DURATION) > 0)
+		        ret.expt_duration = static_cast<uint32_t>(atoi(_arg_map[EXPT_DURATION]));
+                else
+                        ret.expt_duration = 0;
                 // num_clients 
 		ret.num_clients = static_cast<uint8_t>(atoi(_arg_map[NUM_CLIENTS]));
                 // client_id

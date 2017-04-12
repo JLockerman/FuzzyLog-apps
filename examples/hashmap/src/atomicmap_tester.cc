@@ -52,6 +52,7 @@ void AtomicMapTester::Execute() {
                 for (i = 0; *m_flag; i++, i = i % m_num_txns) {
                         // try get completed
                         num_pending -= try_get_completed();
+                        if (!is_duration_based_run() && is_all_executed()) break;
                                                 
                         // issue
                         if (num_pending == m_window_size) {
@@ -62,6 +63,7 @@ void AtomicMapTester::Execute() {
                                 }
                                 num_pending -= 1;
                                 m_context->inc_num_executed();
+                                if (!is_duration_based_run() && is_all_executed()) break;
                         }
 
                         m_txns[i]->AsyncRun();
@@ -77,6 +79,7 @@ void AtomicMapTester::Execute() {
         } else {
                 // Repeat request while flag = true
                 for (i = 0; *m_flag; i++, i = i % m_num_txns) {
+                        if (!is_duration_based_run() && is_all_executed()) break;
                         m_txns[i]->Run();
                 }
                 m_context->set_finished();
@@ -87,4 +90,12 @@ void AtomicMapTester::Execute() {
 
 uint64_t AtomicMapTester::get_num_executed() {
         return m_context->get_num_executed();
+}
+
+bool AtomicMapTester::is_duration_based_run() {
+        return m_expt_duration > 0;
+}
+
+bool AtomicMapTester::is_all_executed() {
+        return m_context->get_num_executed() == m_num_txns;
 }
