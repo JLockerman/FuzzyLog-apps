@@ -80,4 +80,5 @@ public:
 	fuzzy_proxy(DAGHandle *handle, uint16_t port);
 	~fuzzy_proxy();
 	void run();
+	void new_conx();
 };
