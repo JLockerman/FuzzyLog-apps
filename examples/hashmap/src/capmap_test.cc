@@ -164,7 +164,7 @@ void do_experiment(capmap_config cfg) {
         
         // One worker thread
         flag = true;
-        worker = new CAPMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size, cfg.txn_rate);
+        worker = new CAPMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size, cfg.expt_duration, cfg.txn_rate);
 
         // Synchronize clients
         wait_signal(cfg);

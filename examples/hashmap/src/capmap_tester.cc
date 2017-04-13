@@ -23,37 +23,18 @@ void CAPMapTester::join() {
 
 void* CAPMapTester::bootstrap(void *arg) {
         CAPMapTester *worker = static_cast<CAPMapTester*>(arg);
-        CAPMap::ProtocolVersion protocol = worker->m_map->get_protocol_version();
+        CAPMap::ProtocolVersion protocol = worker->m_capmap->get_protocol_version();
         if (protocol == CAPMap::ProtocolVersion::VERSION_1) {
                 worker->ExecuteProtocol1();
 
         } else if (protocol == CAPMap::ProtocolVersion::VERSION_2) { 
-                std::string role = worker->m_map->get_role();
+                std::string role = worker->m_capmap->get_role();
                 worker->ExecuteProtocol2(role);
 
         } else {
                 assert(false);
         }
         return NULL;
-}
-
-pthread_t* CAPMapTester::get_pthread_id() {
-        return &m_thread;
-}
-
-uint32_t CAPMapTester::try_get_completed() {
-        uint32_t num_completed = 0;
-        while (true) {
-                write_id wid = m_map->try_wait_for_any_put();
-                if (wid_equality{}(wid, WRITE_ID_NIL)) 
-                        break; 
-                m_context->inc_num_executed();
-                num_completed += 1;
-                // Add latency stat
-                auto start_time = m_context->mark_ended(wid); 
-                add_put_latency(start_time);
-        }
-        return num_completed;
 }
 
 void CAPMapTester::ExecuteProtocol1() {
@@ -64,6 +45,9 @@ void CAPMapTester::ExecuteProtocol1() {
                 for (i = 0; *m_flag; i++, i = i % m_num_txns) {
                         // try get completed
                         num_pending -= try_get_completed();
+        
+                        // throttle
+                        if (is_throttled()) continue;
                                                 
                         // issue
                         if (num_pending == m_window_size) {
@@ -76,7 +60,7 @@ void CAPMapTester::ExecuteProtocol1() {
                                 m_context->inc_num_executed();
                         }
                         assert(m_txns[i]->op_type() == Txn::optype::PUT);
-                        CAPMap::PartitionStatus partition_status = m_map->get_network_partition_status();
+                        CAPMap::PartitionStatus partition_status = m_capmap->get_network_partition_status();
 
                         if (partition_status == CAPMap::PartitionStatus::PARTITIONED) {
                                 // Append Weak node
@@ -116,11 +100,8 @@ void CAPMapTester::ExecuteProtocol2(std::string& role) {
         uint32_t num_pending = 0; 
         bool partitioning_node_appended = false;
         bool healing_node_appended = false;
-        uint32_t sleep_between_txn = 0;         // in nanocsecond
-        // Throttle txn issuing rate if specified 
-        if (m_txn_rate > 0) {
-                sleep_between_txn = 1000000000 / m_txn_rate; 
-        }
+
+        reset_throttler();
 
         if (m_async) {
                 for (i = 0; *m_flag; i++, i = i % m_num_txns) {
@@ -142,24 +123,24 @@ void CAPMapTester::ExecuteProtocol2(std::string& role) {
                         }
 
                         if (m_txns[i]->op_type() == Txn::optype::PUT) {
-                                CAPMap::PartitionStatus partition_status = m_map->get_network_partition_status();
+                                CAPMap::PartitionStatus partition_status = m_capmap->get_network_partition_status();
                                 if (role == "primary") {
                                         if (partition_status == CAPMap::PartitionStatus::PARTITIONED) {
-                                                // Only throttle while local appending in secondary
-                                                if (sleep_between_txn > 0)
-                                                        std::this_thread::sleep_for(std::chrono::nanoseconds(sleep_between_txn));
+                                                // Throttle local append
+                                                if (is_throttled()) continue;
 
                                                 // Append node
                                                 m_txns[i]->AsyncRun();
+                                                m_num_issued++;
                                                 num_pending += 1;
 
                                         } else if (partition_status == CAPMap::PartitionStatus::NORMAL) {
-                                                // Only throttle while local appending in secondary
-                                                if (sleep_between_txn > 0)
-                                                        std::this_thread::sleep_for(std::chrono::nanoseconds(sleep_between_txn));
+                                                // Throttle local append
+                                                if (is_throttled()) continue;
 
                                                 // Append node
                                                 m_txns[i]->AsyncRun();
+                                                m_num_issued++;
                                                 num_pending += 1;
 
                                         } else if (partition_status == CAPMap::PartitionStatus::HEALING) {
@@ -167,18 +148,20 @@ void CAPMapTester::ExecuteProtocol2(std::string& role) {
                                         }
                                 } else if (role == "secondary") {
                                         if (partition_status == CAPMap::PartitionStatus::PARTITIONED) {
-                                                // Only throttle while local appending in secondary
-                                                if (sleep_between_txn > 0)
-                                                        std::this_thread::sleep_for(std::chrono::nanoseconds(sleep_between_txn));
-
                                                 // TODO: the first node after partition should be causally appended after the latest known primary node
                                                 if (!partitioning_node_appended) {
+                                                        reset_throttler();
                                                         dynamic_cast<ycsb_cross_insert*>(m_txns[i])->AsyncPartitioningAppend();
                                                         partitioning_node_appended = true;
                                                 } else {
+
+                                                        // Throttle local append
+                                                        if (is_throttled()) continue;
+
                                                         // Append node
                                                         m_txns[i]->AsyncRun();
                                                 }
+                                                m_num_issued++;
                                                 num_pending += 1;
 
                                         } else if (partition_status == CAPMap::PartitionStatus::NORMAL) {
@@ -219,7 +202,4 @@ void CAPMapTester::ExecuteProtocol2(std::string& role) {
 
                 std::cout << "total executed: " << m_context->get_num_executed() << std::endl;
         }
-}
-uint64_t CAPMapTester::get_num_executed() {
-        return m_context->get_num_executed();
 }

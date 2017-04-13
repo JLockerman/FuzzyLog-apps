@@ -17,10 +17,11 @@ static struct option long_options[] = {
         {"num_clients",         required_argument, NULL, 3},
         {"client_id",           required_argument, NULL, 4},
         {"workload",            required_argument, NULL, 5},
-        {"async",               optional_argument, NULL, 6},
-        {"window_size",         optional_argument, NULL, 7},
-        {"replication",         optional_argument, NULL, 8},
-        {NULL,                  no_argument,       NULL, 9},
+        {"txn_rate",            optional_argument, NULL, 6},
+        {"async",               optional_argument, NULL, 7},
+        {"window_size",         optional_argument, NULL, 8},
+        {"replication",         optional_argument, NULL, 9},
+        {NULL,                  no_argument,       NULL, 10},
 };
 
 struct atomicmap_config {
@@ -30,6 +31,7 @@ struct atomicmap_config {
         uint8_t                         num_clients;
 	uint8_t 		        client_id;
 	std::vector<workload_config>    workload;
+        uint32_t                        txn_rate;
         bool                            async;
         uint32_t                        window_size;
         bool                            replication;
@@ -44,9 +46,10 @@ private:
                 NUM_CLIENTS     = 3,
 		CLIENT_ID       = 4,
 		WORKLOAD        = 5,
-		ASYNC           = 6,
-		WINDOW_SIZE     = 7,
-                REPLICATION     = 8,
+                TXN_RATE        = 6,
+		ASYNC           = 7,
+		WINDOW_SIZE     = 8,
+                REPLICATION     = 9,
 	};
 
 	bool 					_init;
@@ -88,6 +91,7 @@ private:
 		        std::cerr << "--" << long_options[NUM_CLIENTS].name << "\n";
 		        std::cerr << "--" << long_options[CLIENT_ID].name << "\n";
 		        std::cerr << "--" << long_options[WORKLOAD].name << "\n";
+		        std::cerr << "[--" << long_options[TXN_RATE].name << "]\n";
 		        std::cerr << "[--" << long_options[ASYNC].name << "]\n";
 		        std::cerr << "[--" << long_options[WINDOW_SIZE].name << "]\n";
 		        std::cerr << "[--" << long_options[REPLICATION].name << "]\n";
@@ -171,6 +175,12 @@ private:
                         wc.op_count = op_count; 
                         ret.workload.push_back(wc);
                 }
+                // txn_rate
+                if (_arg_map.count(TXN_RATE) > 0)
+                        ret.txn_rate = static_cast<uint32_t>(atoi(_arg_map[TXN_RATE]));
+                else
+                        ret.txn_rate = 0;
+
 
                 // async
                 ret.async = _arg_map.count(ASYNC) > 0;

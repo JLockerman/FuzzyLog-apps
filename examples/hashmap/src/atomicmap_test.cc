@@ -139,7 +139,7 @@ void do_experiment(atomicmap_config cfg) {
         
         // One worker thread
         flag = true;
-        worker = new AtomicMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size, cfg.expt_duration);
+        worker = new AtomicMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size, cfg.expt_duration, cfg.txn_rate);
 
         // Synchronize clients
         wait_signal(cfg);
