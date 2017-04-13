@@ -1,4 +1,5 @@
 #include <map.h>
+#include <thread>
 #include <cassert>
 
 #define DUMMY_INTERESTING_COLOR         100000
@@ -32,6 +33,7 @@ void BaseMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
                 }
                 m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, c);
         }
+        std::this_thread::sleep_for(std::chrono::seconds(3));
 }
 
 void BaseMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {

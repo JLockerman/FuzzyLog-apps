@@ -38,6 +38,7 @@ CAPMapSynchronizer::CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* lo
                 m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, m_interesting_colors);
         }
 
+        std::this_thread::sleep_for(std::chrono::seconds(3));
         this->m_running = true;
 }
 
