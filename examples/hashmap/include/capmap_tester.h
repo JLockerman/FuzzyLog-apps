@@ -16,6 +16,5 @@ public:
         virtual void run();
         virtual void join();
         static void* bootstrap(void *arg);
-        void ExecuteProtocol1(); 
         void ExecuteProtocol2(std::string& role); 
 };

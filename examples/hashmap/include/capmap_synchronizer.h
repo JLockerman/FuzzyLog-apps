@@ -39,10 +39,8 @@ public:
         virtual void run();
         virtual void join();
         static void* bootstrap(void *arg);
-        void ExecuteProtocol1(); 
         void ExecuteProtocol2Primary(); 
         void ExecuteProtocol2Secondary(); 
-        uint8_t sync_with_log_ver1(uint8_t previous_flag, struct colors* interesting_color);
         uint64_t sync_with_log_ver2_primary();
         uint64_t sync_with_log_ver2_secondary();
         //void sync_with_log_ver2_secondary(struct colors* snapshot_color, struct colors* playback_color);
@@ -57,13 +55,6 @@ public:
         struct colors* clone_remote_color();
         struct colors* clone_all_colors();
         struct colors* clone_color(struct colors* color);
-        struct colors* get_protocol1_snapshot_color();
-        struct colors* get_protocol1_playback_color();
-
-        struct colors* get_protocol2_primary_snapshot_color();
-        struct colors* get_protocol2_primary_playback_color();
-        struct colors* get_protocol2_secondary_snapshot_color();
-        struct colors* get_protocol2_secondary_playback_color();
 
         bool is_local_color(struct colors* color);
         bool is_remote_color(struct colors* color);

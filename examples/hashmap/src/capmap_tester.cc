@@ -25,7 +25,7 @@ void* CAPMapTester::bootstrap(void *arg) {
         CAPMapTester *worker = static_cast<CAPMapTester*>(arg);
         CAPMap::ProtocolVersion protocol = worker->m_capmap->get_protocol_version();
         if (protocol == CAPMap::ProtocolVersion::VERSION_1) {
-                worker->ExecuteProtocol1();
+                assert(false);
 
         } else if (protocol == CAPMap::ProtocolVersion::VERSION_2) { 
                 std::string role = worker->m_capmap->get_role();
@@ -35,62 +35,6 @@ void* CAPMapTester::bootstrap(void *arg) {
                 assert(false);
         }
         return NULL;
-}
-
-void CAPMapTester::ExecuteProtocol1() {
-        uint32_t i;
-        uint32_t num_pending = 0; 
-
-        if (m_async) {
-                for (i = 0; *m_flag; i++, i = i % m_num_txns) {
-                        // try get completed
-                        num_pending -= try_get_completed();
-        
-                        // throttle
-                        if (is_throttled()) continue;
-                                                
-                        // issue
-                        if (num_pending == m_window_size) {
-                                write_id wid = m_map->wait_for_any_put();
-                                if (wid_equality{}(wid, WRITE_ID_NIL)) {
-                                        std::cout << "no pending writes. terminate" << std::endl; 
-                                        break;
-                                }
-                                num_pending -= 1;
-                                m_context->inc_num_executed();
-                        }
-                        assert(m_txns[i]->op_type() == Txn::optype::PUT);
-                        CAPMap::PartitionStatus partition_status = m_capmap->get_network_partition_status();
-
-                        if (partition_status == CAPMap::PartitionStatus::PARTITIONED) {
-                                // Append Weak node
-                                m_txns[i]->AsyncWeaklyConsistentRun();
-                                num_pending += 1;
-
-                        } else if (partition_status == CAPMap::PartitionStatus::NORMAL) {
-                                // Append Strong node
-                                m_txns[i]->AsyncStronglyConsistentRun();
-                                num_pending += 1;
-
-                        } else if (partition_status == CAPMap::PartitionStatus::HEALING) {
-                                // TODO: do nothing. or sleep a bit?
-                        }
-                }
-                m_map->wait_for_all_puts();
-                // TODO: add latecy stat for all remaining requests?                
-                m_context->set_finished();
-
-                std::cout << "total executed: " << m_context->get_num_executed() << std::endl;
-
-        } else {
-                // Repeat request while flag = true
-                for (i = 0; *m_flag; i++, i = i % m_num_txns) {
-                        m_txns[i]->Run();
-                }
-                m_context->set_finished();
-
-                std::cout << "total executed: " << m_context->get_num_executed() << std::endl;
-        }
 }
 
 void CAPMapTester::ExecuteProtocol2(std::string& role) {
