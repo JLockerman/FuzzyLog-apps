@@ -1,8 +1,6 @@
 #include <capmap.h>
 #include <cassert>
 
-char buf[DELOS_MAX_DATA_SIZE];
-
 CAPMap::CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, ProtocolVersion protocol, std::string& role, bool replication): BaseMap(log_addr, replication), m_protocol(protocol), m_role(role), m_network_partition_status(NORMAL), m_synchronizer(NULL) {
         // FIXME: m_map_type
         std::vector<ColorID> interesting_colors;
@@ -18,7 +16,6 @@ CAPMap::~CAPMap() {
 
 bool CAPMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors) {
         bool get_workload_found = false;
-        uint32_t i;
         for (auto w : *workload) {
                 if (w.op_type == "get") {
                         assert(w.first_color.numcolors == 1);
@@ -38,8 +35,8 @@ void CAPMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<C
         m_synchronizer->run();
 }
 
-uint32_t CAPMap::get(uint32_t key) {
-        uint32_t val;
+uint64_t CAPMap::get(uint64_t key) {
+        uint64_t val;
         std::condition_variable cv;
         std::atomic_bool cv_spurious_wake_up;
         std::mutex* mtx;
@@ -56,7 +53,7 @@ uint32_t CAPMap::get(uint32_t key) {
         return val;
 }
 
-void CAPMap::get_payload(uint32_t key, uint32_t value, uint32_t flag, char* out, size_t* out_size) {
+void CAPMap::get_payload(uint64_t key, uint64_t value, uint8_t flag, char* out, size_t* out_size) {
         struct Node* node = (struct Node*)out;
 
         node->key = key;
@@ -72,52 +69,52 @@ void CAPMap::get_payload(uint32_t key, uint32_t value, uint32_t flag, char* out,
         *out_size = sizeof(struct Node);
 }
 
-void CAPMap::get_payload_for_strong_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+void CAPMap::get_payload_for_strong_node(uint64_t key, uint64_t value, char* out, size_t* out_size) {
         get_payload(key, value, StrongNode, out, out_size);
 }
 
-void CAPMap::get_payload_for_weak_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+void CAPMap::get_payload_for_weak_node(uint64_t key, uint64_t value, char* out, size_t* out_size) {
         get_payload(key, value, WeakNode, out, out_size);
 }
 
-void CAPMap::get_payload_for_normal_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+void CAPMap::get_payload_for_normal_node(uint64_t key, uint64_t value, char* out, size_t* out_size) {
         get_payload(key, value, NormalNode, out, out_size);
 }
 
-void CAPMap::get_payload_for_healing_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+void CAPMap::get_payload_for_healing_node(uint64_t key, uint64_t value, char* out, size_t* out_size) {
         get_payload(key, value, HealingNode, out, out_size);
 }
 
-void CAPMap::get_payload_for_partitioning_node(uint32_t key, uint32_t value, char* out, size_t* out_size) {
+void CAPMap::get_payload_for_partitioning_node(uint64_t key, uint64_t value, char* out, size_t* out_size) {
         get_payload(key, value, PartitioningNode, out, out_size);
 }
 
-write_id CAPMap::async_strong_depend_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
+write_id CAPMap::async_strong_depend_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color) {
         size_t size;
-        get_payload_for_strong_node(key, value, buf, &size);
-        return async_append(m_fuzzylog_client, buf, size, op_color, NULL);     // FIXME: dep_color should be set. not working for now
+        get_payload_for_strong_node(key, value, m_buf, &size);
+        return async_append(m_fuzzylog_client, m_buf, size, op_color, NULL);     // FIXME: dep_color should be set. not working for now
 }
 
-write_id CAPMap::async_weak_put(uint32_t key, uint32_t value, struct colors* op_color) {
+write_id CAPMap::async_weak_put(uint64_t key, uint64_t value, struct colors* op_color) {
         size_t size;
-        get_payload_for_weak_node(key, value, buf, &size);
-        return async_append(m_fuzzylog_client, buf, size, op_color, NULL);
+        get_payload_for_weak_node(key, value, m_buf, &size);
+        return async_append(m_fuzzylog_client, m_buf, size, op_color, NULL);
 }
 
-write_id CAPMap::async_normal_put(uint32_t key, uint32_t value, struct colors* op_color) {
+write_id CAPMap::async_normal_put(uint64_t key, uint64_t value, struct colors* op_color) {
         size_t size;
-        get_payload_for_normal_node(key, value, buf, &size);
-        return async_append(m_fuzzylog_client, buf, size, op_color, NULL); 
+        get_payload_for_normal_node(key, value, m_buf, &size);
+        return async_append(m_fuzzylog_client, m_buf, size, op_color, NULL); 
 }
 
-write_id CAPMap::async_partitioning_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
+write_id CAPMap::async_partitioning_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color) {
         size_t size;
-        get_payload_for_partitioning_node(key, value, buf, &size);
-        return async_simple_causal_append(m_fuzzylog_client, buf, size, op_color, dep_color);
+        get_payload_for_partitioning_node(key, value, m_buf, &size);
+        return async_simple_causal_append(m_fuzzylog_client, m_buf, size, op_color, dep_color);
 }
 
-write_id CAPMap::async_healing_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
+write_id CAPMap::async_healing_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color) {
         size_t size;
-        get_payload_for_healing_node(key, value, buf, &size);
-        return async_simple_causal_append(m_fuzzylog_client, buf, size, op_color, dep_color);  // TODO: check if dep_color would depend on the latest node appended by the same machine
+        get_payload_for_healing_node(key, value, m_buf, &size);
+        return async_simple_causal_append(m_fuzzylog_client, m_buf, size, op_color, dep_color);  // TODO: check if dep_color would depend on the latest node appended by the same machine
 }

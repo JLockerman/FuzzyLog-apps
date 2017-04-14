@@ -15,7 +15,7 @@ protected:
         Context*                        m_context;
         BaseMap*                        m_map;
         Txn**                           m_txns;
-        uint32_t                        m_num_txns;
+        uint64_t                        m_num_txns;
         bool                            m_async;
         uint32_t                        m_window_size;
         uint32_t                        m_expt_duration;
@@ -31,7 +31,7 @@ protected:
         std::chrono::system_clock::time_point   m_started_at;
 
 public:
-        Tester(Context* context, BaseMap* map, std::atomic<bool>* flag, Txn** txns, uint32_t num_txns, bool async, uint32_t window_size, uint32_t expt_duration, uint32_t txn_rate) {
+        Tester(Context* context, BaseMap* map, std::atomic<bool>* flag, Txn** txns, uint64_t num_txns, bool async, uint32_t window_size, uint32_t expt_duration, uint32_t txn_rate) {
                 this->m_context = context;
                 this->m_map = map;
                 this->m_flag = flag;

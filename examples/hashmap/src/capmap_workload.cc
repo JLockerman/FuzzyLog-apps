@@ -9,7 +9,7 @@ void ycsb_cross_insert::Run() {
 }
 
 write_id ycsb_cross_insert::AsyncRun() {
-        uint32_t key, value;
+        uint64_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
 
@@ -23,7 +23,7 @@ write_id ycsb_cross_insert::AsyncRun() {
 }
 
 write_id ycsb_cross_insert::AsyncRemoteRun() {
-        uint32_t key, value;
+        uint64_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
 
@@ -37,7 +37,7 @@ write_id ycsb_cross_insert::AsyncRemoteRun() {
 }
 
 write_id ycsb_cross_insert::AsyncStronglyConsistentRun() {
-        uint32_t key, value;
+        uint64_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
 
@@ -51,7 +51,7 @@ write_id ycsb_cross_insert::AsyncStronglyConsistentRun() {
 }
 
 write_id ycsb_cross_insert::AsyncWeaklyConsistentRun() {
-        uint32_t key, value;
+        uint64_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
 
@@ -65,7 +65,7 @@ write_id ycsb_cross_insert::AsyncWeaklyConsistentRun() {
 }
 
 write_id ycsb_cross_insert::AsyncPartitioningAppend() {
-        uint32_t key, value;
+        uint64_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
 
@@ -79,7 +79,7 @@ write_id ycsb_cross_insert::AsyncPartitioningAppend() {
 }
 
 write_id ycsb_cross_insert::AsyncHealingAppend() {
-        uint32_t key, value;
+        uint64_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color != NULL);
 
@@ -93,7 +93,7 @@ write_id ycsb_cross_insert::AsyncHealingAppend() {
 }
 
 void ycsb_cross_read::Run() {
-        uint32_t key;
+        uint64_t key;
         assert(m_map != NULL);
        
         // key = (start, end)
@@ -120,8 +120,8 @@ write_id ycsb_cross_read::AsyncWeaklyConsistentRun() {
 
 
 Txn** capmap_workload_generator::Gen() {
-        uint32_t i;
-        uint32_t total_op_count;
+        uint64_t i;
+        uint64_t total_op_count;
         double r;
 
         // percent of single operations
@@ -133,8 +133,8 @@ Txn** capmap_workload_generator::Gen() {
 
         // make transactions
         vector<double> proportions;
-        vector<uint32_t> allocations;
-        uint32_t n = 0;
+        vector<uint64_t> allocations;
+        uint64_t n = 0;
         for (auto w : *m_workload) {
                 n += w.op_count; 
                 double p = static_cast<double>(n) / total_op_count;
@@ -153,8 +153,8 @@ Txn** capmap_workload_generator::Gen() {
                                 std::string op_type = (*m_workload)[j].op_type; 
                                 struct colors* local_color = &(*m_workload)[j].first_color; 
                                 struct colors* remote_color = &(*m_workload)[j].second_color;
-                                uint32_t start = 0; 
-                                uint32_t end = m_range; 
+                                uint64_t start = 0; 
+                                uint64_t end = m_range; 
 
                                 if (op_type == "put") {
                                         txns[i] = new ycsb_cross_insert(m_map, local_color, remote_color, start, end, m_context, Txn::optype::PUT);

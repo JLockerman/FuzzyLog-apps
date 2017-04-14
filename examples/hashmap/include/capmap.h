@@ -4,10 +4,10 @@
 #include <capmap_synchronizer.h>
 
 struct Node {
-        uint32_t        key;
-        uint32_t        value;
-        uint32_t        flag;
+        uint64_t        key;
+        uint64_t        value;
         long            ts; 
+        uint8_t        flag;
         struct Node* clone() {
                 struct Node* new_node = (struct Node*)malloc(sizeof(struct Node));
                 new_node->key   = this->key;
@@ -31,11 +31,11 @@ public:
                 VERSION_2               = 2,
         };
 
-        static const uint32_t WeakNode         = 11;
-        static const uint32_t StrongNode       = 22;
-        static const uint32_t HealingNode      = 33;
-        static const uint32_t PartitioningNode = 44;
-        static const uint32_t NormalNode       = 55;
+        static const uint8_t WeakNode         = 11;
+        static const uint8_t StrongNode       = 22;
+        static const uint8_t HealingNode      = 33;
+        static const uint8_t PartitioningNode = 44;
+        static const uint8_t NormalNode       = 55;
 
 private:
         ProtocolVersion                         m_protocol;
@@ -70,23 +70,23 @@ public:
                 return m_network_partition_status;
         }
         // get operation
-        uint32_t get(uint32_t key);
+        uint64_t get(uint64_t key);
 
         // create payload
-        void get_payload(uint32_t key, uint32_t value, uint32_t flag, char* out, size_t* out_size);
+        void get_payload(uint64_t key, uint64_t value, uint8_t flag, char* out, size_t* out_size);
         // For protocol 1
-        void get_payload_for_strong_node(uint32_t key, uint32_t value, char* out, size_t* out_size);
-        void get_payload_for_weak_node(uint32_t key, uint32_t value, char* out, size_t* out_size);
+        void get_payload_for_strong_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
+        void get_payload_for_weak_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
         // For protocol 2
-        void get_payload_for_normal_node(uint32_t key, uint32_t value, char* out, size_t* out_size);
-        void get_payload_for_healing_node(uint32_t key, uint32_t value, char* out, size_t* out_size);
-        void get_payload_for_partitioning_node(uint32_t key, uint32_t value, char* out, size_t* out_size);
+        void get_payload_for_normal_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
+        void get_payload_for_healing_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
+        void get_payload_for_partitioning_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
         
         // Operations for protocol 1
-        write_id async_strong_depend_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color);
-        write_id async_weak_put(uint32_t key, uint32_t value, struct colors* op_color);
+        write_id async_strong_depend_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);
+        write_id async_weak_put(uint64_t key, uint64_t value, struct colors* op_color);
         // Operations for protocol 2
-        write_id async_normal_put(uint32_t key, uint32_t value, struct colors* op_color);
-        write_id async_partitioning_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color);        // XXX: should be called only from secondary machine
-        write_id async_healing_put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color);        // XXX: should be called only from secondary machine
+        write_id async_normal_put(uint64_t key, uint64_t value, struct colors* op_color);
+        write_id async_partitioning_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);        // XXX: should be called only from secondary machine
+        write_id async_healing_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);        // XXX: should be called only from secondary machine
 };

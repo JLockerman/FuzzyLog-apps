@@ -77,7 +77,7 @@ void* CAPMapSynchronizer::bootstrap(void *arg) {
 
 void CAPMapSynchronizer::ExecuteProtocol1() {
         std::cout << "Start CAPMap synchronizer protocol 1..." << std::endl;
-        uint32_t previous_flag = 0;
+        uint8_t previous_flag = 0;
         CAPMap::PartitionStatus partition_status;
         struct colors* normal_playback_color = get_protocol1_playback_color();
         struct colors* partition_playback_color = clone_local_color();
@@ -120,8 +120,8 @@ void CAPMapSynchronizer::ExecuteProtocol1() {
 
 void CAPMapSynchronizer::ExecuteProtocol2Primary() {
         std::cout << "Start CAPMap synchronizer protocol 2 for primary..." << std::endl;
-        uint32_t read_count = 0;
-        uint32_t total_read_count = 0;
+        uint64_t read_count = 0;
+        uint64_t total_read_count = 0;
 
         while (m_running) {
                 swap_queue();
@@ -148,8 +148,8 @@ void CAPMapSynchronizer::ExecuteProtocol2Primary() {
 
 void CAPMapSynchronizer::ExecuteProtocol2Secondary() {
         std::cout << "Start CAPMap synchronizer protocol 2 for secondary..." << std::endl;
-        uint32_t read_count = 0;
-        uint32_t total_read_count = 0;
+        uint64_t read_count = 0;
+        uint64_t total_read_count = 0;
 
         while (m_running) {
                 swap_queue();
@@ -174,8 +174,9 @@ void CAPMapSynchronizer::ExecuteProtocol2Secondary() {
         }
 }
 
-uint32_t CAPMapSynchronizer::sync_with_log_ver1(uint32_t previous_flag, struct colors* interesting_color) {
-        uint32_t key, val, flag;
+uint8_t CAPMapSynchronizer::sync_with_log_ver1(uint8_t previous_flag, struct colors* interesting_color) {
+        uint64_t key, val;
+        uint8_t flag;
         long ts;
         size_t size;
         val = 0;
@@ -229,8 +230,9 @@ uint32_t CAPMapSynchronizer::sync_with_log_ver1(uint32_t previous_flag, struct c
         return flag;
 }
 
-uint32_t CAPMapSynchronizer::sync_with_log_ver2_primary() {
-        uint32_t key, val, flag;
+uint64_t CAPMapSynchronizer::sync_with_log_ver2_primary() {
+        uint64_t key, val;
+        uint8_t flag;
         size_t size = 0;
         struct colors* snapshot_color = NULL;
         struct colors* playback_color = NULL;
@@ -239,7 +241,7 @@ uint32_t CAPMapSynchronizer::sync_with_log_ver2_primary() {
         snapshot_color = clone_local_color();
         playback_color = clone_all_colors();
         snapshot_colors(m_fuzzylog_client, snapshot_color);
-        uint32_t read_count = 0;
+        uint64_t read_count = 0;
 
         while (true) {
                 mutable_playback_color = clone_color(playback_color);
@@ -291,15 +293,16 @@ uint32_t CAPMapSynchronizer::sync_with_log_ver2_primary() {
         return read_count;
 }
 
-uint32_t CAPMapSynchronizer::sync_with_log_ver2_secondary() {
-        uint32_t key, val, flag;
+uint64_t CAPMapSynchronizer::sync_with_log_ver2_secondary() {
+        uint64_t key, val;
+        uint8_t flag;
         size_t size = 0;
         struct colors* snapshot_color = NULL;
         struct colors* playback_color = NULL;
         struct colors* mutable_playback_color = NULL;
         CAPMap::PartitionStatus previous_status, current_status;
         previous_status = CAPMap::PartitionStatus::UNINITIALIZED;
-        uint32_t read_count = 0;
+        uint64_t read_count = 0;
         
         while (true) {
                 current_status = m_map->get_network_partition_status();
@@ -386,7 +389,7 @@ std::mutex* CAPMapSynchronizer::get_local_map_lock() {
         return &m_local_map_mtx;
 }
 
-uint32_t CAPMapSynchronizer::get(uint32_t key) {
+uint64_t CAPMapSynchronizer::get(uint64_t key) {
         return m_local_map[key];
 }
 

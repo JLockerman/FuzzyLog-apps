@@ -113,7 +113,7 @@ void wait_signal(atomicmap_config cfg)
 }
 
 void do_experiment(atomicmap_config cfg) {
-        uint32_t total_op_count;
+        uint64_t total_op_count;
         AtomicMap *map;
         atomicmap_workload_generator *workload_gen;
         Txn** txns;

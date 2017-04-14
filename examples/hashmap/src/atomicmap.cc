@@ -36,8 +36,8 @@ void AtomicMap::init_synchronizer(std::vector<std::string>* log_addr, std::vecto
         m_synchronizer->run();
 }
 
-uint32_t AtomicMap::get(uint32_t key) {
-        uint32_t val;
+uint64_t AtomicMap::get(uint64_t key) {
+        uint64_t val;
         std::condition_variable cv;
         std::atomic_bool cv_spurious_wake_up;
         std::mutex* mtx;

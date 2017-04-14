@@ -36,21 +36,30 @@ void BaseMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
         std::this_thread::sleep_for(std::chrono::seconds(3));
 }
 
-void BaseMap::put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color) {
-        uint64_t data = ((uint64_t)key << 32) | value;
-        append(m_fuzzylog_client, reinterpret_cast<char*>(&data), sizeof(data), op_color, dep_color);
+void BaseMap::put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color) {
+        uint64_t *data = reinterpret_cast<uint64_t*>(m_buf);
+        data[0] = key;
+        data[1] = value;
+        size_t data_size = sizeof(uint64_t) * 2;
+        append(m_fuzzylog_client, m_buf, data_size, op_color, dep_color);
 }
 
-void BaseMap::remove(uint32_t key, struct colors* op_color) {
+void BaseMap::remove(uint64_t key, struct colors* op_color) {
         // XXX: remove is the same as putting a zero value
-        uint64_t data = (uint64_t)key << 32;
-        append(m_fuzzylog_client, reinterpret_cast<char*>(&data), sizeof(data), op_color, NULL);
+        uint64_t *data = reinterpret_cast<uint64_t*>(m_buf);
+        data[0] = key;
+        data[1] = 0;
+        size_t data_size = sizeof(uint64_t) * 2;
+        append(m_fuzzylog_client, m_buf, data_size, op_color, NULL);
 }
 
-write_id BaseMap::async_put(uint32_t key, uint32_t value, struct colors* op_color) {
+write_id BaseMap::async_put(uint64_t key, uint64_t value, struct colors* op_color) {
         // Async append 
-        uint64_t data = ((uint64_t)key << 32) | value;
-        return async_append(m_fuzzylog_client, reinterpret_cast<char*>(&data), sizeof(data), op_color, NULL);
+        uint64_t *data = reinterpret_cast<uint64_t*>(m_buf);
+        data[0] = key;
+        data[1] = value;
+        size_t data_size = sizeof(uint64_t) * 2;
+        return async_append(m_fuzzylog_client, m_buf, data_size, op_color, NULL);
 }
 
 void BaseMap::flush_completed_puts() {

@@ -34,7 +34,9 @@ public:
 protected:
         // Fuzzylog connection
         DAGHandle*                                      m_fuzzylog_client;
+        char                                            m_buf[DELOS_MAX_DATA_SIZE];
         bool                                            m_replication;
+
 
 public:
         BaseMap(std::vector<std::string>* log_addr, bool replication) {
@@ -44,10 +46,10 @@ public:
         //MapType get_map_type() { return m_map_type; }
         void init_fuzzylog_client(std::vector<std::string>* log_addr);
         // Synchronous operations
-        void put(uint32_t key, uint32_t value, struct colors* op_color, struct colors* dep_color);
-        void remove(uint32_t key, struct colors* op_color);
+        void put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);
+        void remove(uint64_t key, struct colors* op_color);
         // Asynchronous operations
-        write_id async_put(uint32_t key, uint32_t value, struct colors* op_color);
+        write_id async_put(uint64_t key, uint64_t value, struct colors* op_color);
         void flush_completed_puts();
         write_id try_wait_for_any_put();
         write_id wait_for_any_put();

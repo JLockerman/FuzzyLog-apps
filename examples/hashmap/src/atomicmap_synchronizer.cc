@@ -61,8 +61,8 @@ void* AtomicMapSynchronizer::bootstrap(void *arg) {
 
 void AtomicMapSynchronizer::Execute() {
         std::cout << "Start AtomicMap synchronizer..." << std::endl;
-        uint64_t data;
-        uint32_t key, val;
+        uint64_t *data;
+        uint64_t key, val;
         size_t size;
         val = 0;
         size = 0;
@@ -77,9 +77,10 @@ void AtomicMapSynchronizer::Execute() {
                         snapshot(m_fuzzylog_client);
                         while ((get_next(m_fuzzylog_client, m_read_buf, &size, m_interesting_colors), 1)) {
                                 if (m_interesting_colors->numcolors == 0) break;
-                                data = *reinterpret_cast<uint64_t*>(m_read_buf);
-                                key = static_cast<uint32_t>(data >> 32);
-                                val = static_cast<uint32_t>(data & 0xFFFFFFFF); 
+                                data = reinterpret_cast<uint64_t*>(m_read_buf);
+                                assert(size == sizeof(uint64_t) * 2);
+                                key = data[0];
+                                val = data[1];
 
                                 // update to local map
                                 m_local_map[key] = val;
@@ -112,6 +113,6 @@ std::mutex* AtomicMapSynchronizer::get_local_map_lock() {
         return &m_local_map_mtx;
 }
 
-uint32_t AtomicMapSynchronizer::get(uint32_t key) {
+uint64_t AtomicMapSynchronizer::get(uint64_t key) {
         return m_local_map[key];
 }

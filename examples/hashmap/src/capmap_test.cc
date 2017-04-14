@@ -138,7 +138,7 @@ void wait_signal(capmap_config cfg)
 }
 
 void do_experiment(capmap_config cfg) {
-        uint32_t total_op_count;
+        uint64_t total_op_count;
         CAPMap *map;
         capmap_workload_generator *workload_gen;
         Txn** txns;

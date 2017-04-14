@@ -25,7 +25,7 @@ private:
         char                                                                    m_read_buf[DELOS_MAX_DATA_SIZE];
 
         std::atomic_bool                                                        m_running;
-        std::unordered_map<uint32_t, uint32_t>                                  m_local_map; 
+        std::unordered_map<uint64_t, uint64_t>                                  m_local_map; 
         std::mutex                                                              m_local_map_mtx;
 
         CAPMap*                                                                 m_map;
@@ -42,16 +42,16 @@ public:
         void ExecuteProtocol1(); 
         void ExecuteProtocol2Primary(); 
         void ExecuteProtocol2Secondary(); 
-        uint32_t sync_with_log_ver1(uint32_t previous_flag, struct colors* interesting_color);
-        uint32_t sync_with_log_ver2_primary();
-        uint32_t sync_with_log_ver2_secondary();
+        uint8_t sync_with_log_ver1(uint8_t previous_flag, struct colors* interesting_color);
+        uint64_t sync_with_log_ver2_primary();
+        uint64_t sync_with_log_ver2_secondary();
         //void sync_with_log_ver2_secondary(struct colors* snapshot_color, struct colors* playback_color);
 
         void enqueue_get(std::condition_variable* cv, std::atomic_bool* cv_spurious_wake_up);
         void swap_queue();
         std::mutex* get_local_map_lock();
 
-        uint32_t get(uint32_t key);
+        uint64_t get(uint64_t key);
 
         struct colors* clone_local_color();
         struct colors* clone_remote_color();

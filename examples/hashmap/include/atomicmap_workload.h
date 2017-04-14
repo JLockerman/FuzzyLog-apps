@@ -7,15 +7,15 @@
 class ycsb_insert : public Txn {
 private:
         AtomicMap*                              m_map;
-        uint32_t                                m_start;
-        uint32_t                                m_end;
+        uint64_t                                m_start;
+        uint64_t                                m_end;
         struct colors*                          m_color;
         struct colors*                          m_dep_color;
         Context*                                m_context;
         optype                                  m_op_type;
         bool                                    m_is_strong;
 public:
-        ycsb_insert(AtomicMap* map, struct colors* color, struct colors* dep_color, uint32_t start, uint32_t end, Context* context, optype op_type, bool is_strong) {
+        ycsb_insert(AtomicMap* map, struct colors* color, struct colors* dep_color, uint64_t start, uint64_t end, Context* context, optype op_type, bool is_strong) {
                 this->m_map = map;
                 this->m_color = color;
                 this->m_dep_color = dep_color;
@@ -39,13 +39,13 @@ public:
 class ycsb_read : public Txn {
 private:
         AtomicMap*                              m_map;
-        uint32_t                                m_start;
-        uint32_t                                m_end;
+        uint64_t                                m_start;
+        uint64_t                                m_end;
         struct colors*                          m_color;
         Context*                                m_context;
         optype                                  m_op_type;
 public:
-        ycsb_read(AtomicMap* map, struct colors* color, uint32_t start, uint32_t end, Context* context, optype op_type) {
+        ycsb_read(AtomicMap* map, struct colors* color, uint64_t start, uint64_t end, Context* context, optype op_type) {
                 this->m_map = map;
                 this->m_color = color;
                 this->m_start = start;
@@ -68,10 +68,10 @@ class atomicmap_workload_generator {
 private:
         Context*                                m_context;
         AtomicMap*                              m_map;
-        uint32_t                                m_range;
+        uint64_t                                m_range;
         vector<workload_config>*                m_workload;
 public:
-        atomicmap_workload_generator(Context* context, AtomicMap* map, uint32_t range, vector<workload_config>* workload) {
+        atomicmap_workload_generator(Context* context, AtomicMap* map, uint64_t range, vector<workload_config>* workload) {
                 this->m_context = context;
                 this->m_map = map;
                 this->m_range = range;

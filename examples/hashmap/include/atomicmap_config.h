@@ -26,7 +26,7 @@ static struct option long_options[] = {
 
 struct atomicmap_config {
 	std::vector<std::string>        log_addr;
-	uint32_t 		        expt_range;
+	uint64_t 		        expt_range;
         uint32_t                        expt_duration;
         uint8_t                         num_clients;
 	uint8_t 		        client_id;
@@ -106,7 +106,7 @@ private:
                 // log_addr
                 ret.log_addr = split(std::string(_arg_map[LOG_ADDR]), ',');
                 // expt_range
-		ret.expt_range = static_cast<uint32_t>(atoi(_arg_map[EXPT_RANGE]));
+		ret.expt_range = static_cast<uint64_t>(atoi(_arg_map[EXPT_RANGE]));
                 // expt_duration
                 if (_arg_map.count(EXPT_DURATION) > 0)
 		        ret.expt_duration = static_cast<uint32_t>(atoi(_arg_map[EXPT_DURATION]));
@@ -163,7 +163,7 @@ private:
                         }        
 
                         // op_count
-                        uint32_t op_count = static_cast<uint32_t>(stoi(pair[1]));
+                        uint64_t op_count = static_cast<uint64_t>(stoi(pair[1]));
 
                         // workload
                         workload_config wc;

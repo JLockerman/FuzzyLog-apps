@@ -23,7 +23,7 @@ private:
         char                                                                    m_read_buf[DELOS_MAX_DATA_SIZE];
 
         std::atomic_bool                                                        m_running;
-        std::unordered_map<uint32_t, uint32_t>                                  m_local_map; 
+        std::unordered_map<uint64_t, uint64_t>                                  m_local_map; 
         std::mutex                                                              m_local_map_mtx;
 
         bool                                                                    m_replication;
@@ -40,5 +40,5 @@ public:
         void swap_queue();
         std::mutex* get_local_map_lock();
 
-        uint32_t get(uint32_t key);
+        uint64_t get(uint64_t key);
 };
