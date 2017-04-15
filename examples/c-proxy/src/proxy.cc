@@ -106,34 +106,39 @@ void proxy_request::initialize(char *buf)
 	}
 	
 }
-
-fuzzy_proxy::fuzzy_proxy(DAGHandle *handle, uint16_t port)
-{
-	_handle = handle;
+fuzzy_proxy::fuzzy_proxy(DAGHandle *handle, uint16_t port) { _handle = handle;
 	_max_try_wait = 100;
 
 	/* Set up server's socket */
 	_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 	assert(_socket_fd >= 0);
+	
+	int enable = 1;
+ 	auto success = setsockopt(_socket_fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
+	assert(success >= 0);	
+
 	memset(&_server_addr, 0x0, sizeof(_server_addr));	
 	
 	_server_addr.sin_family = AF_INET;	
 	_server_addr.sin_port = htons(port);	
 	_server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");	
 	
-	auto success = bind(_socket_fd, (struct sockaddr*)&_server_addr, sizeof(_server_addr)); 
+	success = bind(_socket_fd, (struct sockaddr*)&_server_addr, sizeof(_server_addr)); 
 	assert(success == 0); 
 	
 	success = listen(_socket_fd, 20);	
 	assert(success == 0);	
-	
-	_client_addrlen = sizeof(_client_addr);
+}
+
+void fuzzy_proxy::new_conx()
+{
+	close(_client_fd);
+ 	_client_addrlen = sizeof(_client_addr);
 	_client_fd = accept(_socket_fd, (struct sockaddr*)&_client_addr, &_client_addrlen); 		
 }
 
 fuzzy_proxy::~fuzzy_proxy()
 {
-	close(_client_fd);
 	close(_socket_fd);
 }
 

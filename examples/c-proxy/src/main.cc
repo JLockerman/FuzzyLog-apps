@@ -29,7 +29,10 @@ int main(int argc, char **argv)
 	auto handle = create_fuzzylog_handle(cfg);
 	fuzzy_proxy proxy(handle, cfg.proxy_port);
 		
-	proxy.run();
+	while (true) {
+		proxy.new_conx();
+		proxy.run();
+	}
 	close_dag_handle(handle);
 	return 0;
 }
