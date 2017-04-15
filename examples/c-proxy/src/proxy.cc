@@ -121,7 +121,7 @@ fuzzy_proxy::fuzzy_proxy(DAGHandle *handle, uint16_t port) { _handle = handle;
 	
 	_server_addr.sin_family = AF_INET;	
 	_server_addr.sin_port = htons(port);	
-	_server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");	
+	_server_addr.sin_addr.s_addr = INADDR_ANY;	
 	
 	success = bind(_socket_fd, (struct sockaddr*)&_server_addr, sizeof(_server_addr)); 
 	assert(success == 0); 
