@@ -42,7 +42,7 @@ public class FLZKTester
 
 		//synchronous testing
 		int numbatches = 100;
-		int batchsize = 1000;
+		int batchsize = 10;
 		for(int j=0;j<numbatches;j++)
 		{
 			starttime = System.currentTimeMillis();
