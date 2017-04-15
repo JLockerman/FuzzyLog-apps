@@ -94,9 +94,12 @@ public class ProxyClient {
 	}
 	
 	public ProxyClient(int server_port) throws IOException {
-		String ip = "127.0.0.1";
+		this("127.0.0.1", server_port);
+	}
+	
+	public ProxyClient(String hostname, int server_port) throws IOException {
 		_server_port = server_port;
-		_socket = new Socket(ip, _server_port);
+		_socket = new Socket(hostname, _server_port);
 		_input = new DataInputStream(new BufferedInputStream(_socket.getInputStream()));
 		_output = new DataOutputStream(new BufferedOutputStream(_socket.getOutputStream()));
 	}

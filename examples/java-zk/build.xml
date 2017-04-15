@@ -3,7 +3,6 @@
 	<property name="build.dir"		value="build"/>
 	<property name="lib.dir" 		value="lib"/>	
 	<property name="classes.dir"		value="${build.dir}/classes"/>
-	<property name="jar.dir" 		value="${build.dir}/jar"/>
 
 	<property name="main-class"		value="FLZKTester"/>
 
@@ -17,26 +16,28 @@
                 </fileset>
                 <pathelement location="../java-client/java-client/build/classes" />
         </path>
+        <path id="run.classpath">
+                <fileset dir="${lib.dir}">
+                        <include name="**/*.jar" />
+                </fileset>
+                <pathelement location="../java-client/java-client/build/classes" />
+                <pathelement location="build/classes" />                
+        </path>
+
 	
 	<target name="compile">
 		<mkdir dir="${classes.dir}"/>		
 		<javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="build.classpath"/>
 	</target>
 
-	<target name="jar" depends="compile">
-		<mkdir dir="${jar.dir}"/>
-		<jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="${classes.dir}">
-		<manifest>
-			<attribute name="Main-Class" value="${main-class}"/>
-		</manifest>
-		</jar>
-	</target>	
-
-	<target name="run" depends="jar">
-		<java jar="${jar.dir}/${ant.project.name}.jar" fork="true"/>
+	<target name="run" depends="compile">
+		<java classname="FLZKTester" classpathref="run.classpath">
+	      <arg value="${hostname}"/>
+    	  <arg value="${port}"/>
+      	</java>		
 	</target>
 
-	<target name="clean-build" depends="clean,jar"/>
+	<target name="clean-build" depends="clean"/>
 	
 	<target name="main" depends="clean,run"/>
 </project>
