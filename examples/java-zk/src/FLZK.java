@@ -473,8 +473,8 @@ public class FLZK implements IZooKeeper, Runnable
 		else if(cop instanceof DeleteOp) return apply((DeleteOp)cop);
 		else if(cop instanceof ExistsOp) return apply((ExistsOp)cop);
 		else if(cop instanceof SetOp) return apply((SetOp)cop);
-//		else if(cop instanceof GetOp) return apply((GetOp)cop);
-//		else if(cop instanceof GetChildrenOp) return apply((GetChildrenOp)cop);
+		else if(cop instanceof GetOp) return apply((GetOp)cop);
+		else if(cop instanceof GetChildrenOp) return apply((GetChildrenOp)cop);
 		else
 		{
 			System.out.println(cop.getClass());
@@ -596,6 +596,40 @@ public class FLZK implements IZooKeeper, Runnable
 		return x; //handle stat copying either here or at modification
 		
 	}
+	
+		public synchronized Object apply(GetOp gop) throws KeeperException
+	{
+		File F = new File(gop.path);
+		if(!map.containsKey(F))
+			throw new KeeperException.NoNodeException();
+		Node N = map.get(F);
+//		N.lock();
+		Stat x = N.stat;
+		byte[] y = N.data;
+		if(gop.watch && defaultwatcher!=null) N.datawatches.add(defaultwatcher);
+//		N.unlock();
+		return new Pair<byte[], Stat>(y, x); //todo -- copy data and stat
+	
+	}
+	
+	public synchronized Object apply(GetChildrenOp gcop) throws KeeperException
+	{
+		File F = new File(gcop.path);
+		if(!map.containsKey(F))
+				throw new KeeperException.NoNodeException();
+		Node N = map.get(F);
+//		N.lock();
+		LinkedList<String> children = new LinkedList<String>();
+		Iterator<Node> it = N.children.iterator();
+		while(it.hasNext())
+		{
+			children.add(it.next().path);
+		}
+		if(gcop.watch && defaultwatcher!=null) N.childrenwatches.add(defaultwatcher);
+//		N.unlock();
+		return children;
+	}
+
 
 
 

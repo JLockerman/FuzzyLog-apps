@@ -41,8 +41,8 @@ public class FLZKTester
 		long starttime = 0;
 
 		//synchronous testing
-		int numbatches = 100;
-		int batchsize = 10;
+		int numbatches = 1;
+		int batchsize = 100;
 		for(int j=0;j<numbatches;j++)
 		{
 			starttime = System.currentTimeMillis();
@@ -63,21 +63,21 @@ public class FLZKTester
 	//		System.out.println(zk);
 			
 		starttime = System.currentTimeMillis();			
-		for(int i=0;i<1000;i++)
+		for(int i=0;i<100;i++)
 			zk.setData("/abcd/" + i, "BBB".getBytes(), -1);
 		stoptime = System.currentTimeMillis();			
 		System.out.println("SetData done in " + (stoptime-starttime));			
 //		System.out.println(zk);
 		
 		starttime = System.currentTimeMillis();
-		for(int i=0;i<1000;i++)
+		for(int i=0;i<100;i++)
 			zk.exists("/abcd/" + i, false);
 		stoptime = System.currentTimeMillis();		
 		System.out.println("Exists done in " + (stoptime-starttime));			
 //		System.out.println(zk);
 		
 		starttime = System.currentTimeMillis();
-		for(int i=0;i<1000;i++)
+		for(int i=0;i<100;i++)
 			zk.delete("/abcd/" + i, -1);
 		stoptime = System.currentTimeMillis();
 //		System.out.println("Delete done in " + (stoptime-starttime));						
@@ -85,7 +85,163 @@ public class FLZKTester
 			
 //		zk.setData("/abcd", "ABCD".getBytes(), -1);
 		System.out.println(zk);
-		System.out.println("Test done");
+		System.out.println("Synchronous Test done");
+		
+		
+		//asynchronous testing
+		TesterCB dcb = new TesterCB();
+		int numtests = 10000;
+		long testtime = 0;
+		dcb.start(numtests);
+		for(int i=0;i<numtests;i++)
+		{
+			zk.create("/abcd/" + i, "AAA".getBytes(), null, CreateMode.PERSISTENT, dcb, null);
+		}
+		testtime = dcb.waitforcompletion();
+		System.out.println("Throughput (create): " + (1000.0*(double)numtests/(double)testtime));
+		
+		dcb.start(numtests);
+		for(int i=0;i<numtests;i++)
+		{
+			zk.setData("/abcd/" + i, "BBB".getBytes(), -1, dcb, null);
+		}
+		testtime = dcb.waitforcompletion();
+		System.out.println("Throughput (setdata): " + (1000.0*(double)numtests/(double)testtime));		
+
+		dcb.start(numtests);
+		for(int i=0;i<numtests;i++)
+		{
+			zk.exists("/abcd/" + i, false, dcb, null);
+		}
+		testtime = dcb.waitforcompletion();
+		System.out.println("Throughput (exists): " + (1000.0*(double)numtests/(double)testtime));		
+
+		dcb.start(numtests);
+		for(int i=0;i<numtests;i++)
+		{
+			zk.getData("/abcd/" + i, false, dcb, null);
+		}
+		testtime = dcb.waitforcompletion();
+		System.out.println("Throughput (getdata): " + (1000.0*(double)numtests/(double)testtime));		
+		
+		dcb.start(numtests);		
+		for(int i=0;i<numtests;i++)
+		{
+			zk.getChildren("/abcd/" + i, false, dcb, null);
+		}
+		testtime = dcb.waitforcompletion();
+		System.out.println("Throughput (getchildren): " + (1000.0*(double)numtests/(double)testtime));		
+
+		dcb.start(numtests);
+		for(int i=0;i<numtests;i++)
+		{
+			zk.delete("/abcd/" + i, -1, dcb, null);
+		}
+		testtime = dcb.waitforcompletion();
+		System.out.println("Throughput (delete): " + (1000.0*(double)numtests/(double)testtime));		
+		
+		
 		System.exit(0);
 	}	
+}
+
+class TesterCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCallback, AsyncCallback.StatCallback, AsyncCallback.DataCallback, AsyncCallback.ChildrenCallback
+{
+	int numtowaitfor;
+	AtomicInteger numdone;
+	long starttime;
+	long stoptime;
+	boolean debugprints = false;
+	
+	public TesterCB()
+	{
+		numdone = new AtomicInteger();
+	}
+	
+	public void start(int t)
+	{
+		starttime = System.currentTimeMillis();	
+		numtowaitfor = t;
+	}
+	
+	public synchronized boolean done()
+	{
+		return numdone.get()>=numtowaitfor;
+	}
+	
+	public long waitforcompletion()
+	{
+		synchronized(this)
+		{
+			while(!this.done())
+			{
+				try
+				{
+					this.wait();
+				}
+				catch(InterruptedException e)
+				{
+					//continue;
+				}
+			}
+			stoptime = System.currentTimeMillis();
+			System.out.println("Done in " + (stoptime-starttime) + " milliseconds.");
+		}
+		return stoptime-starttime;
+	}
+	
+	
+	@Override
+	public void processResult(int rc, String path, Object ctx, String name) 
+	{
+		if(debugprints) System.out.println(Code.get(rc) + " create " + path + " " + numdone);
+		bump();
+	}
+
+
+	@Override
+	public void processResult(int rc, String path, Object ctx)
+	{	
+		if(debugprints) System.out.println(Code.get(rc) + " delete: " + path + " " + numdone);
+		bump();
+	}
+
+
+	@Override
+	public void processResult(int rc, String path, Object ctx, Stat stat) 
+	{
+		if(debugprints) System.out.println(Code.get(rc) + " setdata/exists: " + path + " " + numdone);
+		bump();		
+	}
+
+
+	@Override
+	public void processResult(int rc, String path, Object ctx, byte[] data,
+			Stat stat) 
+	{
+		if(debugprints) System.out.println(Code.get(rc) + " getdata: " + path + " " + numdone);
+		bump();
+	}
+
+
+	@Override
+	public void processResult(int rc, String path, Object ctx, List<String> children) 
+	{
+		if(debugprints) System.out.println(Code.get(rc) + " getchildren: " + path + " " + numdone);
+		bump();
+		
+	}
+	
+	void bump()
+	{
+		if(numdone.incrementAndGet()>=numtowaitfor)
+		{
+			synchronized(this)
+			{
+				this.notify();
+			}
+		}	
+	}
+	
+	
 }
