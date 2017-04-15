@@ -11,4 +11,4 @@ If the fuzzylog deployment is running on port 12345, run the c-proxy and point i
 
 Once the c-proxy is running, run:
 
-`ant -Dhostname=localhost -Dportno=12344 run`
+`ant -Dhostname=localhost -Dport=12344 run`
