@@ -1,5 +1,5 @@
 ### Building
-ant build
+ant compile
 
 ### Running 
 
