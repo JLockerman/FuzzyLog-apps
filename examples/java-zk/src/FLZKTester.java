@@ -35,21 +35,49 @@ public class FLZKTester
 		System.out.println(zk);
 		Thread.sleep(1000);
 		int numops = 1;
+
+		long stoptime = 0;
+		long starttime = 0;
+
 		//synchronous testing
-		for(int i=0;i<100;i++)
-			zk.create("/abcd/" + i, "AAA".getBytes(), null, CreateMode.PERSISTENT);
-		System.out.println(zk);
+		for(int j=0;j<100;j++)
+		{
+			starttime = System.currentTimeMillis();
+			for(int i=0;i<1000;i++)
+			{
+				try
+				{
+					zk.create("/abcd/" + i, "AAA".getBytes(), null, CreateMode.PERSISTENT);
+				}
+				catch(Exception e)
+				{
+					//fail silently
+				}
+			}
+			stoptime = System.currentTimeMillis();
+			System.out.println("Create done in " + (stoptime-starttime));
+		}
+	//		System.out.println(zk);
 			
-		for(int i=0;i<100;i++)
+		starttime = System.currentTimeMillis();			
+		for(int i=0;i<1000;i++)
 			zk.setData("/abcd/" + i, "BBB".getBytes(), -1);
-		System.out.println(zk);
-			
-		for(int i=0;i<100;i++)
+		stoptime = System.currentTimeMillis();			
+		System.out.println("SetData done in " + (stoptime-starttime));			
+//		System.out.println(zk);
+		
+		starttime = System.currentTimeMillis();
+		for(int i=0;i<1000;i++)
 			zk.exists("/abcd/" + i, false);
-		System.out.println(zk);
-			
-		for(int i=0;i<100;i++)
+		stoptime = System.currentTimeMillis();		
+		System.out.println("Exists done in " + (stoptime-starttime));			
+//		System.out.println(zk);
+		
+		starttime = System.currentTimeMillis();
+		for(int i=0;i<1000;i++)
 			zk.delete("/abcd/" + i, -1);
+		stoptime = System.currentTimeMillis();
+//		System.out.println("Delete done in " + (stoptime-starttime));						
 
 			
 //		zk.setData("/abcd", "ABCD".getBytes(), -1);
