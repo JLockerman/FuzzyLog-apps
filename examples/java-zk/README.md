@@ -1,5 +1,9 @@
 ### Building
-ant compile
+First build java-client by running ant within the java-client directory.
+
+After that, switch to java-zk and run:
+
+`ant compile`
 
 ### Running 
 
