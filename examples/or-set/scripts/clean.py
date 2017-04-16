@@ -19,6 +19,12 @@ def postprocess_results(vals):
 	high_idx = int(len(vals)*0.95)
 	return [vals[median_idx]/float(1000), vals[low_idx]/float(1000), vals[high_idx]/float(1000)]
 
+def crdt_expt(num_client_machines, procs_per_machine, window_sz, num_servers):
+	throughput_time(num_client_machines, procs_per_machine, window_sz, num_servers)
+	calculate_outstanding(num_client_machines, procs_per_machine, window_sz, num_servers)
+	index_file('append_throughput.txt', 'outstanding.txt', 'real_crdt2.in')
+	os.system('gnuplot real_crdt2.plot')
+	
 def index_file(input_file1, input_file2, output_file):
 	results1 = readfile(input_file1)
 	temp1 = list(map(lambda x: x / 1000.0, results1))

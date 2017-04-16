@@ -10,9 +10,18 @@ def kill_fuzzylog():
 def kill_crdts():
 	run('killall or-set')
 
-def fuzzylog_proc(port, server_index, numservers):
+def fuzzylog_proc_head(port, server_index, numservers, down_proc):
 	with cd('fuzzylog/delos-rust/servers/tcp_server'):
-		run('target/release/delos_tcp_server ' + str(port) + ' -ig ' + str(server_index) + ':' + str(numservers) + ' > log.txt 2>&1')
+		with prefix('export RUST_BACKTRACE=1'):
+			run('target/release/delos_tcp_server ' + str(port) + ' -ig ' + str(server_index) + ':' + str(numservers) + ' > log.txt 2>&1')
+#			run('target/release/delos_tcp_server ' + str(port) + ' -ig ' + str(server_index) + ':' + str(numservers) + ' -dwn ' + down_proc +  ' > log.txt 2>&1')
+
+#def fuzzylog_proc_tail(port, server_index, numservers, up_proc):
+	
+#	with cd('fuzzylog/delos-rust/servers/tcp_server'):
+#		with prefix('export RUST_BACKTRACE=1'):
+#			run('target/release/delos_tcp_server ' + str(port) + ' -ig ' + str(server_index) + ':' + str(numservers) + ' -up ' + up_proc + ' > log.txt 2>&1')
+#
 
 def check_network_statistics():
 	run('netstat -i')
@@ -21,14 +30,14 @@ def clean_crdt():
 	with cd('fuzzylog/delos-apps/examples/or-set'):
 		run('rm *.txt')
 
-def run_crdt_clients(log_addr, start_clients, num_clients, window_sz, duration, total_clients, 
+def run_crdt_clients(head_log_addr, tail_log_addr, start_clients, num_clients, window_sz, duration, total_clients, 
 		     low_throughput, 
 		     high_throughput, 
 		     spike_start,
 		     spike_duration):
 	with cd('fuzzylog/delos-apps/examples/or-set'):
 		with prefix('export RUST_BACKTRACE=1'):
-			args = 'scripts/exp.py ' + str(log_addr) + ' ' + str(start_clients) + ' ' + str(num_clients) + ' ' + str(window_sz) + ' ' + str(duration) + ' ' + str(total_clients) + ' ' + str(low_throughput) + ' ' + str(high_throughput) + ' ' + str(spike_start) + ' ' + str(spike_duration)
+			args = 'scripts/exp.py ' + str(head_log_addr) + ' '  + str(tail_log_addr) + ' ' + str(start_clients) + ' ' + str(num_clients) + ' ' + str(window_sz) + ' ' + str(duration) + ' ' + str(total_clients) + ' ' + str(low_throughput) + ' ' + str(high_throughput) + ' ' + str(spike_start) + ' ' + str(spike_duration)
 			run(args)
 
 def compress_log_files():
@@ -40,13 +49,14 @@ def compress_log_files():
 def enable_logging():
 	run('export RUST_LOG=fuzzy_log')
 
-def crdt_proc(log_addr, duration, exp_range, server_id, sync_duration,
+def crdt_proc(head_log_addr, tail_log_addr, duration, exp_range, server_id, sync_duration,
 	      num_clients, window_sz, num_rqs, sample_interval):
 	with cd('fuzzylog/delos-apps/examples/or-set'):
 		with prefix('export RUST_BACKTRACE=1'):
 			args = 'build/or-set '
 			args += '--reader ' 
-			args += '--log_addr ' + str(log_addr) + ' '		
+			args += '--head_log_addr ' + str(head_log_addr) + ' '		
+			args += '--tail_log_addr ' + str(tail_log_addr) + ' '		
 			args += '--expt_duration ' + str(duration) + ' ' 
 			args += '--expt_range ' + str(exp_range) + ' ' 
 			args += '--server_id ' + str(server_id) + ' '

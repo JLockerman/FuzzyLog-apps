@@ -9,15 +9,16 @@ import os
 import sys
 import subprocess
 import time
+import clean
 
 # Default settings for starting new instances.
 # XXX Should probably go into a config file. 
 SUBNET_ID = 'subnet-95bce7b8' 
 SECURITY_GROUP = 'sg-1d531961' 
-IMAGE_ID='ami-4e79c358'
+IMAGE_ID='ami-0758ce11'
 KEYFILE = '~/.ssh/jmfaleiro.pem'
 REGION = 'us-east-1'
-SERVER_INSTANCE_TYPE = 'm4.16xlarge'
+SERVER_INSTANCE_TYPE = 'c4.2xlarge'
 CLIENT_INSTANCE_TYPE = 'c4.2xlarge'
 
 # Returns a list of running instances. 
@@ -110,18 +111,18 @@ def stop_all_running_instances(region):
 	instance_list = get_running_instances(region)
 	stop_instances(region, instance_list)	
 
-def launch_client_controller(fabhost, keyfile, logaddr, start_clients, num_clients, window_sz, duration, total_clients,
+def launch_client_controller(fabhost, keyfile, head_logaddr, tail_logaddr, start_clients, num_clients, window_sz, duration, total_clients,
 			     low_throughput,
 			     high_throughput,
 			     spike_start,
 			     spike_duration):
-	launch_str = 'run_crdt_clients:' + logaddr + ',' + str(start_clients) + ',' + str(num_clients) + ',' + str(window_sz) + ',' + str(duration) + ',' + str(total_clients) + ',' + str(low_throughput) + ',' + str(high_throughput) + ',' + str(spike_start) + ',' + str(spike_duration)	
+	launch_str = 'run_crdt_clients:' + head_logaddr + ',' + tail_logaddr + ',' + str(start_clients) + ',' + str(num_clients) + ',' + str(window_sz) + ',' + str(duration) + ',' + str(total_clients) + ',' + str(low_throughput) + ',' + str(high_throughput) + ',' + str(spike_start) + ',' + str(spike_duration)	
 	return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])
 
 # Launch a CRDT applicatino process.
-def launch_crdt(fabhost, keyfile, logaddr, duration, exp_range, server_id, sync_duration,
+def launch_crdt(fabhost, keyfile, head_logaddr, tail_logaddr, duration, exp_range, server_id, sync_duration,
 		num_clients, window_sz, num_rqs, sample_interval):
-	launch_str = 'crdt_proc:' + logaddr + ',' + str(duration)
+	launch_str = 'crdt_proc:' + head_logaddr + ',' + tail_logaddr + ',' + str(duration)
 	launch_str += ',' + str(exp_range)
 	launch_str += ',' + str(server_id)
 	launch_str += ',' + str(sync_duration)
@@ -153,8 +154,13 @@ def check_statistics(server_ips, keyfile):
 		p.wait()
 
 # Launch fuzzy log. 
-def launch_fuzzylog(fabhost, keyfile, port, server_index, numservers):
-	launch_str = 'fuzzylog_proc:' + str(port) + ',' + str(server_index) + ',' + str(numservers)
+def launch_fuzzylog_head(fabhost, keyfile, port, server_index, numservers, down_proc):
+	launch_str = 'fuzzylog_proc_head:' + str(port) + ',' + str(server_index) + ',' + str(numservers) + ',' + down_proc 
+	proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])  
+	return proc
+
+def launch_fuzzylog_tail(fabhost, keyfile, port, server_index, numservers, up_proc):
+	launch_str = 'fuzzylog_proc_tail:' + str(port) + ',' + str(server_index) + ',' + str(numservers) + ',' + up_proc 
 	proc = subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', fabhost, launch_str])  
 	return proc
 
@@ -167,24 +173,40 @@ def zip_logfiles(fabhost, keyfile):
 # Fabric only supports synchronous calls to hosts. Create a process per-remote call, 
 # either corresponding to a client or server. Manage clients and servers by joining/killing
 # these processes.  
-def fuzzylog_exp(server_instances, client_instances, clients_per_instance, window_sz, duration, low_throughput, high_throughput, 
+def fuzzylog_exp(head_server_instances, tail_server_instances, client_instances, clients_per_instance, window_sz, duration, low_throughput, high_throughput, 
 		 spike_start, spike_duration):
+	
+	if len(head_server_instances) != len(tail_server_instances):
+		assert False
+
 	sync_duration = 300
 	exp_range = 1000000
 	num_rqs = 30000000
 	sample_interval = 1
 
-	logaddr = ''
-	for i in range(0, len(server_instances)):
-		logaddr += server_instances[i]['private']+':3333'
-		if i < len(server_instances)-1:
-			logaddr += '\\,'
+	head_logaddr = ''
+	for i in range(0, len(head_server_instances)):
+		head_logaddr += head_server_instances[i]['private']+':3333'
+		if i < len(head_server_instances)-1:
+			head_logaddr += '\\,'
+	
+	tail_logaddr = ''
+	for i in range(0, len(tail_server_instances)):
+		tail_logaddr += tail_server_instances[i]['private']+':3333'
+		if i < len(tail_server_instances)-1:
+			tail_logaddr += '\\,'
 
+	down_args = list(map(lambda x: x['private'], tail_server_instances))
+	up_args = list(map(lambda x: x['private']+':3333', head_server_instances))
+	
 	fabhost_prefix = 'ubuntu@' 
 	keyfile = '~/.ssh/jmfaleiro.pem'
 	
-	for i in range(0, len(server_instances)):
-		os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + server_instances[i]['public'] + ' kill_fuzzylog')
+	for i in range(0, len(head_server_instances)):
+		os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + head_server_instances[i]['public'] + ' kill_fuzzylog')
+	
+	for i in range(0, len(tail_server_instances)):
+		os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + tail_server_instances[i]['public'] + ' kill_fuzzylog')
 
 	for i in range(0, len(client_instances)):
 		os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + client_instances[i]['public'] + ' clean_crdt')
@@ -192,18 +214,21 @@ def fuzzylog_exp(server_instances, client_instances, clients_per_instance, windo
 		os.system('fab -D -i ' + keyfile + ' -H ' + fabhost_prefix + client_instances[i]['public'] + ' enable_logging')
 
 	log_procs = []
-	for i in range(0, len(server_instances)):
-		log_procs.append(launch_fuzzylog(fabhost_prefix+server_instances[i]['public'], keyfile, 3333, i, len(server_instances)))	
-	time.sleep(10)	
+	for i in range(0, len(head_server_instances)):
+		log_procs.append(launch_fuzzylog_head(fabhost_prefix+head_server_instances[i]['public'], keyfile, 3333, i, len(head_server_instances), down_args[i]))	
+	
+#	for i in range(0, len(tail_server_instances)):
+#		log_procs.append(launch_fuzzylog_tail(fabhost_prefix+tail_server_instances[i]['public'], keyfile, 3333, i, len(tail_server_instances), up_args[i]))	
 
+	time.sleep(10)
 	client_procs = []
 	for i in range(0, len(client_instances) - 1):
 		start_c = i * clients_per_instance
-		client_proc = launch_client_controller(fabhost_prefix+client_instances[i]['public'], keyfile, logaddr, start_c, clients_per_instance, window_sz, duration, clients_per_instance * (len(client_instances) - 1), low_throughput, high_throughput, spike_start, spike_duration)	
+		client_proc = launch_client_controller(fabhost_prefix+client_instances[i]['public'], keyfile, head_logaddr, tail_logaddr, start_c, clients_per_instance, window_sz, duration, clients_per_instance * (len(client_instances) - 1), low_throughput, high_throughput, spike_start, spike_duration)	
 		client_procs.append(client_proc)
 
 	last_client = len(client_instances)-1
-	getter_proc = launch_crdt(fabhost_prefix+client_instances[last_client]['public'], keyfile, logaddr, duration, 1000, 							len(client_procs)*clients_per_instance, 500, len(client_procs)*clients_per_instance,
+	getter_proc = launch_crdt(fabhost_prefix+client_instances[last_client]['public'], keyfile, head_logaddr, tail_logaddr, duration, 1000, 							len(client_procs)*clients_per_instance, 500, len(client_procs)*clients_per_instance,
 				  window_sz, 0, 1)  
 	client_procs.append(getter_proc)
 	
@@ -282,19 +307,22 @@ def start_single_client_instance():
 def do_expt():
 	# Start up instances for experiment. 
 	client_instances = launch_instances(5, CLIENT_INSTANCE_TYPE, REGION)
-	# instance_ids = get_stopped_instances(REGION)
-	# instances = start_instances(REGION, instance_ids)
-	server_instances = launch_instances(5, SERVER_INSTANCE_TYPE, REGION)
-
+	server_head_instances = launch_instances(5, SERVER_INSTANCE_TYPE, REGION)
+	# server_tail_instances = launch_instances(1, SERVER_INSTANCE_TYPE, REGION)
+	server_tail_instances = server_head_instances
 
 	client_instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, client_instances))
-	server_instance_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, server_instances))
-	test_instances(server_instance_ips, KEYFILE)
+	server_head_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, server_head_instances))
+	server_tail_ips = list(map(lambda x: {'public' : x.public_dns_name, 'private' : x.private_ip_address}, server_tail_instances))
+
 	test_instances(client_instance_ips, KEYFILE)
-	
+	test_instances(server_head_ips, KEYFILE)
+	test_instances(server_tail_ips, KEYFILE)
+
 	os.system('mkdir results')
 	log_fmt = '{0}_logs.tar.gz'
 		
+	
 	low_throughput = 10000
 	high_throughput = 60000
 	spike_start = 45 
@@ -306,7 +334,7 @@ def do_expt():
 	g = len(client_instance_ips)-1
 	
 	for i in range(4, 5):	
-		fuzzylog_exp(server_instance_ips[0:i+1], client_instance_ips, num_clients, window_sz, duration, 
+		fuzzylog_exp(server_head_ips[0:i+1], server_tail_ips[0:i+1], client_instance_ips, num_clients, window_sz, duration, 
 			     low_throughput, 
 			     high_throughput, 
 			     spike_start,
@@ -322,8 +350,9 @@ def do_expt():
 			os.system('scp -r -i ~/.ssh/jmfaleiro.pem -o StrictHostKeyChecking=no ubuntu@' + c['public'] + ':~/fuzzylog/delos-apps/examples/or-set/logs.tar.gz ' + os.path.join(result_dir, logfile)) 
 	
 
-	instances = client_instances + server_instances
+	instances = client_instances + server_head_instances + server_tail_instances
 	terminate_instances(REGION, instances)	
+	clean.crdt_expt(len(client_instances), num_clients, window_sz, len(server_head_instances))
 
 def main():
 	do_expt()
