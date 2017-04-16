@@ -32,23 +32,91 @@ public class Start {
 		int[] meta = new int[2];
 		int num_gets = 0;
 		
+		int[] color_count = new int[4];
+		color_count[0] = 0;
+		color_count[1] = 0;
+		color_count[2] = 0;
+		color_count[3] = 0;
+
 		long start_time = 0;
 		while (num_gets < _num_requests) {
 			if (_client.get_next(data, colors, meta) == false) {
 				_client.snapshot();
 			} else {
+				assert(meta[1] == 1);
+				color_count[colors[0]] += 1;
 				num_gets += 1;
 			}
 			if (num_gets == 1) {
 				start_time = System.nanoTime();
 			}
 		}
+
+		assert(color_count[2] == color_count[3]);
 		
 		long end_time = System.nanoTime();
 		double throughput = _num_requests*1000000000.0 / (end_time - start_time);
 		System.err.println("Throughput: " + throughput);
 	}
 	
+	public void causal_append() throws IOException {
+		byte[] data = new byte[4];
+		data[0] = (byte)0xFF;
+		data[1] = (byte)0xFF;
+		data[2] = (byte)0xFF;
+		data[3] = (byte)0xFF;
+		
+		int[] color0 = new int[1];
+		color0[0] = 2;
+		
+		int[] color1 = new int[1];
+		color1[0] = 3;
+
+		int num_pending = 0;
+		WriteID ack_wid = new WriteID();
+				
+		int[] num_results = new int[2];
+		
+		long start_time = System.nanoTime();
+		
+		for (int i = 0; i < _num_requests; ++i) {
+			
+			WriteID wid = new WriteID();
+			if (i % 2 == 0)
+				_client.async_append_causal(color0, color1, data, wid);
+			else 
+				_client.async_append_causal(color1, color0, data, wid);
+			
+			_pending_appends.put(wid,  i);
+			num_pending += 1;
+			
+			if (num_pending == _window_sz) {
+				/*
+				while (true) {
+					if (_client.get_next(data, colors, num_results) == false) {
+						_client.snapshot();
+						break;
+					}
+				}
+				*/
+				_client.wait_any_append(ack_wid);
+				_pending_appends.remove(ack_wid);
+					num_pending -= 1;
+			}
+		}
+		
+		while (num_pending != 0) {
+			_client.wait_any_append(ack_wid);
+			_pending_appends.remove(ack_wid);
+			num_pending -= 1;
+		}
+		
+		long end_time = System.nanoTime();
+		double throughput = _num_requests*1000000000.0 / (end_time - start_time);
+		System.err.println("Throughput: " + throughput);
+	
+	}
+
 	public void multi_append() throws IOException {
 		byte[] data = new byte[4];
 		data[0] = (byte)0xFF;
@@ -233,7 +301,8 @@ public class Start {
 				st.multi_append();
 			else if (expt == 1)
 				st.multi_read();
-				
+			else if (expt == 2)
+				st.causal_append();
 			
 			//st.test_proxy();
 			//st.test_values();

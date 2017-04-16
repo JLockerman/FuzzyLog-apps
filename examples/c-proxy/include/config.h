@@ -13,14 +13,14 @@
 static struct option long_options[] = {
   {"log_addr", required_argument, NULL, 0},
   {"proxy_port", required_argument, NULL, 1},
-  {"client_id", required_argument, NULL, 2},
+  {"colors", required_argument, NULL, 2},
   {NULL, no_argument, NULL, 3},
 };
 
 struct config {
 	std::vector<std::string> 		log_addr;
 	uint16_t				proxy_port;
-	uint32_t 				client_id;
+	std::vector<uint32_t>			colors;
 }; 
 
 class config_parser {
@@ -28,7 +28,7 @@ private:
 	enum OptionCode {
 		LOG_ADDR = 0,
 		PROXY_PORT=1,
-		CLIENT_ID=2,
+		COLORS=2,
 	};
 
 	bool 					_init;
@@ -60,17 +60,15 @@ private:
 
 		if (_arg_map.count(LOG_ADDR) == 0 || 
 		    _arg_map.count(PROXY_PORT) == 0 || 
-		    _arg_map.count(CLIENT_ID) == 0) {
+		    _arg_map.count(COLORS) == 0) {
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[PROXY_PORT].name << "\n";
-		        std::cerr << "--" << long_options[CLIENT_ID].name << "\n";
+		        std::cerr << "--" << long_options[COLORS].name << "\n";
 		        exit(-1);
 		}
 	
 		ret.proxy_port = (uint16_t)atoi(_arg_map[PROXY_PORT]);
-		ret.client_id = (uint32_t)atoi(_arg_map[CLIENT_ID]);
-		assert(ret.client_id != 0);
 
 		std::string log_addresses;
 		log_addresses.assign(_arg_map[LOG_ADDR]);
@@ -79,6 +77,12 @@ private:
 			
 		while (getline(addr_s, item, ',')) 
 			ret.log_addr.push_back(item);
+				
+		std::string colors;
+		colors.assign(_arg_map[COLORS]);
+		std::stringstream colors_s(colors);
+		while (getline(colors_s, item, ','))
+			ret.colors.push_back((uint32_t)atoi(item.c_str()));
 		
 		return ret;
 	}

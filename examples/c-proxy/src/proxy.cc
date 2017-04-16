@@ -67,7 +67,7 @@ void fuzzy_proxy::do_get_next()
 	size_t buf_sz;
 	struct colors c;
 	uint32_t *uint_buf;
-	
+
 	get_next(_handle, &_buffer[2*sizeof(uint32_t)], &buf_sz, &c);
 	uint_buf = (uint32_t *)_buffer;
 	uint_buf[0] = htonl((uint32_t)buf_sz);
@@ -77,8 +77,9 @@ void fuzzy_proxy::do_get_next()
 		_buffer_len = 2*sizeof(uint32_t);
 	} else { 
 		auto offset = 2*sizeof(uint32_t) + buf_sz;
+		uint_buf = (uint32_t*)(&_buffer[offset]);
 		for (auto i = 0; i < c.numcolors; ++i) {
-			_buffer[offset+i] = htonl(c.mycolors[i]);
+			uint_buf[i] = htonl(c.mycolors[i]);
 		}
 		free(c.mycolors);
 		_buffer_len = 2*sizeof(uint32_t) + buf_sz + sizeof(ColorID)*c.numcolors;
