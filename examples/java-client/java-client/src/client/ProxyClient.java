@@ -6,18 +6,23 @@ import java.util.Queue;
 
 public class ProxyClient {
 
-	private int 					_server_port;
-	private Socket 					_socket;
+	private int 				_server_port;
+	private Socket 				_socket;
 	private DataOutputStream 		_output;
 	private DataInputStream 		_input;
+	private int[] 				_empty_causal;
 	
-	private void serialize_async_append(int[] append_colors, byte[] payload) throws IOException {
+	private void serialize_async_append(int[] append_colors, int[] depend_colors, byte[] payload) throws IOException {
 		_output.writeInt(0);
 		_output.writeInt(append_colors.length);
-		_output.writeInt(0);
+		_output.writeInt(depend_colors.length);
 		
 		for (int i = 0; i < append_colors.length; ++i) {
 			_output.writeInt(append_colors[i]);
+		}
+		
+		for (int i = 0; i < depend_colors.length; ++i) {
+			_output.writeInt(depend_colors[i]);
 		}
 		
 		_output.writeInt(payload.length);
@@ -102,10 +107,16 @@ public class ProxyClient {
 		_socket = new Socket(hostname, _server_port);
 		_input = new DataInputStream(new BufferedInputStream(_socket.getInputStream()));
 		_output = new DataOutputStream(new BufferedOutputStream(_socket.getOutputStream()));
+		_empty_causal = new int[0];
 	}
 	
 	public void async_append(int[] append_colors, byte[] buffer, WriteID wid)  throws IOException{
-		serialize_async_append(append_colors, buffer);
+		serialize_async_append(append_colors, _empty_causal, buffer);
+		deserialize_async_append_response(wid);
+	}
+	
+	public void async_append_causal(int[] append_colors, int[] causal_colors, byte[] buffer, WriteID wid) throws IOException {
+		serialize_async_append(append_colors, causal_colors, buffer);
 		deserialize_async_append_response(wid);
 	}
 	

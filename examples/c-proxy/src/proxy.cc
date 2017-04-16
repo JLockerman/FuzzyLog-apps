@@ -25,8 +25,19 @@ write_id fuzzy_proxy::do_async_append()
 		colors[i] = c;
 		i += 1;
 	}
+	
+	ColorID causal_array[_request._depend_colors.size()];
+	struct colors causal_colors;
+	causal_colors.mycolors = causal_array;
+	causal_colors.numcolors = _request._depend_colors.size(); 
+	
+	i = 0;
+	for (auto c : _request._depend_colors) {
+		causal_array[i] = c;
+		i += 1;
+	}
 
-	return async_append(_handle, _request._payload, _request._payload_size, &append_colors, NULL);  
+	return async_simple_causal_append(_handle, _request._payload, _request._payload_size, &append_colors, &causal_colors);  
 }
 
 void fuzzy_proxy::do_try_wait_any(std::deque<write_id> &wid_list)
