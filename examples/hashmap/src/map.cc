@@ -4,6 +4,14 @@
 
 #define DUMMY_INTERESTING_COLOR         100000
 
+BaseMap::BaseMap(std::vector<std::string>* log_addr, bool replication): m_replication(replication) {
+        init_fuzzylog_client(log_addr);
+}
+
+BaseMap::~BaseMap() {
+        close_dag_handle(m_fuzzylog_client);
+}
+
 void BaseMap::init_fuzzylog_client(std::vector<std::string>* log_addr) {
         // XXX This color is not used
         struct colors* c;

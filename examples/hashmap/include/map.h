@@ -39,10 +39,9 @@ protected:
 
 
 public:
-        BaseMap(std::vector<std::string>* log_addr, bool replication) {
-                this->m_replication = replication;
-                init_fuzzylog_client(log_addr);
-        }
+        BaseMap(std::vector<std::string>* log_addr, bool replication);
+        virtual ~BaseMap();
+
         //MapType get_map_type() { return m_map_type; }
         void init_fuzzylog_client(std::vector<std::string>* log_addr);
         // Synchronous operations

@@ -13,7 +13,6 @@ AtomicMap::AtomicMap(std::vector<std::string>* log_addr, std::vector<workload_co
 AtomicMap::~AtomicMap() {
         if (m_synchronizer != NULL)
                 m_synchronizer->join();
-        close_dag_handle(m_fuzzylog_client);
 }
 
 bool AtomicMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors) {

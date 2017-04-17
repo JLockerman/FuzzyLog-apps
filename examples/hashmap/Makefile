@@ -8,7 +8,7 @@ LIBS=-pthread -lc_link -ldl -lrt -lcityhash
 INC_DIRS=include libs/include $(DELOS_RUST_LOC)/examples/c_linking
 INCLUDE=$(foreach d, $(INC_DIRS), -I$d)
 
-all: build/atomicmap build/capmap
+all: build/atomicmap build/capmap build/txmap
 
 build/%.o: src/%.cc 
 	@mkdir -p build
@@ -22,6 +22,11 @@ build/atomicmap: $(ATOMICMAP_OBJECTS)
 CAPMAP_OBJECTS = build/capmap_workload.o build/tester.o build/capmap_tester.o build/capmap_synchronizer.o build/map.o build/capmap.o build/capmap_test.o
 
 build/capmap: $(CAPMAP_OBJECTS)
+	$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)
+
+TXMAP_OBJECTS = build/txmap_synchronizer.o build/map.o build/txmap.o build/txmap_test.o
+
+build/txmap: $(TXMAP_OBJECTS)
 	$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)
 
 .PHONY: clean
