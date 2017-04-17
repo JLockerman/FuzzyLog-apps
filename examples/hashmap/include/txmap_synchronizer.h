@@ -11,6 +11,19 @@ extern "C" {
         #include "fuzzy_log.h"
 }
 
+typedef struct txmap_record {
+        uint64_t key;
+        uint64_t value;
+        uint64_t version;  
+} txmap_record;
+
+typedef struct txmap_set {
+        uint32_t num_entry;
+        txmap_record* set;
+        ~txmap_set() { delete set; }
+} txmap_set;
+
+
 // Synchronizer class which eagerly synchronize with fuzzylog 
 class TXMapSynchronizer : public Runnable {
 private:
@@ -23,7 +36,7 @@ private:
         char                                                                    m_read_buf[DELOS_MAX_DATA_SIZE];
 
         std::atomic_bool                                                        m_running;
-        std::unordered_map<uint64_t, uint64_t>                                  m_local_map; 
+        std::unordered_map<uint64_t, uint64_t>                                  m_local_map;    // Hack: let's store version into value 
         std::mutex                                                              m_local_map_mtx;
 
         bool                                                                    m_replication;
@@ -41,4 +54,11 @@ public:
         std::mutex* get_local_map_lock();
 
         uint64_t get(uint64_t key);
+        void put(uint64_t key, uint64_t value);
+
+        // Txn validation
+        void deserialize_commit_record(char *buf, size_t size, txmap_set *rset, txmap_set *wset);
+        void validate_txn(txmap_set *rset, txmap_set *wset);
+        uint64_t get_latest_key_version(uint64_t key);
+        void update_map(txmap_set *wset);
 };

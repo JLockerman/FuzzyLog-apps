@@ -3,21 +3,12 @@
 #include <map.h>
 #include <txmap_synchronizer.h>
 
-typedef struct txmap_record {
-        uint64_t key;
-        uint64_t value;
-        LocationInColor version;  
-} txmap_record;
-
-typedef struct txmap_set {
-        uint32_t num_entry;
-        txmap_record* set;
-} txmap_set;
-
 class TXMap : public BaseMap {
 private:
         // Reader thread
-        TXMapSynchronizer*                          m_synchronizer; 
+        struct colors                                   m_op_color;
+        TXMapSynchronizer*                              m_synchronizer; 
+        std::atomic<uint64_t>                           m_commit_record_id;
 
 public:
         TXMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, bool replication);
@@ -25,9 +16,10 @@ public:
 
         void get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors);
         void init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication);
+        void init_op_color(std::vector<ColorID>& interesting_colors);
 
         uint64_t get(uint64_t key);
 
-        void beginTX();
-        bool endTX(txmap_set* read_set, txmap_set* write_set);
+        void serialize_commit_record(txmap_set *rset, txmap_set *wset, char* out, size_t* out_size);
+        void execute_move_txn(uint64_t from_key, uint64_t to_key);
 };
