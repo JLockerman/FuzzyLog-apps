@@ -29,17 +29,22 @@ public:
         virtual write_id AsyncRemoteRun();
         virtual write_id AsyncStronglyConsistentRun();
         virtual write_id AsyncWeaklyConsistentRun();
+        virtual optype op_type() {
+                return optype::PUT;
+        }
 };
 
 class txmap_workload_generator {
 private:
         Context*                                m_context;
         TXMap*                                  m_map;
+        uint64_t                                m_key_range;
         vector<workload_config>*                m_workload;
 public:
-        txmap_workload_generator(Context* context, TXMap* map, vector<workload_config>* workload) {
+        txmap_workload_generator(Context* context, TXMap* map, uint64_t key_range, vector<workload_config>* workload) {
                 this->m_context = context;
                 this->m_map = map;
+                this->m_key_range = key_range;
                 this->m_workload = workload;
         }
         Txn** Gen();

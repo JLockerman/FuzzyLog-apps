@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/file.h>
-#include <txmap_config.h>
+#include <txmap_tester.h>
 #include <signal.h>
 
 extern "C" {
@@ -18,6 +18,30 @@ using namespace std;
 using ns = chrono::nanoseconds;
 using get_time = chrono::system_clock;
 
+void write_throughput(uint32_t client_id, std::string &output_suffix, std::vector<uint64_t>& results) {
+        std::ofstream result_file; 
+        result_file.open(std::to_string(client_id) + output_suffix + ".txt", std::ios::app | std::ios::out);
+        for (auto r : results) {
+                result_file << r << "\n"; 
+        }
+        result_file.close();        
+}
+
+void measure_fn(TXMapTester *w, uint64_t duration, std::vector<uint64_t> &executed_results, std::vector<uint64_t> &committed_results)
+{
+        uint64_t start_iters, end_iters;
+        
+        end_iters = w->get_num_executed();
+        for (auto i = 0; i < duration; ++i) {
+                start_iters = end_iters; 
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                end_iters = w->get_num_executed();        
+                std::cout << i << " measured: " << end_iters << " - " << start_iters << " = " << end_iters - start_iters << std::endl;
+                executed_results.push_back(end_iters - start_iters);
+        }
+
+        // TODO committed results
+}
 
 void wait_signal(txmap_config cfg)
 {
@@ -81,6 +105,71 @@ void wait_signal(txmap_config cfg)
 }
 
 void do_experiment(txmap_config cfg) {
+        uint64_t total_op_count;
+        TXMap *map;
+        txmap_workload_generator *workload_gen;
+        Txn** txns;
+        TXMapTester* worker;
+        std::atomic<bool> flag;
+        std::vector<uint64_t> executed_results;
+        std::vector<uint64_t> committed_results;
+
+        // Total operation count
+        total_op_count = 0;
+        assert(cfg.workload.size() == 1);
+        workload_config &w = cfg.workload[0];
+        total_op_count = w.op_count;
+        Context ctx;    // Can be used to share info between TXMapTester and Txns
+
+        // Fuzzymap
+        map = new TXMap(&cfg.log_addr, &cfg.workload, cfg.replication);
+
+        // Generate append workloads: uniform distribution
+        workload_gen = new txmap_workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);
+        txns = workload_gen->Gen();
+        
+        // One worker thread
+        flag = true;
+        worker = new TXMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size, cfg.expt_duration, cfg.txn_rate);
+
+        // Synchronize clients
+        wait_signal(cfg);
+
+        // Run workers
+        worker->run();
+        
+        // Measure
+        if (cfg.expt_duration > 0) {
+                std::this_thread::sleep_for(std::chrono::seconds(5));  
+                measure_fn(worker, cfg.expt_duration, executed_results, committed_results);
+                // Stop worker
+                flag = false;
+        }
+
+        while (!ctx.is_finished()) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+
+        // Wait until worker finishes
+        worker->join();
+ 
+        // Write throughput to output file
+        
+        if (executed_results.size() > 0) {
+                std::string tput_output_suffix = "_tput";
+                write_throughput(cfg.client_id, tput_output_suffix, executed_results);
+        }
+
+        if (committed_results.size() > 0) {
+                std::string goodput_output_suffix = "_gput";
+                write_throughput(cfg.client_id, goodput_output_suffix, committed_results);
+        }
+
+        // Free
+        delete worker;
+        delete map;
+        delete workload_gen;
+
 }
 
 int main(int argc, char** argv) {

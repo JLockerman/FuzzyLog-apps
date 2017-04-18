@@ -48,10 +48,9 @@ Txn** txmap_workload_generator::Gen() {
         workload_config &w = m_workload->at(0);
         total_op_count = w.op_count;
         local_key_range_start = 0;        
-        local_key_range_end = w.expt_range;
-        remote_key_range_start = w.expt_range + 1;
-        remote_key_range_end = w.expt_range * 2;
-
+        local_key_range_end = m_key_range;
+        remote_key_range_start = m_key_range + 1;
+        remote_key_range_end = m_key_range * 2;
 
         Txn **txns = (Txn**)malloc(sizeof(Txn*) * total_op_count);
 

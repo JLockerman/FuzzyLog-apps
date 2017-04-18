@@ -24,7 +24,7 @@ CAPMAP_OBJECTS = build/capmap_workload.o build/tester.o build/capmap_tester.o bu
 build/capmap: $(CAPMAP_OBJECTS)
 	$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)
 
-TXMAP_OBJECTS = build/txmap_synchronizer.o build/map.o build/txmap.o build/txmap_test.o
+TXMAP_OBJECTS = build/txmap_workload.o build/tester.o build/txmap_tester.o build/txmap_synchronizer.o build/map.o build/txmap.o build/txmap_test.o
 
 build/txmap: $(TXMAP_OBJECTS)
 	$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)
