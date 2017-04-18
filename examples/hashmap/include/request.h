@@ -11,11 +11,15 @@ using namespace std;
 class Context {
 private:
         std::atomic<uint64_t>                   m_num_executed;
+        std::atomic<uint64_t>                   m_num_committed;
+        std::atomic<uint64_t>                   m_num_aborted;
         std::atomic<bool>                       m_finished;
         std::unordered_map<write_id, std::chrono::system_clock::time_point, wid_hasher, wid_equality>   m_request_map;
 public:
         Context() {
                 this->m_num_executed = 0;
+                this->m_num_committed = 0;
+                this->m_num_aborted = 0;
                 this->m_finished = false;
         }
         bool is_finished() {
@@ -29,6 +33,18 @@ public:
         }
         void inc_num_executed() {
                 m_num_executed++; 
+        }
+        uint64_t get_num_committed() {
+                return m_num_committed;
+        }
+        void inc_num_committed() {
+                m_num_committed++;
+        }
+        uint64_t get_num_aborted() {
+                return m_num_aborted;
+        }
+        void inc_num_aborted() {
+                m_num_aborted++;
         }
         void mark_started(write_id wid, std::chrono::system_clock::time_point issued_time) {
                 m_request_map[wid] = issued_time;

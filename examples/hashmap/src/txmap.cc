@@ -4,10 +4,10 @@
 #include <cassert>
 #include <unistd.h>
 
-TXMap::TXMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, bool replication): BaseMap(log_addr, replication), m_commit_record_id(0) {
+TXMap::TXMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, Context* context, bool replication): BaseMap(log_addr, replication), m_commit_record_id(0), m_synchronizer(NULL) {
         std::vector<ColorID> interesting_colors;
         get_interesting_colors(workload, interesting_colors);
-        init_synchronizer(log_addr, interesting_colors, replication);
+        init_synchronizer(log_addr, interesting_colors, context, replication);
 
         // init color
         init_op_color(interesting_colors);
@@ -28,8 +28,8 @@ void TXMap::get_interesting_colors(std::vector<workload_config>* workload, std::
         }
 }
 
-void TXMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication) {
-        m_synchronizer = new TXMapSynchronizer(log_addr, interesting_colors, replication);
+void TXMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, bool replication) {
+        m_synchronizer = new TXMapSynchronizer(log_addr, interesting_colors, context, replication);
         m_synchronizer->run();
 }
 
@@ -119,10 +119,18 @@ void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
         write_set.set[0] = local_write_record;
         write_set.set[1] = remote_write_record;
 
-        // TODO: make payload
+        // Make payload
         size_t size = 0;
         serialize_commit_record(&read_set, &write_set, m_buf, &size);
 
         // Append commit record
         async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL, 0);
+}
+
+void TXMap::log(txmap_set* rset, txmap_set* wset) {
+        std::ofstream result_file; 
+        result_file.open("txns.txt", std::ios::app | std::ios::out);
+        result_file << "[R] " << rset->log(); 
+        result_file << "[W] " << wset->log() << std::endl; 
+        result_file.close();        
 }

@@ -2,10 +2,12 @@
 
 #include <runnable.h>
 #include <iostream>
+#include <sstream>
 #include <atomic>
 #include <queue>
 #include <condition_variable>
 #include <unordered_map>
+#include <request.h>
 
 extern "C" {
         #include "fuzzy_log.h"
@@ -15,12 +17,31 @@ typedef struct txmap_record {
         uint64_t key;
         uint64_t value;
         uint64_t version;  
+        void print() {
+                std::cout << "key:" << key << ",ver:" << version << std::endl;
+        }
+        std::string log() {
+                std::stringstream ss;
+                ss << "key:" << key << ",ver:" << version << std::endl;
+                return ss.str();
+        }
 } txmap_record;
 
 typedef struct txmap_set {
         uint32_t num_entry;
         txmap_record* set;
         ~txmap_set() { delete set; }
+        void print() {
+                for (size_t i = 0; i < num_entry; i++)
+                        set[i].print();
+        }
+        std::string log() {
+                std::stringstream ss;
+                for (size_t i = 0; i < num_entry; i++)
+                        ss << set[i].log();
+                return ss.str();
+        }
+
 } txmap_set;
 
 
@@ -34,6 +55,8 @@ private:
         DAGHandle*                                                              m_fuzzylog_client;
         struct colors*                                                          m_interesting_colors;
         char                                                                    m_read_buf[DELOS_MAX_DATA_SIZE];
+        
+        Context*                                                                m_context;
 
         std::atomic_bool                                                        m_running;
         std::unordered_map<uint64_t, uint64_t>                                  m_local_map;    // Hack: let's store version into value 
@@ -42,7 +65,7 @@ private:
         bool                                                                    m_replication;
         
 public:
-        TXMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication);
+        TXMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, bool replication);
         ~TXMapSynchronizer() {}
         virtual void run();
         virtual void join();
@@ -57,8 +80,8 @@ public:
         void put(uint64_t key, uint64_t value);
 
         // Txn validation
-        void deserialize_commit_record(char *buf, size_t size, txmap_set *rset, txmap_set *wset);
-        void validate_txn(txmap_set *rset, txmap_set *wset);
+        void deserialize_commit_record(uint8_t *buf, size_t size, txmap_set *rset, txmap_set *wset);
+        bool validate_txn(txmap_set *rset, txmap_set *wset);
         uint64_t get_latest_key_version(uint64_t key);
-        void update_map(txmap_set *wset);
+        void update_map(txmap_set *wset, LocationInColor commit_version);
 };

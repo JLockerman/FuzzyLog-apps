@@ -29,18 +29,22 @@ void write_throughput(uint32_t client_id, std::string &output_suffix, std::vecto
 
 void measure_fn(TXMapTester *w, uint64_t duration, std::vector<uint64_t> &executed_results, std::vector<uint64_t> &committed_results)
 {
-        uint64_t start_iters, end_iters;
+        uint64_t start_executed, end_executed;
+        uint64_t start_committed, end_committed;
         
-        end_iters = w->get_num_executed();
+        end_executed = w->get_num_executed();
+        end_committed = w->get_num_committed();
         for (auto i = 0; i < duration; ++i) {
-                start_iters = end_iters; 
+                start_executed = end_executed; 
+                start_committed = end_committed;
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-                end_iters = w->get_num_executed();        
-                std::cout << i << " measured: " << end_iters << " - " << start_iters << " = " << end_iters - start_iters << std::endl;
-                executed_results.push_back(end_iters - start_iters);
+                end_executed = w->get_num_executed();        
+                end_committed = w->get_num_committed();
+                std::cout << i << " executed : " << end_executed << " - " << start_executed << " = " << end_executed - start_executed << std::endl;
+                std::cout << i << " committed: " << end_committed << " - " << start_committed << " = " << end_committed - start_committed << std::endl;
+                executed_results.push_back(end_executed - start_executed);
+                committed_results.push_back(end_committed - start_committed);
         }
-
-        // TODO committed results
 }
 
 void wait_signal(txmap_config cfg)
@@ -122,7 +126,7 @@ void do_experiment(txmap_config cfg) {
         Context ctx;    // Can be used to share info between TXMapTester and Txns
 
         // Fuzzymap
-        map = new TXMap(&cfg.log_addr, &cfg.workload, cfg.replication);
+        map = new TXMap(&cfg.log_addr, &cfg.workload, &ctx, cfg.replication);
 
         // Generate append workloads: uniform distribution
         workload_gen = new txmap_workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);
@@ -140,7 +144,7 @@ void do_experiment(txmap_config cfg) {
         
         // Measure
         if (cfg.expt_duration > 0) {
-                std::this_thread::sleep_for(std::chrono::seconds(5));  
+                std::this_thread::sleep_for(std::chrono::seconds(5));
                 measure_fn(worker, cfg.expt_duration, executed_results, committed_results);
                 // Stop worker
                 flag = false;

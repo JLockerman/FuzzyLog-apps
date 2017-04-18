@@ -5,6 +5,10 @@ uint64_t Tester::get_num_executed() {
         return m_context->get_num_executed();
 }
 
+uint64_t Tester::get_num_committed() {
+        return m_context->get_num_committed();
+}
+
 uint32_t Tester::try_get_completed() {
         uint32_t num_completed = 0;
         while (true) {
@@ -35,7 +39,7 @@ void Tester::reset_throttler() {
 
 bool Tester::is_throttled() {
         if (m_txn_rate == 0)
-                return true;
+                return false;
         auto now = std::chrono::system_clock::now();
         std::chrono::duration<uint64_t, std::nano> elapsed = now - m_started_at;
         // rate 

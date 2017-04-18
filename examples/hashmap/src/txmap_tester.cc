@@ -51,8 +51,7 @@ void TXMapTester::Execute() {
                         m_context->inc_num_executed();
                         if (!is_duration_based_run() && is_all_executed()) break;
                 }
-
-                m_txns[i]->AsyncRun();
+                m_txns[i]->Run();
                 m_num_issued++;
                 num_pending += 1;
         }
