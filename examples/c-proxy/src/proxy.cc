@@ -202,7 +202,7 @@ void fuzzy_proxy::run()
 	write_id wid;
 	
 	while (true) {
-		if (recv(_client_fd, _buffer, MAX_PROXY_BUF, 0) <= 0)
+		if (recv(_client_fd, _buffer, DELOS_MAX_DATA_SIZE, 0) <= 0)
 			break;
 
 		_request.initialize(_buffer);

@@ -12,8 +12,6 @@ extern "C" {
 	#include <unistd.h>
 }
 
-#define MAX_PROXY_BUF		4096	
-
 class wid_equality {
 public:
 	bool operator() (write_id const &wid1, write_id const &wid2) const {
@@ -49,7 +47,7 @@ class fuzzy_proxy {
 
 private:
 	DAGHandle 		*_handle;
-	char 			_buffer[MAX_PROXY_BUF];	
+	char 			_buffer[DELOS_MAX_DATA_SIZE];	
 	std::size_t 		_buffer_len;
 	proxy_request 		_request;
 	uint32_t 		_max_try_wait;	
