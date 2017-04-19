@@ -94,7 +94,7 @@ void TXMapSynchronizer::Execute() {
                                 if (node.node_type == txmap_node::NodeType::COMMIT_RECORD) {
                                         assert(locs_read == 2);
                                         txmap_commit_node commit_node;
-                                        // read commit record
+                                        // Read commit record
                                         deserialize_commit_record(const_cast<uint8_t*>(next_val.data), size, &commit_node);
 
                                         // DEBUG ===================
@@ -118,7 +118,7 @@ void TXMapSynchronizer::Execute() {
                                                 continue;
                                         }
 
-                                        // validate
+                                        // Validate
                                         bool valid = validate_txn(&commit_node);
                                         if (valid) {
                                                 update_map(&commit_node.write_set, commit_version);
@@ -128,7 +128,7 @@ void TXMapSynchronizer::Execute() {
                                                 m_context->inc_num_aborted();
                                         }
 
-                                        // append decision node to remote color
+                                        // Append decision node to remote color
                                         append_decision_node_to_remote(commit_version, valid);
 
                                         // DEBUG ===================
@@ -146,7 +146,7 @@ void TXMapSynchronizer::Execute() {
                                 } else if (node.node_type == txmap_node::NodeType::DECISION_RECORD) {
                                         assert(locs_read == 1);
                                         txmap_decision_node decision_node;
-                                        // read commit record
+                                        // Read decision record
                                         deserialize_decision_record(const_cast<uint8_t*>(next_val.data), size, &decision_node);
                                         //needs_buffering = apply_buffered_nodes(&decision_node);
                                 }
@@ -235,8 +235,7 @@ bool TXMapSynchronizer::is_decision_possible(txmap_commit_node *commit_node) {
         assert(rset->num_entry == 1);
         txmap_record &r = rset->set[0]; 
         // XXX Rule: every keys in read set should be in local key range
-        TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
-        return r.key >= ctx->m_local_key_range_start && r.key < ctx->m_local_key_range_end;
+        return is_local_key(r.key);
 }
 
 void TXMapSynchronizer::append_decision_node_to_remote(LocationInColor commit_version, bool committed) {
@@ -310,6 +309,12 @@ void TXMapSynchronizer::update_map(txmap_set *wset, LocationInColor commit_versi
         num_entry = wset->num_entry;
         for (i = 0; i < num_entry; i++) {
                 txmap_record &r = wset->set[i];
-                put(r.key, commit_version);
+                if (is_local_key(r.key))
+                        put(r.key, commit_version);
         }
+}
+
+bool TXMapSynchronizer::is_local_key(uint64_t key) {
+        TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
+        return key >= ctx->m_local_key_range_start && key < ctx->m_local_key_range_end;
 }

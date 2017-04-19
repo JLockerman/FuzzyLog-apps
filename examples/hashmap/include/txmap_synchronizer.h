@@ -123,4 +123,5 @@ public:
         bool validate_txn(txmap_commit_node *commit_node);
         uint64_t get_latest_key_version(uint64_t key);
         void update_map(txmap_set *wset, LocationInColor commit_version);
+        bool is_local_key(uint64_t key);
 };
