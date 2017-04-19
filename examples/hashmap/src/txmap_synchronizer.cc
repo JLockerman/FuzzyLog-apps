@@ -80,11 +80,11 @@ void TXMapSynchronizer::Execute() {
 
         while (m_running) {
                 // m_pending_queue ==> m_current_queue
-                swap_queue();
+          //      swap_queue();
 
                 // update local map
                 {
-                        std::lock_guard<std::mutex> lock(m_local_map_mtx);
+                        //std::lock_guard<std::mutex> lock(m_local_map_mtx);
                         snapshot(m_fuzzylog_client);
                         while (true) {
                                 next_val = get_next2(m_fuzzylog_client, &size, &locs_read);
@@ -135,14 +135,14 @@ void TXMapSynchronizer::Execute() {
                         }
                 }
                 // Wake up all waiting worker threads
-                while (!m_current_queue.empty()) {
-                        std::condition_variable* cv = m_current_queue.front().first;
-                        std::atomic_bool* cv_spurious_wake_up = m_current_queue.front().second;
-                        assert(*cv_spurious_wake_up == true);
-                        *cv_spurious_wake_up = false;
-                        cv->notify_one();
-                        m_current_queue.pop();
-                } 
+         //     while (!m_current_queue.empty()) {
+         //             std::condition_variable* cv = m_current_queue.front().first;
+         //             std::atomic_bool* cv_spurious_wake_up = m_current_queue.front().second;
+         //             assert(*cv_spurious_wake_up == true);
+         //             *cv_spurious_wake_up = false;
+         //             cv->notify_one();
+         //             m_current_queue.pop();
+         //     } 
                 std::this_thread::sleep_for(std::chrono::nanoseconds(1));
         }
 }
@@ -162,12 +162,17 @@ std::mutex* TXMapSynchronizer::get_local_map_lock() {
 }
 
 uint64_t TXMapSynchronizer::get(uint64_t key) {
-        if (m_local_map.count(key) == 0)
-                return 0;
-        return m_local_map[key];
+        uint64_t value = 0;
+        {
+                std::lock_guard<std::mutex> lock(m_local_map_mtx);
+                if (m_local_map.count(key) > 0)
+                        value = m_local_map[key];
+        }
+        return value;
 }
 
 void TXMapSynchronizer::put(uint64_t key, uint64_t value) {
+        std::lock_guard<std::mutex> lock(m_local_map_mtx);
         m_local_map[key] = value;
 }
 
@@ -404,22 +409,22 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
 }
 
 void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, LocationInColor commit_version, LocationInColor latest_key_version, bool decision) {
-        std::ofstream result_file; 
-        result_file.open(file_name, std::ios::app | std::ios::out);
-        result_file << "========== " << prefix << " ==========" << std::endl; 
-        if (node->node_type == txmap_node::NodeType::COMMIT_RECORD) {
-                txmap_commit_node* commit_node = reinterpret_cast<txmap_commit_node*>(node);
-                result_file << "[R] " << commit_node->read_set.log(); 
-                result_file << "[W] " << commit_node->write_set.log(); 
-                if (commit_version != 0) result_file << "[COMMIT_VER] " << commit_version << std::endl;
-                if (latest_key_version != 0) result_file << "[LATEST_VER] " << latest_key_version << ", DECISION:" << (decision ? "COMMIT" : "ABORT") << std::endl;
-                bool is_local_commit = is_local_key(commit_node->read_set.set[0].key);
-                result_file << (is_local_commit ? "[LOCAL COMMIT]" : "[REMOTE COMMIT]") << std::endl;
+//      std::ofstream result_file; 
+//      result_file.open(file_name, std::ios::app | std::ios::out);
+//      result_file << "========== " << prefix << " ==========" << std::endl; 
+//      if (node->node_type == txmap_node::NodeType::COMMIT_RECORD) {
+//              txmap_commit_node* commit_node = reinterpret_cast<txmap_commit_node*>(node);
+//              result_file << "[R] " << commit_node->read_set.log(); 
+//              result_file << "[W] " << commit_node->write_set.log(); 
+//              if (commit_version != 0) result_file << "[COMMIT_VER] " << commit_version << std::endl;
+//              if (latest_key_version != 0) result_file << "[LATEST_VER] " << latest_key_version << ", DECISION:" << (decision ? "COMMIT" : "ABORT") << std::endl;
+//              bool is_local_commit = is_local_key(commit_node->read_set.set[0].key);
+//              result_file << (is_local_commit ? "[LOCAL COMMIT]" : "[REMOTE COMMIT]") << std::endl;
 
-        } else if (node->node_type == txmap_node::NodeType::DECISION_RECORD) {
-                txmap_decision_node* decision_node = reinterpret_cast<txmap_decision_node*>(node);
-                result_file << "[RD] " << decision_node->commit_version << "," << decision_node->decision << std::endl; 
-                if (commit_version != 0) result_file << "[BUFFERED_HEAD_COMMIT_VER] " << commit_version << std::endl;
-        }
-        result_file.close();        
+//      } else if (node->node_type == txmap_node::NodeType::DECISION_RECORD) {
+//              txmap_decision_node* decision_node = reinterpret_cast<txmap_decision_node*>(node);
+//              result_file << "[RD] " << decision_node->commit_version << "," << decision_node->decision << std::endl; 
+//              if (commit_version != 0) result_file << "[BUFFERED_HEAD_COMMIT_VER] " << commit_version << std::endl;
+//      }
+//      result_file.close();        
 }

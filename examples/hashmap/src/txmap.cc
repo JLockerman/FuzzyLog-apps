@@ -44,21 +44,22 @@ void TXMap::init_op_color(std::vector<ColorID>& interesting_colors) {
 }
 
 uint64_t TXMap::get(uint64_t key) {
-        uint64_t val;
-        std::condition_variable cv;
-        std::atomic_bool cv_spurious_wake_up;
-        std::mutex* mtx;
+  //    uint64_t val;
+  //    std::condition_variable cv;
+  //    std::atomic_bool cv_spurious_wake_up;
+  //    std::mutex* mtx;
 
-        cv_spurious_wake_up = true;
-        mtx = m_synchronizer->get_local_map_lock();
-        std::unique_lock<std::mutex> lock(*mtx);
-        m_synchronizer->enqueue_get(&cv, &cv_spurious_wake_up);
-        cv.wait(lock, [&cv_spurious_wake_up]{ return cv_spurious_wake_up != true; });
+  //    cv_spurious_wake_up = true;
+  //    mtx = m_synchronizer->get_local_map_lock();
+  //    std::unique_lock<std::mutex> lock(*mtx);
+  //    m_synchronizer->enqueue_get(&cv, &cv_spurious_wake_up);
+  //    cv.wait(lock, [&cv_spurious_wake_up]{ return cv_spurious_wake_up != true; });
 
-        val = m_synchronizer->get(key);
-        lock.unlock();
+  //    val = m_synchronizer->get(key);
+  //    lock.unlock();
 
-        return val;
+  //    return val;
+        return m_synchronizer->get(key);        // get stale data
 }
 
 void TXMap::serialize_commit_record(txmap_commit_node *commit_node, char* out, size_t* out_size) {
@@ -143,10 +144,10 @@ void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
 }
 
 void TXMap::log(txmap_set* rset, txmap_set* wset) {
-        std::ofstream result_file; 
-        result_file.open("txns.txt", std::ios::app | std::ios::out);
-        result_file << "========== " << "APPEND COMMIT RECORD" << " ==========" << std::endl; 
-        result_file << "[R] " << rset->log(); 
-        result_file << "[W] " << wset->log(); 
-        result_file.close();        
+  //    std::ofstream result_file; 
+  //    result_file.open("txns.txt", std::ios::app | std::ios::out);
+  //    result_file << "========== " << "APPEND COMMIT RECORD" << " ==========" << std::endl; 
+  //    result_file << "[R] " << rset->log(); 
+  //    result_file << "[W] " << wset->log(); 
+  //    result_file.close();        
 }
