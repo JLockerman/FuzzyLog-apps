@@ -64,11 +64,38 @@ void fuzzy_proxy::do_snapshot()
 
 void fuzzy_proxy::do_get_next()
 {
-	size_t buf_sz;
+	size_t buf_sz, locs_read;
 	struct colors c;
-	uint32_t *uint_buf;
+	uint32_t *uint_buf = (uint32_t*)_buffer;
 
-	get_next(_handle, &_buffer[2*sizeof(uint32_t)], &buf_sz, &c);
+	get_next_val val;
+
+	val = async_get_next2(_handle, &buf_sz, &locs_read);
+	if (locs_read == 0 && val.locs != NULL) { /* Async get_next returns nothing */
+		uint_buf[0] = 0;
+		uint_buf[1] = htonl(1);
+		_buffer_len = 2*sizeof(uint32_t);
+	} else if (locs_read > 0 && val.locs != NULL) { /* We have data, return it */
+		uint_buf[0] = htonl((uint32_t)buf_sz);
+		uint_buf[1] = htonl((uint32_t)locs_read);
+
+		char *buf_begin = (char*)&uint_buf[2];		
+		memcpy(buf_begin, val.data, buf_sz);
+		uint_buf = (uint32_t*)(buf_begin + buf_sz);
+		for (auto i = 0; i < locs_read; ++i) {
+			uint_buf[i] = htonl(val.locs[i].color);
+		}
+		_buffer_len = 2*sizeof(uint32_t) + buf_sz + sizeof(ColorID)*locs_read;
+	} else if (locs_read == 0 && val.locs == NULL) { /* Snapshot drained */
+		uint_buf[0] = 0;
+		uint_buf[1] = 0;
+
+		_buffer_len = 2*sizeof(uint32_t);
+	} else { /* Undefined */
+		assert(false);
+	}
+
+	/*
 	uint_buf = (uint32_t *)_buffer;
 	uint_buf[0] = htonl((uint32_t)buf_sz);
 	uint_buf[1] = htonl((uint32_t)c.numcolors);
@@ -84,6 +111,7 @@ void fuzzy_proxy::do_get_next()
 		free(c.mycolors);
 		_buffer_len = 2*sizeof(uint32_t) + buf_sz + sizeof(ColorID)*c.numcolors;
 	}
+	*/
 }
 
 void proxy_request::initialize(char *buf)

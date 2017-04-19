@@ -43,8 +43,8 @@ public class Start {
 			if (_client.get_next(data, colors, meta) == false) {
 				_client.snapshot();
 			} else {
-				assert(meta[1] == 1);
-				color_count[colors[0]] += 1;
+//				assert(meta[1] == 1);
+//				color_count[colors[0]] += 1;
 				num_gets += 1;
 			}
 			if (num_gets == 1) {
@@ -52,7 +52,7 @@ public class Start {
 			}
 		}
 
-		assert(color_count[2] == color_count[3]);
+//		assert(color_count[2] == color_count[3]);
 		
 		long end_time = System.nanoTime();
 		double throughput = _num_requests*1000000000.0 / (end_time - start_time);
@@ -124,9 +124,10 @@ public class Start {
 		data[2] = (byte)0xFF;
 		data[3] = (byte)0xFF;
 		
-		int[] colors = new int[2];
-		colors[0] = 2;
-		colors[1] = 3;
+		int[] colors = new int[6];
+		for (int i = 0; i < 6; ++i) {
+			colors[i] = i + 1;
+		}
 		
 		int num_pending = 0;
 		WriteID ack_wid = new WriteID();

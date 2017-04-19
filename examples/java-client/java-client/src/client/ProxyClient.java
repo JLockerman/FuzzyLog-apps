@@ -86,16 +86,17 @@ public class ProxyClient {
 		
 		num_results[0] = buf_sz;
 		num_results[1] = colors_sz;
-		if (colors_sz == 0) {
+		if (colors_sz == 0 && buf_sz == 0) {
 			return false;
+		} else if (buf_sz == 0) {
+			return true;
+		} else {
+			_input.read(data_buf, 0, buf_sz);
+			for (int i = 0; i < colors_sz; ++i) {
+				color_buf[i] = _input.readInt();
+			}
+			return true;
 		}
-		
-		_input.read(data_buf, 0, buf_sz);
-		
-		for (int i = 0; i < colors_sz; ++i) {
-			color_buf[i] = _input.readInt();
-		}
-		return true;
 	}
 	
 	public ProxyClient(int server_port) throws IOException {
