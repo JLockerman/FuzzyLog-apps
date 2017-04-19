@@ -320,10 +320,14 @@ void TXMapSynchronizer::buffer_decision_node(txmap_decision_node* node) {
 bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node) {
         assert(m_buffered_commit_nodes.size() > 0);
         assert(m_buffered_commit_nodes.size() == m_buffered_commit_versions.size());
+        // DEBUG ========
+        log(val_file, "DECISION NODE ARRIVED", reinterpret_cast<txmap_node*>(decision_node));
+
         txmap_commit_node* commit_node = m_buffered_commit_nodes.front();
         LocationInColor commit_version = m_buffered_commit_versions.front();
         if (commit_version != decision_node->commit_version) {
                 // buffer decision node
+                log(val_file, "DECISION NODE NOT MATCHING", reinterpret_cast<txmap_node*>(decision_node), commit_version);
                 buffer_decision_node(decision_node->clone());
         } else {
                 // apply 
@@ -415,7 +419,7 @@ void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, Loc
         } else if (node->node_type == txmap_node::NodeType::DECISION_RECORD) {
                 txmap_decision_node* decision_node = reinterpret_cast<txmap_decision_node*>(node);
                 result_file << "[RD] " << decision_node->commit_version << "," << decision_node->decision << std::endl; 
-
+                if (commit_version != 0) result_file << "[BUFFERED_HEAD_COMMIT_VER] " << commit_version << std::endl;
         }
         result_file.close();        
 }
