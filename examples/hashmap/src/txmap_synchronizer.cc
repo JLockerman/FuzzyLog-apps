@@ -108,12 +108,13 @@ void TXMapSynchronizer::Execute() {
 
 
                                         if (needs_buffering) {
-                                                // TODO: buffer all node
-
+                                                // buffer node
+                                                buffer_commit_node(commit_node.clone(), commit_version);
                                                 continue;
                                         }
                                         if (!is_decision_possible(&commit_node)) {
-                                                // TODO: buffer all node
+                                                // buffer node
+                                                buffer_commit_node(commit_node.clone(), commit_version);
                                                 needs_buffering = true;                
                                                 continue;
                                         }
@@ -148,7 +149,7 @@ void TXMapSynchronizer::Execute() {
                                         txmap_decision_node decision_node;
                                         // Read decision record
                                         deserialize_decision_record(const_cast<uint8_t*>(next_val.data), size, &decision_node);
-                                        //needs_buffering = apply_buffered_nodes(&decision_node);
+                                        needs_buffering = apply_buffered_nodes(&decision_node);
                                 }
                         }
                 }
@@ -317,4 +318,94 @@ void TXMapSynchronizer::update_map(txmap_set *wset, LocationInColor commit_versi
 bool TXMapSynchronizer::is_local_key(uint64_t key) {
         TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
         return key >= ctx->m_local_key_range_start && key < ctx->m_local_key_range_end;
+}
+
+void TXMapSynchronizer::buffer_commit_node(txmap_commit_node* node, LocationInColor commit_version) {
+        m_buffered_commit_nodes.push_back(node);
+        m_buffered_commit_versions.push_back(commit_version);
+}
+
+void TXMapSynchronizer::buffer_decision_node(txmap_decision_node* node) {
+        m_buffered_decision_nodes.push_back(node);
+}
+
+bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node) {
+        assert(m_buffered_commit_nodes.size() > 0);
+        assert(m_buffered_commit_nodes.size() == m_buffered_commit_versions.size());
+        txmap_commit_node* commit_node = m_buffered_commit_nodes.front();
+        LocationInColor commit_version = m_buffered_commit_versions.front();
+        if (commit_version != decision_node->commit_version) {
+                // buffer decision node
+                buffer_decision_node(decision_node->clone());
+        } else {
+                // apply 
+                if (decision_node->decision == txmap_decision_node::DecisionType::COMMITTED) {
+                        update_map(&commit_node->write_set, decision_node->commit_version);
+                        m_context->inc_num_committed();
+
+                } else if (decision_node->decision == txmap_decision_node::DecisionType::ABORTED) {
+                        m_context->inc_num_aborted();
+
+                } else {
+                        assert(false);
+                }
+                m_buffered_commit_nodes.pop_front();
+                m_buffered_commit_versions.pop_front();
+                delete commit_node;
+
+                // Keep applying if possible
+                while (true) {
+                        commit_node = m_buffered_commit_nodes.front();
+                        commit_version = m_buffered_commit_versions.front();
+                        if (is_decision_possible(commit_node)) {
+                                // Validate
+                                bool valid = validate_txn(commit_node);
+                                if (valid) {
+                                        update_map(&commit_node->write_set, commit_version);
+                                        m_context->inc_num_committed();
+
+                                } else {
+                                        m_context->inc_num_aborted();
+                                }
+
+                                // Append decision node to remote color
+                                append_decision_node_to_remote(commit_version, valid);
+                                m_buffered_commit_nodes.pop_front();
+                                m_buffered_commit_versions.pop_front();
+                                delete commit_node;
+
+                        } else {
+                                bool decision_record_exists = false;
+                                uint32_t i = 0;
+                                for (auto d : m_buffered_decision_nodes) {
+                                        if (commit_version == d->commit_version) {
+                                                if (d->decision == txmap_decision_node::DecisionType::COMMITTED) { 
+                                                        update_map(&commit_node->write_set, d->commit_version);
+                                                        m_context->inc_num_committed();
+
+                                                } else if (d->decision == txmap_decision_node::DecisionType::ABORTED) {
+                                                        m_context->inc_num_aborted();
+
+                                                } else {
+                                                        assert(false);
+                                                }
+                                                decision_record_exists = true; 
+                                                break;
+                                        }
+                                        i++;
+                                }
+                                if (decision_record_exists) {
+                                        // Remove decision record from this buffer
+                                        m_buffered_decision_nodes.erase(m_buffered_decision_nodes.begin() + i); 
+                                        m_buffered_commit_nodes.pop_front();
+                                        m_buffered_commit_versions.pop_front();
+                                        delete commit_node;
+                                } else {
+                                        break;
+                                }
+                        }
+                }
+        }
+        assert(m_buffered_commit_nodes.size() == m_buffered_commit_versions.size());
+        return m_buffered_commit_nodes.size() > 0;
 }

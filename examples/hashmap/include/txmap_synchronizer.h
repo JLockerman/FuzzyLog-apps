@@ -28,9 +28,6 @@ typedef struct txmap_record {
         uint64_t key;
         uint64_t value;
         uint64_t version;  
-        void print() {
-                std::cout << "key:" << key << ",ver:" << version << std::endl;
-        }
         std::string log() {
                 std::stringstream ss;
                 ss << "key:" << key << ",ver:" << version << std::endl;
@@ -42,15 +39,20 @@ typedef struct txmap_set {
         uint32_t num_entry;
         txmap_record* set;
         ~txmap_set() { delete set; }
-        void print() {
-                for (size_t i = 0; i < num_entry; i++)
-                        set[i].print();
-        }
         std::string log() {
                 std::stringstream ss;
                 for (size_t i = 0; i < num_entry; i++)
                         ss << set[i].log();
                 return ss.str();
+        }
+        txmap_set* clone() {
+                txmap_set* new_set = static_cast<txmap_set*>(malloc(sizeof(txmap_set)));
+                new_set->num_entry = this->num_entry;
+                new_set->set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)*this->num_entry));
+                for (size_t i = 0; i < num_entry; i++) {
+                        new_set->set[i] = this->set[i];
+                }
+                return new_set;
         }
 } txmap_set;
 
@@ -66,6 +68,13 @@ typedef struct txmap_commit_node {
         txmap_node node;
         txmap_set read_set;
         txmap_set write_set;
+        txmap_commit_node* clone() {
+                txmap_commit_node* new_node = static_cast<txmap_commit_node*>(malloc(sizeof(txmap_commit_node)));
+                new_node->node = this->node;
+                new_node->read_set = *this->read_set.clone();
+                new_node->write_set = *this->write_set.clone();
+                return new_node;
+        }
 } txmap_commit_node;
 
 typedef struct txmap_decision_node {
@@ -76,6 +85,13 @@ typedef struct txmap_decision_node {
         txmap_node node;
         LocationInColor commit_version;
         uint32_t decision;
+        txmap_decision_node* clone() {
+                txmap_decision_node* new_node = static_cast<txmap_decision_node*>(malloc(sizeof(txmap_decision_node)));
+                new_node->node = this->node;
+                new_node->commit_version = this->commit_version;
+                new_node->decision = this->decision;
+                return new_node;
+        }
 } txmap_decision_node;
 
 // Synchronizer class which eagerly synchronize with fuzzylog 
@@ -96,6 +112,9 @@ private:
         std::atomic_bool                                                        m_running;
         std::unordered_map<uint64_t, uint64_t>                                  m_local_map;    // Hack: let's store version into value 
         std::mutex                                                              m_local_map_mtx;
+        std::deque<txmap_commit_node*>                                          m_buffered_commit_nodes;
+        std::deque<LocationInColor>                                             m_buffered_commit_versions;
+        std::deque<txmap_decision_node*>                                        m_buffered_decision_nodes;
 
         bool                                                                    m_replication;
         
@@ -124,4 +143,7 @@ public:
         uint64_t get_latest_key_version(uint64_t key);
         void update_map(txmap_set *wset, LocationInColor commit_version);
         bool is_local_key(uint64_t key);
+        void buffer_commit_node(txmap_commit_node* commit_node, LocationInColor commit_version);
+        void buffer_decision_node(txmap_decision_node* decision_node);
+        bool apply_buffered_nodes(txmap_decision_node *decision_node);
 };
