@@ -8,18 +8,19 @@
 #include <atomicmap.h>
 
 TXMapSynchronizer::TXMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, bool replication): m_context(context), m_replication(replication) {
-        struct colors* c;
-        c = static_cast<struct colors*>(malloc(sizeof(struct colors)));
-        // Only play back local
-        c->numcolors = 1;
-        c->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
-        c->mycolors[0] = interesting_colors[0];
-    //  c->numcolors = interesting_colors.size();
-    //  c->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID) * c->numcolors));
-    //  for (i = 0; i < c->numcolors; i++) {
-    //          c->mycolors[i] = interesting_colors[i];
+        assert(interesting_colors.size() == 2);
+        // local color
+        m_local_color = static_cast<struct colors*>(malloc(sizeof(struct colors)));
+        m_local_color->numcolors = 1;
+        m_local_color->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
+        m_local_color->mycolors[0] = interesting_colors[0];
+        // remote color
+        m_remote_color = static_cast<struct colors*>(malloc(sizeof(struct colors)));
+        m_remote_color->numcolors = 1;
+        m_remote_color->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
+        m_remote_color->mycolors[0] = interesting_colors[1];
     //  }
-        this->m_interesting_colors = c;
+        this->m_interesting_colors = m_local_color;
         // Initialize fuzzylog connection
         if (m_replication) {
                 assert (log_addr->size() > 0 && log_addr->size() % 2 == 0);
@@ -32,7 +33,7 @@ TXMapSynchronizer::TXMapSynchronizer(std::vector<std::string>* log_addr, std::ve
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_tail_ips[i] = log_addr->at(num_chain_servers+i).c_str();
                 }
-                m_fuzzylog_client = new_dag_handle_with_replication(num_chain_servers, chain_server_head_ips, chain_server_tail_ips, c);
+                m_fuzzylog_client = new_dag_handle_with_replication(num_chain_servers, chain_server_head_ips, chain_server_tail_ips, m_interesting_colors);
 
         } else {
                 size_t num_chain_servers = log_addr->size();
@@ -40,7 +41,7 @@ TXMapSynchronizer::TXMapSynchronizer(std::vector<std::string>* log_addr, std::ve
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_ips[i] = log_addr->at(i).c_str();
                 }
-                m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, c);
+                m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, m_interesting_colors);
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(3));
@@ -123,6 +124,9 @@ void TXMapSynchronizer::Execute() {
                                         if (valid) {
                                                 update_map(&commit_node.write_set, commit_version);
                                                 m_context->inc_num_committed();
+
+                                                // TODO: append decision node to remote color
+
                                         } else {
                                                 m_context->inc_num_aborted();
                                         }

@@ -76,6 +76,8 @@ private:
 
         DAGHandle*                                                              m_fuzzylog_client;
         struct colors*                                                          m_interesting_colors;
+        struct colors*                                                          m_local_color;
+        struct colors*                                                          m_remote_color;
         char                                                                    m_read_buf[DELOS_MAX_DATA_SIZE];
         
         Context*                                                                m_context;
