@@ -150,7 +150,7 @@ void do_experiment(txmap_config cfg) {
         worker = new TXMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size, cfg.expt_duration, cfg.txn_rate);
 
         // Synchronize clients
-        wait_signal(cfg);
+        //wait_signal(cfg);
 
         // Run workers
         worker->run();

@@ -130,12 +130,16 @@ void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
         commit_node.write_set.set[0] = local_write_record;
         commit_node.write_set.set[1] = remote_write_record;
 
+        // DEBUG
+        log(&commit_node.read_set, &commit_node.write_set);
+
         // Make payload
         size_t size = 0;
         serialize_commit_record(&commit_node, m_buf, &size);
 
         // Append commit record
-        async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL, 0);
+        //async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL, 0);
+        async_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL);
 }
 
 void TXMap::log(txmap_set* rset, txmap_set* wset) {

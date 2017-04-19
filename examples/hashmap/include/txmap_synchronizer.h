@@ -38,7 +38,7 @@ typedef struct txmap_record {
 typedef struct txmap_set {
         uint32_t num_entry;
         txmap_record* set;
-        ~txmap_set() { delete set; }
+        //~txmap_set() { delete set; }
         std::string log() {
                 std::stringstream ss;
                 for (size_t i = 0; i < num_entry; i++)
