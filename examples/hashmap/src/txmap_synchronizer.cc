@@ -413,6 +413,8 @@ void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, Loc
                 result_file << "[W] " << commit_node->write_set.log(); 
                 if (commit_version != 0) result_file << "[COMMIT_VER] " << commit_version << std::endl;
                 if (latest_key_version != 0) result_file << "[LATEST_VER] " << latest_key_version << ", DECISION:" << (decision ? "COMMIT" : "ABORT") << std::endl;
+                bool is_local_commit = is_local_key(commit_node->read_set.set[0].key);
+                result_file << (is_local_commit ? "[LOCAL COMMIT]" : "[REMOTE COMMIT]") << std::endl;
 
         } else if (node->node_type == txmap_node::NodeType::DECISION_RECORD) {
                 txmap_decision_node* decision_node = reinterpret_cast<txmap_decision_node*>(node);
