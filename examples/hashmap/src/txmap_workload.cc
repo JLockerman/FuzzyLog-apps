@@ -43,10 +43,15 @@ Txn** txmap_workload_generator::Gen() {
         assert(m_workload->size() == 1);
         workload_config &w = m_workload->at(0);
         total_op_count = w.op_count;
-        local_key_range_start = 0;        
-        local_key_range_end = m_key_range;
-        remote_key_range_start = m_key_range;
-        remote_key_range_end = m_key_range * 2;
+
+        assert(w.first_color.numcolors == 2);
+        ColorID local_color = w.first_color.mycolors[0];
+        local_key_range_start = local_color * m_key_range;
+        local_key_range_end = local_key_range_start + m_key_range;
+
+        ColorID remote_color = w.first_color.mycolors[1];
+        remote_key_range_start = remote_color * m_key_range;
+        remote_key_range_end = remote_key_range_start + m_key_range;
 
         Txn **txns = (Txn**)malloc(sizeof(Txn*) * total_op_count);
 
