@@ -345,11 +345,9 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                 m_buffered_commit_versions.pop_front();
                 delete commit_node;
 
-                if (m_buffered_commit_nodes.size() == 0)
-                        return false;
-
                 // Keep applying if possible
-                while (true) {
+                while (m_buffered_commit_nodes.size() > 0) {
+
                         commit_node = m_buffered_commit_nodes.front();
                         commit_version = m_buffered_commit_versions.front();
                         if (is_decision_possible(commit_node)) {
