@@ -123,13 +123,26 @@ void do_experiment(txmap_config cfg) {
         assert(cfg.workload.size() == 1);
         workload_config &w = cfg.workload[0];
         total_op_count = w.op_count;
-        Context ctx;    // Can be used to share info between TXMapTester and Txns
+
+        // Context 
+        uint64_t local_key_range_start;
+        uint64_t local_key_range_end;
+        uint64_t remote_key_range_start;
+        uint64_t remote_key_range_end;
+        assert(w.first_color.numcolors == 2);
+        ColorID local_color = w.first_color.mycolors[0];
+        local_key_range_start = local_color * cfg.expt_range;
+        local_key_range_end = local_key_range_start + cfg.expt_range;
+        ColorID remote_color = w.first_color.mycolors[1];
+        remote_key_range_start = remote_color * cfg.expt_range;
+        remote_key_range_end = remote_key_range_start + cfg.expt_range;
+        TXMapContext ctx(local_key_range_start, local_key_range_end, remote_key_range_start, remote_key_range_end);
 
         // Fuzzymap
         map = new TXMap(&cfg.log_addr, &cfg.workload, &ctx, cfg.replication);
 
         // Generate append workloads: uniform distribution
-        workload_gen = new txmap_workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);
+        workload_gen = new txmap_workload_generator(&ctx, map, &cfg.workload);
         txns = workload_gen->Gen();
         
         // One worker thread
@@ -149,10 +162,14 @@ void do_experiment(txmap_config cfg) {
                 // Stop worker
                 flag = false;
         }
-
         while (!ctx.is_finished()) {
                 std::this_thread::sleep_for(std::chrono::seconds(1));
         }
+
+        // Give more time to reader thread
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::cout << "total committed: " << ctx.get_num_committed() << std::endl;
+        std::cout << "total aborted  : " << ctx.get_num_aborted() << std::endl;
 
         // Wait until worker finishes
         worker->join();

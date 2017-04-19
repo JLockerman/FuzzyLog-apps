@@ -9,7 +9,7 @@
 using namespace std;
 
 class Context {
-private:
+protected:
         std::atomic<uint64_t>                   m_num_executed;
         std::atomic<uint64_t>                   m_num_committed;
         std::atomic<uint64_t>                   m_num_aborted;
