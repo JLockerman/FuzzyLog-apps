@@ -25,8 +25,10 @@ public class FLZKTester
 			System.out.println("Usage: java FLZK [hostname] [proxyport]");
 			System.exit(0);
 		}
-		ProxyClient client = new ProxyClient(args[0], Integer.parseInt(args[1]));
-		IZooKeeper zk = new FLZK(client, null);
+		ProxyClient appendclient = new ProxyClient(args[0], Integer.parseInt(args[1]));
+//		ProxyClient client2 = new ProxyClient(args[0], Integer.parseInt(args[1])+1);
+		ProxyClient playbackclient = appendclient;
+		IZooKeeper zk = new FLZK(appendclient, playbackclient, null);
 		
 		System.out.println("hello world!");
 

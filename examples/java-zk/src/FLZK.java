@@ -246,7 +246,8 @@ class DeleteOp extends FLZKOp implements Serializable
 
 public class FLZK implements IZooKeeper, Runnable
 {
-	private ProxyClient client;
+	private ProxyClient appendclient;
+	private ProxyClient playbackclient;
 	HashMap<File, Node> map;
 	
 	HashMap<Object, FLZKOp> pendinglist;  //mutating operations
@@ -259,7 +260,7 @@ public class FLZK implements IZooKeeper, Runnable
 	
 	boolean debugprints;
 	
-	public FLZK(ProxyClient tclient, Watcher W) throws Exception, KeeperException
+	public FLZK(ProxyClient tclient, ProxyClient tclient2, Watcher W) throws Exception, KeeperException
 	{
 		defaultwatcher = W;
 		pendinglist = new HashMap<Object, FLZKOp>();
@@ -269,7 +270,8 @@ public class FLZK implements IZooKeeper, Runnable
 		map = new HashMap<File, Node>();
 		map.put(new File("/"), new Node("foobar".getBytes(), "/"));		
 		existswatches = new HashMap<String, Set<Watcher>>();
-		client = tclient;
+		appendclient = tclient;
+		playbackclient = tclient2;
 		
 		//IO Thread
 		(new Thread(this)).start();
@@ -342,8 +344,8 @@ public class FLZK implements IZooKeeper, Runnable
 				//client.append(ObjectToBytes(flop));
 				try
 				{
-					client.async_append(colors, ObjectToBytes(flop), new WriteID());
-					client.wait_any_append(new WriteID());
+					appendclient.async_append(colors, ObjectToBytes(flop), new WriteID());
+					appendclient.wait_any_append(new WriteID());
 					//we don't have to wait for the append to finish;
 					//we just wait for it to appear in the learner thread					
 				}
@@ -395,7 +397,7 @@ public class FLZK implements IZooKeeper, Runnable
 		{
 			boolean tailreached = false;
 			
-			client.snapshot();
+			playbackclient.snapshot();
 			
 			while(true)
 			{
@@ -409,7 +411,7 @@ public class FLZK implements IZooKeeper, Runnable
 				if(debugprints) System.out.println("sync");
 				if(!tailreached)
 				{
-					tailreached = !client.get_next(b, colors, results); // what do we do with results?
+					tailreached = !playbackclient.get_next(b, colors, results); // what do we do with results?
 					//encountered current tail of log -- sync complete
 				}
 				
