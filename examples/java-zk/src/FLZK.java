@@ -258,9 +258,11 @@ public class FLZK implements IZooKeeper, Runnable
 	
 	long numentries=0;
 	
+	int mycolor = 0;
+	
 	boolean debugprints;
 	
-	public FLZK(ProxyClient tclient, ProxyClient tclient2, Watcher W) throws Exception, KeeperException
+	public FLZK(ProxyClient tclient, ProxyClient tclient2, int tmycolor, Watcher W) throws Exception, KeeperException
 	{
 		defaultwatcher = W;
 		pendinglist = new HashMap<Object, FLZKOp>();
@@ -272,6 +274,7 @@ public class FLZK implements IZooKeeper, Runnable
 		existswatches = new HashMap<String, Set<Watcher>>();
 		appendclient = tclient;
 		playbackclient = tclient2;
+		mycolor = tmycolor;
 		
 		//IO Thread
 		(new Thread(this)).start();
@@ -340,7 +343,7 @@ public class FLZK implements IZooKeeper, Runnable
 			if(mutate)
 			{
 				pendinglist.put(flop.id, flop);
-				int[] colors = new int[1]; colors[0] = 1;
+				int[] colors = new int[1]; colors[0] = mycolor;
 				//client.append(ObjectToBytes(flop));
 				try
 				{

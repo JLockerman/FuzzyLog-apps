@@ -20,15 +20,16 @@ public class FLZKTester
 {
 	public static void main(String[] args) throws Exception
 	{
-		if(args.length<2)
+		if(args.length<3)
 		{
-			System.out.println("Usage: java FLZK [hostname] [proxyport]");
+			System.out.println("Usage: java FLZK [hostname] [proxyport] [color]");
 			System.exit(0);
 		}
 		ProxyClient appendclient = new ProxyClient(args[0], Integer.parseInt(args[1]));
 //		ProxyClient client2 = new ProxyClient(args[0], Integer.parseInt(args[1])+1);
 		ProxyClient playbackclient = appendclient;
-		IZooKeeper zk = new FLZK(appendclient, playbackclient, null);
+		int color = Integer.parseInt(args[2]);
+		IZooKeeper zk = new FLZK(appendclient, playbackclient, color, null);
 		
 		System.out.println("hello world!");
 
