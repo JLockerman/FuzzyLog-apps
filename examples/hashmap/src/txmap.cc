@@ -145,8 +145,8 @@ void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
 void TXMap::log(txmap_set* rset, txmap_set* wset) {
         std::ofstream result_file; 
         result_file.open("txns.txt", std::ios::app | std::ios::out);
+        result_file << "========== " << "APPEND COMMIT RECORD" << " ==========" << std::endl; 
         result_file << "[R] " << rset->log(); 
-        result_file << "[W] " << wset->log() << std::endl; 
-        result_file << "internal_id:" << m_commit_record_id << std::endl;
+        result_file << "[W] " << wset->log(); 
         result_file.close();        
 }

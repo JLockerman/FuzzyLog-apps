@@ -7,6 +7,9 @@
 #include <algorithm>
 #include <atomicmap.h>
 
+static char* txn_file = "txns.txt";
+static char* val_file = "val.txt";
+
 TXMapSynchronizer::TXMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, bool replication): m_context(context), m_replication(replication) {
         assert(interesting_colors.size() == 2);
         // local color
@@ -97,16 +100,6 @@ void TXMapSynchronizer::Execute() {
                                         // Read commit record
                                         deserialize_commit_record(const_cast<uint8_t*>(next_val.data), size, &commit_node);
 
-                                        // DEBUG ===================
-                                        std::stringstream ss;
-                                        ss << "[R] " << commit_node.read_set.log(); 
-                                        ss << "[W] " << commit_node.write_set.log(); 
-                                        std::ofstream result_file; 
-                                        result_file.open("validation.txt", std::ios::app | std::ios::out);
-                                        result_file << ss.str();
-                                        result_file.close();
-
-
                                         if (needs_buffering) {
                                                 // buffer node
                                                 buffer_commit_node(commit_node.clone(), commit_version);
@@ -122,7 +115,7 @@ void TXMapSynchronizer::Execute() {
                                         // Validate
                                         bool valid = validate_txn(&commit_node);
                                         if (valid) {
-                                                update_map(&commit_node.write_set, commit_version);
+                                                update_map(&commit_node, commit_version);
                                                 m_context->inc_num_committed();
 
                                         } else {
@@ -131,18 +124,6 @@ void TXMapSynchronizer::Execute() {
 
                                         // Append decision node to remote color
                                         append_decision_node_to_remote(commit_version, valid);
-
-                                        // DEBUG ===================
-                                        std::stringstream ss1;
-                                        if (valid)
-                                                ss1 << "[D] commit" << std::endl;
-                                        else 
-                                                ss1 << "[D] abort" << std::endl;
-
-                                        result_file.open("validation.txt", std::ios::app | std::ios::out);
-                                        result_file << ss1.str() << std::endl;
-                                        result_file.close();
-
 
                                 } else if (node.node_type == txmap_node::NodeType::DECISION_RECORD) {
                                         assert(locs_read == 1);
@@ -247,7 +228,10 @@ void TXMapSynchronizer::append_decision_node_to_remote(LocationInColor commit_ve
         size_t size = 0;
         serialize_decision_record(&decision_node, m_write_buf, &size);
         async_append(m_fuzzylog_client, m_write_buf, size, m_remote_color, NULL);
+        // DEBUG ==========
+        log(txn_file, "APPEND DECISION RECORD", reinterpret_cast<txmap_node*>(&decision_node));
 }
+
 
 void TXMapSynchronizer::serialize_decision_record(txmap_decision_node *decision_node, char* out, size_t* out_size) {
         txmap_decision_node *buf_decision_node;
@@ -286,17 +270,13 @@ bool TXMapSynchronizer::validate_txn(txmap_commit_node *commit_node) {
         for (i = 0; i < num_entry; i++) {
                 record = &rset->set[i];         // FIXME: Wrong precedence?
                 latest_key_version = get_latest_key_version(record->key);
-                ss << "[V] latest key version: " << latest_key_version << std::endl;
                 if (latest_key_version != record->version) {
                         valid = false;
                         break;
                 }
         } 
-
-        std::ofstream result_file; 
-        result_file.open("validation.txt", std::ios::app | std::ios::out);
-        result_file << ss.str();
-        result_file.close();
+        // DEBUG =======
+        log(val_file, "VALIDATION", reinterpret_cast<txmap_node*>(commit_node), 0, latest_key_version, valid);
 
         return valid;
 }
@@ -305,8 +285,13 @@ uint64_t TXMapSynchronizer::get_latest_key_version(uint64_t key) {
         return get(key);        // XXX Hack: let's store version into value
 }
 
-void TXMapSynchronizer::update_map(txmap_set *wset, LocationInColor commit_version) {
+void TXMapSynchronizer::update_map(txmap_commit_node *commit_node, LocationInColor commit_version) {
+        // DEBUG =========
+        log(val_file, "APPLY", reinterpret_cast<txmap_node*>(commit_node), commit_version);
+
         uint32_t i, num_entry;
+        txmap_set *wset; 
+        wset = &commit_node->write_set;
         num_entry = wset->num_entry;
         for (i = 0; i < num_entry; i++) {
                 txmap_record &r = wset->set[i];
@@ -321,6 +306,9 @@ bool TXMapSynchronizer::is_local_key(uint64_t key) {
 }
 
 void TXMapSynchronizer::buffer_commit_node(txmap_commit_node* node, LocationInColor commit_version) {
+        // DEBUG =========
+        log(val_file, "BUFFER NODE", reinterpret_cast<txmap_node*>(node), commit_version);
+
         m_buffered_commit_nodes.push_back(node);
         m_buffered_commit_versions.push_back(commit_version);
 }
@@ -340,7 +328,7 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
         } else {
                 // apply 
                 if (decision_node->decision == txmap_decision_node::DecisionType::COMMITTED) {
-                        update_map(&commit_node->write_set, decision_node->commit_version);
+                        update_map(commit_node, decision_node->commit_version);
                         m_context->inc_num_committed();
 
                 } else if (decision_node->decision == txmap_decision_node::DecisionType::ABORTED) {
@@ -364,7 +352,7 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                                 // Validate
                                 bool valid = validate_txn(commit_node);
                                 if (valid) {
-                                        update_map(&commit_node->write_set, commit_version);
+                                        update_map(commit_node, commit_version);
                                         m_context->inc_num_committed();
 
                                 } else {
@@ -383,7 +371,7 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                                 for (auto d : m_buffered_decision_nodes) {
                                         if (commit_version == d->commit_version) {
                                                 if (d->decision == txmap_decision_node::DecisionType::COMMITTED) { 
-                                                        update_map(&commit_node->write_set, d->commit_version);
+                                                        update_map(commit_node, d->commit_version);
                                                         m_context->inc_num_committed();
 
                                                 } else if (d->decision == txmap_decision_node::DecisionType::ABORTED) {
@@ -411,4 +399,23 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
         }
         assert(m_buffered_commit_nodes.size() == m_buffered_commit_versions.size());
         return m_buffered_commit_nodes.size() > 0;
+}
+
+void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, LocationInColor commit_version, LocationInColor latest_key_version, bool decision) {
+        std::ofstream result_file; 
+        result_file.open(file_name, std::ios::app | std::ios::out);
+        result_file << "========== " << prefix << " ==========" << std::endl; 
+        if (node->node_type == txmap_node::NodeType::COMMIT_RECORD) {
+                txmap_commit_node* commit_node = reinterpret_cast<txmap_commit_node*>(node);
+                result_file << "[R] " << commit_node->read_set.log(); 
+                result_file << "[W] " << commit_node->write_set.log(); 
+                if (commit_version != 0) result_file << "[COMMIT_VER] " << commit_version << std::endl;
+                if (latest_key_version != 0) result_file << "[LATEST_VER] " << latest_key_version << ", DECISION:" << (decision ? "COMMIT" : "ABORT") << std::endl;
+
+        } else if (node->node_type == txmap_node::NodeType::DECISION_RECORD) {
+                txmap_decision_node* decision_node = reinterpret_cast<txmap_decision_node*>(node);
+                result_file << "[RD] " << decision_node->commit_version << "," << decision_node->decision << std::endl; 
+
+        }
+        result_file.close();        
 }

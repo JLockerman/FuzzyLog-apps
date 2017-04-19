@@ -141,9 +141,10 @@ public:
         void deserialize_decision_record(uint8_t *in, size_t size, txmap_decision_node *decision_node);
         bool validate_txn(txmap_commit_node *commit_node);
         uint64_t get_latest_key_version(uint64_t key);
-        void update_map(txmap_set *wset, LocationInColor commit_version);
+        void update_map(txmap_commit_node *commit_node, LocationInColor commit_version);
         bool is_local_key(uint64_t key);
         void buffer_commit_node(txmap_commit_node* commit_node, LocationInColor commit_version);
         void buffer_decision_node(txmap_decision_node* decision_node);
         bool apply_buffered_nodes(txmap_decision_node *decision_node);
+        void log(char *file_name, char *prefix, txmap_node *node, LocationInColor commit_version=0, LocationInColor latest_key_version=0, bool decision=false);
 };
