@@ -1,19 +1,8 @@
 #pragma once
 
-#include <txmap.h>
 #include <request.h>
+#include <txmap.h>
 #include <txmap_config.h>
-
-class TXMapContext: public Context {
-public:
-        uint64_t                        m_local_key_range_start;
-        uint64_t                        m_local_key_range_end;
-        uint64_t                        m_remote_key_range_start;
-        uint64_t                        m_remote_key_range_end;
-public:
-        TXMapContext(uint64_t lstart, uint64_t lend, uint64_t rstart, uint64_t rend): Context(), m_local_key_range_start(lstart), m_local_key_range_end(lend), m_remote_key_range_start(rstart), m_remote_key_range_end(rend) {}
-        ~TXMapContext() {}
-};
 
 class read_write_txn: public Txn {
 private:

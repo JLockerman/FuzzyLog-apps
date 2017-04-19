@@ -13,6 +13,17 @@ extern "C" {
         #include "fuzzy_log.h"
 }
 
+class TXMapContext: public Context {
+public:
+        uint64_t                        m_local_key_range_start;
+        uint64_t                        m_local_key_range_end;
+        uint64_t                        m_remote_key_range_start;
+        uint64_t                        m_remote_key_range_end;
+public:
+        TXMapContext(uint64_t lstart, uint64_t lend, uint64_t rstart, uint64_t rend): Context(), m_local_key_range_start(lstart), m_local_key_range_end(lend), m_remote_key_range_start(rstart), m_remote_key_range_end(rend) {}
+        ~TXMapContext() {}
+};
+
 typedef struct txmap_record {
         uint64_t key;
         uint64_t value;
@@ -78,7 +89,7 @@ private:
         struct colors*                                                          m_interesting_colors;
         struct colors*                                                          m_local_color;
         struct colors*                                                          m_remote_color;
-        char                                                                    m_read_buf[DELOS_MAX_DATA_SIZE];
+        char                                                                    m_write_buf[DELOS_MAX_DATA_SIZE];
         
         Context*                                                                m_context;
 
@@ -104,7 +115,11 @@ public:
         void put(uint64_t key, uint64_t value);
 
         // Txn validation
-        void deserialize_commit_record(uint8_t *buf, size_t size, txmap_commit_node *commit_node);
+        void deserialize_commit_record(uint8_t *in, size_t size, txmap_commit_node *commit_node);
+        bool is_decision_possible(txmap_commit_node *commit_node);
+        void append_decision_node_to_remote(LocationInColor commit_version, bool committed);
+        void serialize_decision_record(txmap_decision_node *decision_node, char* out, size_t* out_size);
+        void deserialize_decision_record(uint8_t *in, size_t size, txmap_decision_node *decision_node);
         bool validate_txn(txmap_commit_node *commit_node);
         uint64_t get_latest_key_version(uint64_t key);
         void update_map(txmap_set *wset, LocationInColor commit_version);

@@ -1,6 +1,7 @@
 #include <txmap_tester.h>
 #include <cstring>
 #include <cassert>
+#include <thread>
 
 TXMapTester::~TXMapTester() {
         for (size_t i = 0; i < m_num_txns; i++) {
@@ -55,8 +56,10 @@ void TXMapTester::Execute() {
                 m_num_issued++;
                 num_pending += 1;
         }
-
-        m_map->wait_for_all_puts();
+        while (num_pending > 0) {
+                num_pending -= try_get_completed();
+                std::this_thread::sleep_for(std::chrono::microseconds(1));
+        } 
         m_context->set_finished();
 
         std::cout << "total executed: " << m_context->get_num_executed() << std::endl;
