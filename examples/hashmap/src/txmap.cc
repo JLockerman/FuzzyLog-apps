@@ -61,13 +61,22 @@ uint64_t TXMap::get(uint64_t key) {
         return val;
 }
 
-void TXMap::serialize_commit_record(txmap_set *rset, txmap_set *wset, char* out, size_t* out_size) {
+void TXMap::serialize_commit_record(txmap_commit_node *commit_node, char* out, size_t* out_size) {
         uint32_t i, offset;
         txmap_set *buf_rset, *buf_wset;
+        txmap_set *rset, *wset;
         txmap_record *buf_record;
+        txmap_node *buf_node;
+
+        rset = &commit_node->read_set;
+        wset = &commit_node->write_set;
 
         offset = 0;
-        buf_rset = reinterpret_cast<txmap_set*>(out);
+        buf_node = reinterpret_cast<txmap_node*>(out + offset);
+        buf_node->node_type = commit_node->node.node_type;
+        offset += sizeof(txmap_node);
+
+        buf_rset = reinterpret_cast<txmap_set*>(out + offset);
         buf_rset->num_entry = rset->num_entry;
         offset += sizeof(uint32_t);
         for (i = 0; i < rset->num_entry; i++) {
@@ -87,18 +96,21 @@ void TXMap::serialize_commit_record(txmap_set *rset, txmap_set *wset, char* out,
 }
 
 void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
-        uint64_t from_key_version;
+        txmap_commit_node commit_node;
+
+        // node type
+        commit_node.node.node_type = txmap_node::NodeType::COMMIT_RECORD;
 
         // readset
+        uint64_t from_key_version;
         from_key_version = get(from_key);
         txmap_record read_record;
         read_record.key = from_key; 
         read_record.value = 0;          // Value is irrelevant to the protocol 
         read_record.version = from_key_version; 
-        txmap_set read_set;
-        read_set.num_entry = 1;
-        read_set.set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)));
-        read_set.set[0] = read_record;
+        commit_node.read_set.num_entry = 1;
+        commit_node.read_set.set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)));
+        commit_node.read_set.set[0] = read_record;
 
         // writeset
         m_commit_record_id++;
@@ -113,15 +125,14 @@ void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
         remote_write_record.value = 0;          // Value is irrelevant to the protocol 
         remote_write_record.version = m_commit_record_id; 
 
-        txmap_set write_set;
-        write_set.num_entry = 2;
-        write_set.set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)*2));
-        write_set.set[0] = local_write_record;
-        write_set.set[1] = remote_write_record;
+        commit_node.write_set.num_entry = 2;
+        commit_node.write_set.set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)*2));
+        commit_node.write_set.set[0] = local_write_record;
+        commit_node.write_set.set[1] = remote_write_record;
 
         // Make payload
         size_t size = 0;
-        serialize_commit_record(&read_set, &write_set, m_buf, &size);
+        serialize_commit_record(&commit_node, m_buf, &size);
 
         // Append commit record
         async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL, 0);
@@ -132,5 +143,6 @@ void TXMap::log(txmap_set* rset, txmap_set* wset) {
         result_file.open("txns.txt", std::ios::app | std::ios::out);
         result_file << "[R] " << rset->log(); 
         result_file << "[W] " << wset->log() << std::endl; 
+        result_file << "internal_id:" << m_commit_record_id << std::endl;
         result_file.close();        
 }

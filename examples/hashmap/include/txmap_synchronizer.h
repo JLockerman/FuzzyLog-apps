@@ -41,9 +41,31 @@ typedef struct txmap_set {
                         ss << set[i].log();
                 return ss.str();
         }
-
 } txmap_set;
 
+typedef struct txmap_node {
+        enum NodeType {
+                COMMIT_RECORD = 1,
+                DECISION_RECORD = 2,   
+        };
+        uint32_t node_type;
+} txmap_node;
+
+typedef struct txmap_commit_node {
+        txmap_node node;
+        txmap_set read_set;
+        txmap_set write_set;
+} txmap_commit_node;
+
+typedef struct txmap_decision_node {
+        enum DecisionType {
+                COMMITTED = 1,
+                ABORTED = 2,   
+        };
+        txmap_node node;
+        LocationInColor commit_version;
+        uint32_t decision;
+} txmap_decision_node;
 
 // Synchronizer class which eagerly synchronize with fuzzylog 
 class TXMapSynchronizer : public Runnable {
@@ -80,8 +102,8 @@ public:
         void put(uint64_t key, uint64_t value);
 
         // Txn validation
-        void deserialize_commit_record(uint8_t *buf, size_t size, txmap_set *rset, txmap_set *wset);
-        bool validate_txn(txmap_set *rset, txmap_set *wset);
+        void deserialize_commit_record(uint8_t *buf, size_t size, txmap_commit_node *commit_node);
+        bool validate_txn(txmap_commit_node *commit_node);
         uint64_t get_latest_key_version(uint64_t key);
         void update_map(txmap_set *wset, LocationInColor commit_version);
 };

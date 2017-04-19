@@ -20,7 +20,7 @@ public:
 
         uint64_t get(uint64_t key);
 
-        void serialize_commit_record(txmap_set *rset, txmap_set *wset, char* out, size_t* out_size);
+        void serialize_commit_record(txmap_commit_node *commit_node, char* out, size_t* out_size);
         void execute_move_txn(uint64_t from_key, uint64_t to_key);
 
         void log(txmap_set* rset, txmap_set* wset);

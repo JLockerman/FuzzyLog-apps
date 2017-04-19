@@ -4,6 +4,7 @@
 #include <fstream>
 #include <cassert>
 #include <thread>
+#include <algorithm>
 #include <atomicmap.h>
 
 TXMapSynchronizer::TXMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, bool replication): m_context(context), m_replication(replication) {
@@ -71,6 +72,8 @@ void TXMapSynchronizer::Execute() {
         get_next_val next_val;
         LocationInColor commit_version;
 
+        bool needs_buffering = false;
+
         while (m_running) {
                 // m_pending_queue ==> m_current_queue
                 swap_queue();
@@ -82,41 +85,67 @@ void TXMapSynchronizer::Execute() {
                         while (true) {
                                 next_val = get_next2(m_fuzzylog_client, &size, &locs_read);
                                 if (locs_read == 0) break;
-                                // FIXME: with async_append
-                                assert(locs_read == 2);
-                                assert(next_val.locs[0].entry == next_val.locs[1].entry);
-                                commit_version = next_val.locs[0].entry;
+                                //assert(next_val.locs[0].entry == next_val.locs[1].entry);
+                                commit_version = std::max(next_val.locs[0].entry, next_val.locs[1].entry);
                                 // readset, writeset
-                                txmap_set read_set, write_set;
-                                // read commit record
-                                deserialize_commit_record(const_cast<uint8_t*>(next_val.data), size, &read_set, &write_set);
-                                // validate -> notify?
-                                
-                                std::stringstream ss;
-                                ss << "[R] " << read_set.log(); 
-                                ss << "[W] " << write_set.log(); 
-                                std::ofstream result_file; 
-                                result_file.open("validation.txt", std::ios::app | std::ios::out);
-                                result_file << ss.str();
-                                result_file.close();
+                                txmap_node node;
+                                node = *reinterpret_cast<txmap_node*>(const_cast<uint8_t*>(next_val.data));
+                                if (node.node_type == txmap_node::NodeType::COMMIT_RECORD) {
+                                        assert(locs_read == 2);
+                                        txmap_commit_node commit_node;
+                                        // read commit record
+                                        deserialize_commit_record(const_cast<uint8_t*>(next_val.data), size, &commit_node);
 
-                                bool valid = validate_txn(&read_set, &write_set);
-                                if (valid) {
-                                        update_map(&write_set, commit_version);
-                                        m_context->inc_num_committed();
-                                } else {
-                                        m_context->inc_num_aborted();
+                                        // DEBUG ===================
+                                        std::stringstream ss;
+                                        ss << "[R] " << commit_node.read_set.log(); 
+                                        ss << "[W] " << commit_node.write_set.log(); 
+                                        std::ofstream result_file; 
+                                        result_file.open("validation.txt", std::ios::app | std::ios::out);
+                                        result_file << ss.str();
+                                        result_file.close();
+
+
+                                        if (needs_buffering) {
+                                                // TODO: buffer all node
+
+                                                continue;
+                                        }
+                                        if (false) {
+                                        //if (!is_decision_possible()) {
+                                                // TODO: buffer all node
+                                                needs_buffering = true;                
+                                                continue;
+                                        }
+
+                                        // validate
+                                        bool valid = validate_txn(&commit_node);
+                                        if (valid) {
+                                                update_map(&commit_node.write_set, commit_version);
+                                                m_context->inc_num_committed();
+                                        } else {
+                                                m_context->inc_num_aborted();
+                                        }
+                                        // DEBUG ===================
+                                        std::stringstream ss1;
+                                        if (valid)
+                                                ss1 << "[D] commit" << std::endl;
+                                        else 
+                                                ss1 << "[D] abort" << std::endl;
+
+                                        result_file.open("validation.txt", std::ios::app | std::ios::out);
+                                        result_file << ss1.str() << std::endl;
+                                        result_file.close();
+
+
+                                } else if (node.node_type == txmap_node::NodeType::DECISION_RECORD) {
+                                        assert(locs_read == 1);
+                                        txmap_decision_node decision_node;
+                                        decision_node.node = node;
+                                        // read commit record
+                                        //deserialize_decision_record(const_cast<uint8_t*>(next_val.data), size, &decision_node);
+                                        //needs_buffering = apply_buffered_nodes(&decision_node);
                                 }
-
-                                std::stringstream ss1;
-                                if (valid)
-                                        ss1 << "[D] commit" << std::endl;
-                                else 
-                                        ss1 << "[D] abort" << std::endl;
-
-                                result_file.open("validation.txt", std::ios::app | std::ios::out);
-                                result_file << ss1.str() << std::endl;
-                                result_file.close();
                         }
                 }
                 // Wake up all waiting worker threads
@@ -156,14 +185,23 @@ void TXMapSynchronizer::put(uint64_t key, uint64_t value) {
         m_local_map[key] = value;
 }
 
-void TXMapSynchronizer::deserialize_commit_record(uint8_t *in, size_t size, txmap_set *rset, txmap_set *wset) {
+void TXMapSynchronizer::deserialize_commit_record(uint8_t *in, size_t size, txmap_commit_node* commit_node) {
         // deserialize read set
         uint32_t offset;
         txmap_record *buf_record;
-        
+        txmap_node *buf_node;
         txmap_set *buf_rset;
+        txmap_set *rset, *wset;
+        rset = &commit_node->read_set;
+        wset = &commit_node->write_set;
+        
         offset = 0;
-        buf_rset = reinterpret_cast<txmap_set*>(in);
+        buf_node = reinterpret_cast<txmap_node*>(in + offset);
+        assert(buf_node->node_type == txmap_node::NodeType::COMMIT_RECORD);
+        commit_node->node.node_type = buf_node->node_type;
+        offset += sizeof(txmap_node);
+
+        buf_rset = reinterpret_cast<txmap_set*>(in + offset);
         rset->num_entry = buf_rset->num_entry;
         offset += sizeof(uint32_t);
         rset->set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)*rset->num_entry));
@@ -185,13 +223,17 @@ void TXMapSynchronizer::deserialize_commit_record(uint8_t *in, size_t size, txma
         }
 }
 
-bool TXMapSynchronizer::validate_txn(txmap_set *rset, txmap_set *wset) {
-        assert(rset != NULL);
-        assert(wset != NULL);
+bool TXMapSynchronizer::validate_txn(txmap_commit_node *commit_node) {
         uint32_t i, num_entry;
         txmap_record *record;
+        txmap_set *rset, *wset;
         bool valid = true;
         uint64_t latest_key_version;
+
+        rset = &commit_node->read_set;
+        wset = &commit_node->write_set;
+        assert(rset != NULL);
+        assert(wset != NULL);
 
         std::stringstream ss;
 
