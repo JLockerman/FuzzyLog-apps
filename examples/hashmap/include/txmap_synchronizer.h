@@ -143,6 +143,7 @@ public:
         uint64_t get_latest_key_version(uint64_t key);
         void update_map(txmap_commit_node *commit_node, LocationInColor commit_version);
         bool is_local_key(uint64_t key);
+        bool is_local_only_txn(txmap_commit_node* commit_node);
         void buffer_commit_node(txmap_commit_node* commit_node, LocationInColor commit_version);
         void buffer_decision_node(txmap_decision_node* decision_node);
         bool apply_buffered_nodes(txmap_decision_node *decision_node);

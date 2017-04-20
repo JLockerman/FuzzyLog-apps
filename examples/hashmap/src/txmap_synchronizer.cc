@@ -123,7 +123,8 @@ void TXMapSynchronizer::Execute() {
                                         }
 
                                         // Append decision node to remote color
-                                        append_decision_node_to_remote(commit_version, valid);
+                                        if (is_local_only_txn(&commit_node)) 
+                                                append_decision_node_to_remote(commit_version, valid);
 
                                 } else if (node.node_type == txmap_node::NodeType::DECISION_RECORD) {
                                         assert(locs_read == 1);
@@ -310,6 +311,22 @@ bool TXMapSynchronizer::is_local_key(uint64_t key) {
         return key >= ctx->m_local_key_range_start && key < ctx->m_local_key_range_end;
 }
 
+bool TXMapSynchronizer::is_local_only_txn(txmap_commit_node* commit_node) {
+        bool is_local = true;
+        uint32_t i, num_entry;
+        txmap_set *wset; 
+        wset = &commit_node->write_set;
+        num_entry = wset->num_entry;
+        for (i = 0; i < num_entry; i++) {
+                txmap_record &r = wset->set[i];
+                if (!is_local_key(r.key)) {
+                        is_local = false;
+                        break;
+                }
+        }
+        return is_local;
+}
+
 void TXMapSynchronizer::buffer_commit_node(txmap_commit_node* node, LocationInColor commit_version) {
         // DEBUG =========
         log(val_file, "BUFFER NODE", reinterpret_cast<txmap_node*>(node), commit_version);
@@ -366,8 +383,9 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                                         m_context->inc_num_aborted();
                                 }
 
-                                // Append decision node to remote color
-                                append_decision_node_to_remote(commit_version, valid);
+                                // Append decision node to remote color if this is not local commit
+                                if (is_local_only_txn(commit_node)) 
+                                        append_decision_node_to_remote(commit_version, valid);
                                 m_buffered_commit_nodes.pop_front();
                                 m_buffered_commit_versions.pop_front();
                                 delete commit_node;
