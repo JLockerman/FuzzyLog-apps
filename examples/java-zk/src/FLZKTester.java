@@ -22,23 +22,92 @@ public class FLZKTester
 	{
 		if(args.length<3)
 		{
-			System.out.println("Usage: java FLZK [hostname] [proxyport] [color]");
+			System.out.println("Usage: java FLZK [hostname] [proxyport] [testtype] [color] [othercolor]");
 			System.exit(0);
 		}
 		ProxyClient appendclient = new ProxyClient(args[0], Integer.parseInt(args[1]));
 //		ProxyClient client2 = new ProxyClient(args[0], Integer.parseInt(args[1])+1);
 		ProxyClient playbackclient = appendclient;
-		int color = Integer.parseInt(args[2]);
-		IZooKeeper zk = new FLZK(appendclient, playbackclient, color, null);
+		int testtype = Integer.parseInt(args[2]);
+		int color = Integer.parseInt(args[3]);
+		int secondcolor = Integer.parseInt(args[4]);
 		
+		IZooKeeper zk=null;
+		
+		if(testtype==0)
+		{
+			zk = new FLZK(appendclient, playbackclient, color, null);
+		}
+		else if(testtype==1)
+		{
+			int othercolors[] = new int[1]; othercolors[0] = secondcolor;
+			zk = new FLZKCausal(appendclient, playbackclient, color, null, othercolors);
+		}
+		else if(testtype==2)
+		{
+			zk = new FLZKCAP(appendclient, playbackclient, color, null, secondcolor);
+		}
+		
+			
 		System.out.println("hello world!");
 
 		if(zk.exists("/abcd",  true)==null)
 			zk.create("/abcd", "AAA".getBytes(), null, CreateMode.PERSISTENT);
 		zk.setData("/abcd", "ABCD".getBytes(), -1);
-		System.out.println(zk);
+//		System.out.println(zk);
 		Thread.sleep(1000);
-		int numops = 1;
+		
+		if(testtype==2)
+		{
+		
+			Thread.sleep(1000);
+			for(int i=0;i<100;i++)
+			{
+				try
+				{
+					zk.create("/abcd/" + i, "AAA".getBytes(), null, CreateMode.PERSISTENT);
+				}
+				catch(Exception e)
+				{
+					//fail silently
+				}
+			}
+			System.out.println("Network partitions...");
+			((FLZKCAP)zk).disconnect();
+			Thread.sleep(1000);
+			for(int i=0;i<200;i++)
+			{
+				try
+				{
+					zk.create("/abcd/" + i, "AAA".getBytes(), null, CreateMode.PERSISTENT);
+				}
+				catch(Exception e)
+				{
+					//fail silently
+				}
+			}
+			System.out.println("Network heals!");
+			Thread.sleep(500);
+			//how do we know that we're capturing all prior appends to secondary
+			((FLZKCAP)zk).reconnect();
+			Thread.sleep(500);
+			for(int i=0;i<200;i++)
+			{
+				try
+				{
+					zk.delete("/abcd/" + i, -1);
+				}
+				catch(Exception e)
+				{
+					//fail silently
+				}
+			}
+			
+		}
+		
+
+
+		System.out.println("starting synchronous test!");
 
 		long stoptime = 0;
 		long starttime = 0;
@@ -57,7 +126,7 @@ public class FLZKTester
 				}
 				catch(Exception e)
 				{
-					//fail silently
+					//fail silently? catch nodeexists keeperexception
 				}
 			}
 			stoptime = System.currentTimeMillis();

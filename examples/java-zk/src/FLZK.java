@@ -26,26 +26,6 @@ class Pair<A,B>
 	}
 }
 
-
-abstract class FLZKOp implements Serializable
-{
-	static AtomicInteger idcounter = new AtomicInteger();
-	Object id;
-	public FLZKOp()
-	{
-		id = new Integer(idcounter.getAndIncrement());
-	}
-	public boolean equals(FLZKOp cop)
-	{
-		return cop.id.equals(this.id);
-	}
-	public void callback(KeeperException ke)
-	{
-		callback(ke, null);
-	}
-	public abstract void callback(KeeperException k, Object O);
-}
-
 class SetOp extends FLZKOp implements Serializable
 {
 	String path;
@@ -246,8 +226,8 @@ class DeleteOp extends FLZKOp implements Serializable
 
 public class FLZK implements IZooKeeper, Runnable
 {
-	private ProxyClient appendclient;
-	private ProxyClient playbackclient;
+	protected ProxyClient appendclient;
+	protected ProxyClient playbackclient;
 	HashMap<File, Node> map;
 	
 	HashMap<Object, FLZKOp> pendinglist;  //mutating operations

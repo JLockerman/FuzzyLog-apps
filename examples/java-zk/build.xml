@@ -34,7 +34,9 @@
 		<java classname="FLZKTester" classpathref="run.classpath">
 	      <arg value="${hostname}"/>
     	  <arg value="${port}"/>
+		<arg value="${testtype}"/>    	  
 		<arg value="${color}"/>
+		<arg value="${othercolor}"/>		
       	</java>		
 	</target>
 
