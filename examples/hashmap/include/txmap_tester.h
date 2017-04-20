@@ -15,5 +15,6 @@ public:
         virtual void run();
         virtual void join();
         static void* bootstrap(void *arg);
+        virtual uint32_t try_get_completed();
         void Execute(); 
 };

@@ -27,40 +27,39 @@ void* TXMapTester::bootstrap(void *arg) {
         return NULL;
 }
 
+uint32_t TXMapTester::try_get_completed() {
+        while (true) {
+                write_id wid = m_map->try_wait_for_any_put();
+                if (wid_equality{}(wid, WRITE_ID_NIL)) 
+                        break; 
+        }
+        return 0;
+}
+
 void TXMapTester::Execute() {
         uint32_t i;
-        uint32_t num_pending = 0; 
+        TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
         reset_throttler();
 
         assert(m_async);
         for (i = 0; *m_flag; i++, i = i % m_num_txns) {
                 // try get completed
-                num_pending -= try_get_completed();
+                try_get_completed();
+
                 if (!is_duration_based_run() && is_all_executed()) break;
                                         
                 // throttle
                 if (is_throttled()) continue;
 
                 // issue
-                if (num_pending == m_window_size) {
-                        write_id wid = m_map->wait_for_any_put();
-                        if (wid_equality{}(wid, WRITE_ID_NIL)) { 
-                                std::cout << "no pending writes. terminate" << std::endl; 
-                                break;
-                        }
-                        num_pending -= 1;
-                        m_context->inc_num_executed();
-                        if (!is_duration_based_run() && is_all_executed()) break;
+                if (ctx->is_window_filled()) {
+                        std::this_thread::sleep_for(std::chrono::nanoseconds(10));
+                        continue;
                 }
                 m_txns[i]->Run();
-                m_num_issued++;
-                num_pending += 1;
+                m_context->inc_num_executed();
+                ctx->inc_num_pending_txns();
         }
-        while (num_pending > 0) {
-                num_pending -= try_get_completed();
-                std::this_thread::sleep_for(std::chrono::microseconds(1));
-        } 
         m_context->set_finished();
-
         std::cout << "total executed: " << m_context->get_num_executed() << std::endl;
 }

@@ -15,14 +15,30 @@ extern "C" {
 
 class TXMapContext: public Context {
 public:
+        uint32_t                        m_request_window_size;
+        std::atomic<uint32_t>           m_num_pending_txns;
         double                          m_rename_percent;
         uint64_t                        m_local_key_range_start;
         uint64_t                        m_local_key_range_end;
         uint64_t                        m_remote_key_range_start;
         uint64_t                        m_remote_key_range_end;
 public:
-        TXMapContext(double rename_percent, uint64_t lstart, uint64_t lend, uint64_t rstart, uint64_t rend): Context(), m_rename_percent(rename_percent), m_local_key_range_start(lstart), m_local_key_range_end(lend), m_remote_key_range_start(rstart), m_remote_key_range_end(rend) {}
+        TXMapContext(uint32_t request_window_size, double rename_percent, uint64_t lstart, uint64_t lend, uint64_t rstart, uint64_t rend): Context(), m_request_window_size(request_window_size), m_rename_percent(rename_percent), m_local_key_range_start(lstart), m_local_key_range_end(lend), m_remote_key_range_start(rstart), m_remote_key_range_end(rend) {
+                this->m_num_pending_txns = 0;
+        }
         ~TXMapContext() {}
+
+        void inc_num_pending_txns() {
+                m_num_pending_txns++;
+        }
+
+        void dec_num_pending_txns() {
+                m_num_pending_txns--;
+        }
+
+        bool is_window_filled() {
+                return m_num_pending_txns == m_request_window_size;
+        }
 
         bool do_rename_txn() {
                 double r = static_cast<double>(rand()) / (RAND_MAX) * 100.0;

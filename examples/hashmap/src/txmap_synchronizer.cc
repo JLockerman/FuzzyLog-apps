@@ -281,6 +281,10 @@ bool TXMapSynchronizer::validate_txn(txmap_commit_node *commit_node) {
                         break;
                 }
         } 
+        // After validation, this commit is decided
+        TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
+        ctx->dec_num_pending_txns();
+
         // DEBUG =======
         log(val_file, "VALIDATION", reinterpret_cast<txmap_node*>(commit_node), 0, latest_key_version, valid);
 

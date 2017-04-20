@@ -49,7 +49,7 @@ public:
         virtual void join() = 0;
         uint64_t get_num_executed();
         uint64_t get_num_committed();
-        uint32_t try_get_completed();
+        virtual uint32_t try_get_completed();
         bool is_duration_based_run();
         bool is_all_executed();
         void reset_throttler();
