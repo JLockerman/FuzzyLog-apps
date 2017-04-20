@@ -4,7 +4,7 @@
 #include <cassert>
 #include <unistd.h>
 
-TXMap::TXMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, Context* context, bool replication): BaseMap(log_addr, replication), m_commit_record_id(0), m_synchronizer(NULL) {
+TXMap::TXMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, Context* context, bool replication): BaseMap(log_addr, replication), m_synchronizer(NULL) {
         std::vector<ColorID> interesting_colors;
         get_interesting_colors(workload, interesting_colors);
         init_synchronizer(log_addr, interesting_colors, context, replication);
@@ -96,6 +96,44 @@ void TXMap::serialize_commit_record(txmap_commit_node *commit_node, char* out, s
         *out_size = offset;
 }
 
+void TXMap::execute_update_txn(uint64_t key) {
+        txmap_commit_node commit_node;
+
+        // node type
+        commit_node.node.node_type = txmap_node::NodeType::COMMIT_RECORD;
+
+        // readset
+        uint64_t update_key_version;
+        update_key_version = get(key);
+        txmap_record read_record;
+        read_record.key = key; 
+        read_record.value = 0;                  // Value is irrelevant to the OCC validation 
+        read_record.version = update_key_version; 
+        commit_node.read_set.num_entry = 1;
+        commit_node.read_set.set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)));
+        commit_node.read_set.set[0] = read_record;
+
+        // writeset
+        txmap_record write_record;
+        write_record.key = key; 
+        write_record.value = 0;                 // Value is irrelevant to the OCC validation
+        write_record.version = 0;               // This version would not be used. Instead, Fuzzylog location ID would be used as version during validation phase
+        commit_node.write_set.num_entry = 1;
+        commit_node.write_set.set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)));
+        commit_node.write_set.set[0] = write_record;
+
+        // DEBUG
+        log(&commit_node.read_set, &commit_node.write_set);
+
+        // Make payload
+        size_t size = 0;
+        serialize_commit_record(&commit_node, m_buf, &size);
+
+        // Append commit record
+        //async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL, 0);
+        async_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL);
+}
+
 void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
         txmap_commit_node commit_node;
 
@@ -107,24 +145,22 @@ void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
         from_key_version = get(from_key);
         txmap_record read_record;
         read_record.key = from_key; 
-        read_record.value = 0;          // Value is irrelevant to the protocol 
+        read_record.value = 0;                  // Value is irrelevant to the OCC validation
         read_record.version = from_key_version; 
         commit_node.read_set.num_entry = 1;
         commit_node.read_set.set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)));
         commit_node.read_set.set[0] = read_record;
 
         // writeset
-        m_commit_record_id++;
-
         txmap_record local_write_record;
         local_write_record.key = from_key; 
-        local_write_record.value = 0;          // Value is irrelevant to the protocol 
-        local_write_record.version = m_commit_record_id; 
+        local_write_record.value = 0;                   // Value is irrelevant to the OCC validation 
+        local_write_record.version = 0;                 // This version would not be used. Instead, Fuzzylog location ID would be used as version during validation phase
 
         txmap_record remote_write_record;
         remote_write_record.key = to_key; 
-        remote_write_record.value = 0;          // Value is irrelevant to the protocol 
-        remote_write_record.version = m_commit_record_id; 
+        remote_write_record.value = 0;                  // Value is irrelevant to the OCC validation 
+        remote_write_record.version = 0;                // This version would not be used. Instead, Fuzzylog location ID would be used as version during validation phase
 
         commit_node.write_set.num_entry = 2;
         commit_node.write_set.set = static_cast<txmap_record*>(malloc(sizeof(txmap_record)*2));
