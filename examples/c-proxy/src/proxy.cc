@@ -68,6 +68,7 @@ void fuzzy_proxy::do_get_next()
 	struct colors c;
 	uint32_t *uint_buf = (uint32_t*)_buffer;
 
+#ifdef ASYNC_GET_NEXT
 	get_next_val val;
 
 	val = async_get_next2(_handle, &buf_sz, &locs_read);
@@ -95,12 +96,16 @@ void fuzzy_proxy::do_get_next()
 		assert(false);
 	}
 
-	/*
+#else
+
+	get_next(_handle, &_buffer[2*sizeof(uint32_t)], &buf_sz, &c);
 	uint_buf = (uint32_t *)_buffer;
 	uint_buf[0] = htonl((uint32_t)buf_sz);
 	uint_buf[1] = htonl((uint32_t)c.numcolors);
 		
 	if (c.numcolors == 0) {
+		uint_buf[0] = 0;
+		uint_buf[1] = 0;
 		_buffer_len = 2*sizeof(uint32_t);
 	} else { 
 		auto offset = 2*sizeof(uint32_t) + buf_sz;
@@ -111,7 +116,7 @@ void fuzzy_proxy::do_get_next()
 		free(c.mycolors);
 		_buffer_len = 2*sizeof(uint32_t) + buf_sz + sizeof(ColorID)*c.numcolors;
 	}
-	*/
+#endif 
 }
 
 void proxy_request::initialize(char *buf)
