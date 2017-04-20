@@ -59,9 +59,13 @@ void TXMapTester::Execute() {
                         continue;
                 }
                 m_txns[i]->Run();
-                m_context->inc_num_executed();
+                ctx->inc_num_executed();
                 ctx->inc_num_pending_txns();
         }
-        ctx->end_issuing();
-        m_context->set_finished();
+        ctx->set_finished();
+}
+
+uint64_t TXMapTester::get_num_committed() {
+        TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
+        return ctx->get_num_committed();
 }

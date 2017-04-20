@@ -75,6 +75,7 @@ void TXMapSynchronizer::Execute() {
         size_t locs_read = 0;
         get_next_val next_val;
         LocationInColor commit_version;
+        TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
 
         bool needs_buffering = false;
 
@@ -116,10 +117,10 @@ void TXMapSynchronizer::Execute() {
                                         bool valid = validate_txn(&commit_node);
                                         if (valid) {
                                                 update_map(&commit_node, commit_version);
-                                                m_context->inc_num_committed();
+                                                ctx->inc_num_committed();
 
                                         } else {
-                                                m_context->inc_num_aborted();
+                                                ctx->inc_num_aborted();
                                         }
 
                                         // Append decision node to remote color if this is not local only commit
@@ -284,8 +285,6 @@ bool TXMapSynchronizer::validate_txn(txmap_commit_node *commit_node) {
         // After validation, this commit is decided
         TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
         ctx->dec_num_pending_txns();
-        if (ctx->is_all_txn_decided())
-                ctx->end_measure_time();
 
         // DEBUG =======
         log(val_file, "VALIDATION", reinterpret_cast<txmap_node*>(commit_node), 0, latest_key_version, valid);
@@ -351,6 +350,8 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
         // DEBUG ========
         log(val_file, "DECISION NODE ARRIVED", reinterpret_cast<txmap_node*>(decision_node));
 
+        TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
+
         txmap_commit_node* commit_node = m_buffered_commit_nodes.front();
         LocationInColor commit_version = m_buffered_commit_versions.front();
         if (commit_version != decision_node->commit_version) {
@@ -361,10 +362,10 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                 // apply 
                 if (decision_node->decision == txmap_decision_node::DecisionType::COMMITTED) {
                         update_map(commit_node, decision_node->commit_version);
-                        m_context->inc_num_committed();
+                        ctx->inc_num_committed();
 
                 } else if (decision_node->decision == txmap_decision_node::DecisionType::ABORTED) {
-                        m_context->inc_num_aborted();
+                        ctx->inc_num_aborted();
 
                 } else {
                         assert(false);
@@ -383,10 +384,10 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                                 bool valid = validate_txn(commit_node);
                                 if (valid) {
                                         update_map(commit_node, commit_version);
-                                        m_context->inc_num_committed();
+                                        ctx->inc_num_committed();
 
                                 } else {
-                                        m_context->inc_num_aborted();
+                                        ctx->inc_num_aborted();
                                 }
 
                                 // Append decision node to remote color if this is not local only commit
@@ -403,10 +404,10 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                                         if (commit_version == d->commit_version) {
                                                 if (d->decision == txmap_decision_node::DecisionType::COMMITTED) { 
                                                         update_map(commit_node, d->commit_version);
-                                                        m_context->inc_num_committed();
+                                                        ctx->inc_num_committed();
 
                                                 } else if (d->decision == txmap_decision_node::DecisionType::ABORTED) {
-                                                        m_context->inc_num_aborted();
+                                                        ctx->inc_num_aborted();
 
                                                 } else {
                                                         assert(false);

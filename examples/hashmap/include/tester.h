@@ -48,7 +48,6 @@ public:
         virtual void run() = 0;
         virtual void join() = 0;
         uint64_t get_num_executed();
-        uint64_t get_num_committed();
         virtual uint32_t try_get_completed();
         bool is_duration_based_run();
         bool is_all_executed();

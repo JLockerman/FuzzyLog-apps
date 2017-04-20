@@ -17,4 +17,5 @@ public:
         static void* bootstrap(void *arg);
         virtual uint32_t try_get_completed();
         void Execute(); 
+        uint64_t get_num_committed();
 };

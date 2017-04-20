@@ -5,10 +5,6 @@ uint64_t Tester::get_num_executed() {
         return m_context->get_num_executed();
 }
 
-uint64_t Tester::get_num_committed() {
-        return m_context->get_num_committed();
-}
-
 uint32_t Tester::try_get_completed() {
         uint32_t num_completed = 0;
         while (true) {

@@ -16,11 +16,12 @@ extern "C" {
 class TXMapContext: public Context {
 public:
         uint32_t                        m_request_window_size;
+        std::atomic<uint64_t>           m_num_committed;
+        std::atomic<uint64_t>           m_num_aborted;
         std::atomic<uint32_t>           m_num_pending_txns;
         uint32_t                        m_num_local_only_txns;
         uint32_t                        m_num_dist_txns;
         double                          m_rename_percent;
-        std::atomic<bool>               m_request_issuing_ended;
         uint64_t                        m_local_key_range_start;
         uint64_t                        m_local_key_range_end;
         uint64_t                        m_remote_key_range_start;
@@ -32,12 +33,31 @@ public:
 
 public:
         TXMapContext(uint32_t request_window_size, double rename_percent, uint64_t lstart, uint64_t lend, uint64_t rstart, uint64_t rend): Context(), m_request_window_size(request_window_size), m_rename_percent(rename_percent), m_local_key_range_start(lstart), m_local_key_range_end(lend), m_remote_key_range_start(rstart), m_remote_key_range_end(rend) {
+                this->m_num_committed = 0;
+                this->m_num_aborted = 0;
                 this->m_num_pending_txns = 0;
                 this->m_num_local_only_txns = 0;
                 this->m_num_dist_txns = 0;
-                this->m_request_issuing_ended = false;
         }
         ~TXMapContext() {}
+
+        uint64_t get_num_committed() {
+                return m_num_committed;
+        }
+
+        void inc_num_committed() {
+                m_num_committed++;
+                end_measure_time();             // memorize last time when committ is decided
+        }
+
+        uint64_t get_num_aborted() {
+                return m_num_aborted;
+        }
+
+        void inc_num_aborted() {
+                m_num_aborted++;
+                end_measure_time();             // memorize last time when committ is decided
+        }
 
         void inc_num_pending_txns() {
                 m_num_pending_txns++;
@@ -72,20 +92,12 @@ public:
                 return r < m_rename_percent;
         }
 
-        void end_issuing() {
-                m_request_issuing_ended = true;
-        }
-
         void start_measure_time() {
                 m_start_time = std::chrono::system_clock::now();
         }
 
         void end_measure_time() {
                 m_end_time = std::chrono::system_clock::now();
-        }
-
-        bool is_all_txn_decided() {
-                return m_request_issuing_ended && m_num_pending_txns == 0;
         }
 
         double get_execution_time() {
