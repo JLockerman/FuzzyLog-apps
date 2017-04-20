@@ -18,12 +18,10 @@ using namespace std;
 using ns = chrono::nanoseconds;
 using get_time = chrono::system_clock;
 
-void write_throughput(uint32_t client_id, std::string &output_suffix, std::vector<uint64_t>& results) {
+void write_output(uint32_t client_id, std::string output) {
         std::ofstream result_file; 
-        result_file.open(std::to_string(client_id) + output_suffix + ".txt", std::ios::app | std::ios::out);
-        for (auto r : results) {
-                result_file << r << "\n"; 
-        }
+        result_file.open(std::to_string(client_id) + ".txt", std::ios::app | std::ios::out);
+        result_file << output; 
         result_file.close();        
 }
 
@@ -168,39 +166,33 @@ void do_experiment(txmap_config cfg) {
 
         // Give more time to reader thread
         std::this_thread::sleep_for(std::chrono::seconds(3));
-        std::cout << "total executed              : " << ctx.get_num_executed() << std::endl;
-        std::cout << "total executed (local only) : " << ctx.get_num_local_only_txns() << std::endl;
-        std::cout << "total executed (distributed): " << ctx.get_num_dist_txns() << std::endl;
-        std::cout << "total committed             : " << ctx.get_num_committed() << std::endl;
-        std::cout << "total aborted               : " << ctx.get_num_aborted() << std::endl;
+        std::stringstream ss;
+        ss << "total executed              : " << ctx.get_num_executed() << std::endl;
+        ss << "total executed (local only) : " << ctx.get_num_local_only_txns() << std::endl;
+        ss << "total executed (distributed): " << ctx.get_num_dist_txns() << std::endl;
+        ss << "total committed             : " << ctx.get_num_committed() << std::endl;
+        ss << "total aborted               : " << ctx.get_num_aborted() << std::endl;
         double abort_rate = (double)ctx.get_num_aborted() / ctx.get_num_executed() * 100.0;
-        std::cout.precision(10);
-        std::cout << "execution time              : " << ctx.get_execution_time() << std::endl; 
-        std::cout << "tput                        : " << ctx.get_throughput() << std::endl; 
-        std::cout << "gput                        : " << ctx.get_goodput() << std::endl; 
-        std::cout.precision(2);
-        std::cout << "abort rate                  : " << abort_rate << std::endl; 
+        ss.precision(8);
+        ss << "execution time              : " << ctx.get_execution_time() << std::endl; 
+        ss << "tput                        : " << ctx.get_throughput() << std::endl; 
+        ss << "gput                        : " << ctx.get_goodput() << std::endl; 
+        ss.precision(2);
+        ss << "abort rate                  : " << abort_rate << std::endl; 
+        
+        // Print
+        std::cout << ss.str();
+
+        // Write to file
+        write_output(cfg.client_id, ss.str());
 
         // Wait until worker finishes
         worker->join();
- 
-        // Write throughput to output file
-        
-        if (executed_results.size() > 0) {
-                std::string tput_output_suffix = "_tput";
-                write_throughput(cfg.client_id, tput_output_suffix, executed_results);
-        }
-
-        if (committed_results.size() > 0) {
-                std::string goodput_output_suffix = "_gput";
-                write_throughput(cfg.client_id, goodput_output_suffix, committed_results);
-        }
 
         // Free
         delete worker;
         delete map;
         delete workload_gen;
-
 }
 
 int main(int argc, char** argv) {
