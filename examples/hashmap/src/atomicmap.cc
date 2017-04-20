@@ -53,4 +53,3 @@ uint64_t AtomicMap::get(uint64_t key) {
 
         return val;
 }
-

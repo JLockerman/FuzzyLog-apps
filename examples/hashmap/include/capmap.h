@@ -74,17 +74,11 @@ public:
 
         // create payload
         void get_payload(uint64_t key, uint64_t value, uint8_t flag, char* out, size_t* out_size);
-        // For protocol 1
-        void get_payload_for_strong_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
-        void get_payload_for_weak_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
         // For protocol 2
         void get_payload_for_normal_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
         void get_payload_for_healing_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
         void get_payload_for_partitioning_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
         
-        // Operations for protocol 1
-        write_id async_strong_depend_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);
-        write_id async_weak_put(uint64_t key, uint64_t value, struct colors* op_color);
         // Operations for protocol 2
         write_id async_normal_put(uint64_t key, uint64_t value, struct colors* op_color);
         write_id async_partitioning_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);        // XXX: should be called only from secondary machine

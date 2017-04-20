@@ -37,31 +37,11 @@ write_id ycsb_cross_insert::AsyncRemoteRun() {
 }
 
 write_id ycsb_cross_insert::AsyncStronglyConsistentRun() {
-        uint64_t key, value;
-        assert(m_map != NULL);
-        assert(m_dep_color != NULL);
-
-        // key = (start, end)
-        key = rand() % (m_end - m_start);
-        value = rand();
-        auto start_time = std::chrono::system_clock::now();
-        write_id wid = m_map->async_strong_depend_put(key, value, m_color, m_dep_color);
-        m_context->mark_started(wid, start_time); 
-        return wid;
+        assert(false);
 }
 
 write_id ycsb_cross_insert::AsyncWeaklyConsistentRun() {
-        uint64_t key, value;
-        assert(m_map != NULL);
-        assert(m_dep_color != NULL);
-
-        // key = (start, end)
-        key = rand() % (m_end - m_start);
-        value = rand();
-        auto start_time = std::chrono::system_clock::now();
-        write_id wid = m_map->async_weak_put(key, value, m_color);
-        m_context->mark_started(wid, start_time); 
-        return wid;
+        assert(false);
 }
 
 write_id ycsb_cross_insert::AsyncPartitioningAppend() {
