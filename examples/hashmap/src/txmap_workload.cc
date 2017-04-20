@@ -14,9 +14,11 @@ void read_write_txn::Run() {
         if (ctx->do_rename_txn()) {
                 to_key = rand() % (ctx->m_remote_key_range_end - ctx->m_remote_key_range_start) + ctx->m_remote_key_range_start;
                 m_map->execute_rename_txn(from_key, to_key);
+                ctx->inc_num_dist_txns();
 
         } else {
                 m_map->execute_update_txn(from_key);
+                ctx->inc_num_local_only_txns();
         }
 }
 

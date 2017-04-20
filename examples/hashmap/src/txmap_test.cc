@@ -168,8 +168,14 @@ void do_experiment(txmap_config cfg) {
 
         // Give more time to reader thread
         std::this_thread::sleep_for(std::chrono::seconds(3));
-        std::cout << "total committed: " << ctx.get_num_committed() << std::endl;
-        std::cout << "total aborted  : " << ctx.get_num_aborted() << std::endl;
+        std::cout << "total executed              : " << ctx.get_num_executed() << std::endl;
+        std::cout << "total executed (local only) : " << ctx.get_num_local_only_txns() << std::endl;
+        std::cout << "total executed (distributed): " << ctx.get_num_dist_txns() << std::endl;
+        std::cout << "total committed             : " << ctx.get_num_committed() << std::endl;
+        std::cout << "total aborted               : " << ctx.get_num_aborted() << std::endl;
+        double abort_rate = (double)ctx.get_num_aborted() / ctx.get_num_executed() * 100.0;
+        std::cout.precision(2);
+        std::cout << "abort rate                  : " << abort_rate << std::endl; 
 
         // Wait until worker finishes
         worker->join();

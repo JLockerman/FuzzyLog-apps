@@ -61,5 +61,4 @@ void TXMapTester::Execute() {
                 ctx->inc_num_pending_txns();
         }
         m_context->set_finished();
-        std::cout << "total executed: " << m_context->get_num_executed() << std::endl;
 }

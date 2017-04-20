@@ -17,6 +17,8 @@ class TXMapContext: public Context {
 public:
         uint32_t                        m_request_window_size;
         std::atomic<uint32_t>           m_num_pending_txns;
+        uint32_t                        m_num_local_only_txns;
+        uint32_t                        m_num_dist_txns;
         double                          m_rename_percent;
         uint64_t                        m_local_key_range_start;
         uint64_t                        m_local_key_range_end;
@@ -25,6 +27,8 @@ public:
 public:
         TXMapContext(uint32_t request_window_size, double rename_percent, uint64_t lstart, uint64_t lend, uint64_t rstart, uint64_t rend): Context(), m_request_window_size(request_window_size), m_rename_percent(rename_percent), m_local_key_range_start(lstart), m_local_key_range_end(lend), m_remote_key_range_start(rstart), m_remote_key_range_end(rend) {
                 this->m_num_pending_txns = 0;
+                this->m_num_local_only_txns = 0;
+                this->m_num_dist_txns = 0;
         }
         ~TXMapContext() {}
 
@@ -34,6 +38,22 @@ public:
 
         void dec_num_pending_txns() {
                 m_num_pending_txns--;
+        }
+
+        void inc_num_local_only_txns() {
+                m_num_local_only_txns++;
+        }
+        
+        uint32_t get_num_local_only_txns() {
+                return m_num_local_only_txns;
+        }
+
+        void inc_num_dist_txns() {
+                m_num_dist_txns++;
+        }
+
+        uint32_t get_num_dist_txns() {
+                return m_num_dist_txns;
         }
 
         bool is_window_filled() {
