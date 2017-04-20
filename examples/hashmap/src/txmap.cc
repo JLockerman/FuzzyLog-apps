@@ -34,12 +34,18 @@ void TXMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<Co
 }
 
 void TXMap::init_op_color(std::vector<ColorID>& interesting_colors) {
-        m_op_color.numcolors = interesting_colors.size();
-        m_op_color.mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)*interesting_colors.size()));
+        // for local txn
+        m_local_txn_color.numcolors = 1;
+        m_local_txn_color.mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
+        m_local_txn_color.mycolors[0] = interesting_colors[0];
+
+        // for dist txn
+        m_dist_txn_color.numcolors = interesting_colors.size();
+        m_dist_txn_color.mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)*interesting_colors.size()));
 
         uint32_t i;
         for (i = 0; i < interesting_colors.size(); i++) {
-                m_op_color.mycolors[i] = interesting_colors[i];
+                m_dist_txn_color.mycolors[i] = interesting_colors[i];
         }
 }
 
@@ -130,11 +136,11 @@ void TXMap::execute_update_txn(uint64_t key) {
         serialize_commit_record(&commit_node, m_buf, &size);
 
         // Append commit record
-        //async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL, 0);
-        async_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL);
+        //async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_local_txn_color, NULL, 0);
+        async_append(m_fuzzylog_client, m_buf, size, &m_local_txn_color, NULL);
 }
 
-void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
+void TXMap::execute_rename_txn(uint64_t from_key, uint64_t to_key) {
         txmap_commit_node commit_node;
 
         // node type
@@ -175,8 +181,8 @@ void TXMap::execute_move_txn(uint64_t from_key, uint64_t to_key) {
         serialize_commit_record(&commit_node, m_buf, &size);
 
         // Append commit record
-        //async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL, 0);
-        async_append(m_fuzzylog_client, m_buf, size, &m_op_color, NULL);
+        //async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_dist_txn_color, NULL, 0);
+        async_append(m_fuzzylog_client, m_buf, size, &m_dist_txn_color, NULL);
 }
 
 void TXMap::log(txmap_set* rset, txmap_set* wset) {

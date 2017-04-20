@@ -18,11 +18,12 @@ static struct option long_options[] = {
         {"num_clients",         required_argument, NULL, 3},
         {"client_id",           required_argument, NULL, 4},
         {"workload",            required_argument, NULL, 5},
-        {"txn_rate",            optional_argument, NULL, 6},
-        {"async",               optional_argument, NULL, 7},
-        {"window_size",         optional_argument, NULL, 8},
-        {"replication",         optional_argument, NULL, 9},
-        {NULL,                  no_argument,       NULL, 10},
+        {"rename_percent",      required_argument, NULL, 6},
+        {"txn_rate",            optional_argument, NULL, 7},
+        {"async",               optional_argument, NULL, 8},
+        {"window_size",         optional_argument, NULL, 9},
+        {"replication",         optional_argument, NULL, 10},
+        {NULL,                  no_argument,       NULL, 11},
 };
 
 struct txmap_config {
@@ -32,6 +33,7 @@ struct txmap_config {
         uint8_t                         num_clients;
 	uint8_t 		        client_id;
 	std::vector<workload_config>    workload;
+	double                 	        rename_percent;
         uint32_t                        txn_rate;
         bool                            async;
         uint32_t                        window_size;
@@ -47,10 +49,11 @@ private:
                 NUM_CLIENTS     = 3,
 		CLIENT_ID       = 4,
 		WORKLOAD        = 5,
-                TXN_RATE        = 6,
-		ASYNC           = 7,
-		WINDOW_SIZE     = 8,
-                REPLICATION     = 9,
+		RENAME_PERCENT  = 6,
+                TXN_RATE        = 7,
+		ASYNC           = 8,
+		WINDOW_SIZE     = 9,
+                REPLICATION     = 10,
 	};
 
 	bool 					_init;
@@ -84,7 +87,8 @@ private:
 		    _arg_map.count(EXPT_RANGE) == 0 ||
 		    _arg_map.count(NUM_CLIENTS) == 0 || 
 		    _arg_map.count(CLIENT_ID) == 0 || 
-		    _arg_map.count(WORKLOAD) == 0) {
+		    _arg_map.count(WORKLOAD) == 0 || 
+		    _arg_map.count(RENAME_PERCENT) == 0) {
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
 		        std::cerr << "--" << long_options[EXPT_RANGE].name << "\n";
@@ -92,6 +96,7 @@ private:
 		        std::cerr << "--" << long_options[NUM_CLIENTS].name << "\n";
 		        std::cerr << "--" << long_options[CLIENT_ID].name << "\n";
 		        std::cerr << "--" << long_options[WORKLOAD].name << "\n";
+		        std::cerr << "--" << long_options[RENAME_PERCENT].name << "\n";
 		        std::cerr << "[--" << long_options[TXN_RATE].name << "]\n";
 		        std::cerr << "[--" << long_options[ASYNC].name << "]\n";
 		        std::cerr << "[--" << long_options[WINDOW_SIZE].name << "]\n";
@@ -175,6 +180,12 @@ private:
                         wc.is_strong = is_strong;
                         wc.op_count = op_count; 
                         ret.workload.push_back(wc);
+                }
+                // rename_percent 
+		ret.rename_percent = static_cast<double>(atof(_arg_map[RENAME_PERCENT]));
+                if (ret.rename_percent < 0.0 || ret.rename_percent > 100.0) {
+                        std::cerr << "Error. --" << long_options[RENAME_PERCENT].name << " only allows [0,100]\n";
+                        exit(-1);
                 }
                 // txn_rate
                 if (_arg_map.count(TXN_RATE) > 0)

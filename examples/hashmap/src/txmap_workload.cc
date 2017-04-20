@@ -11,8 +11,13 @@ void read_write_txn::Run() {
        
         // uniform distribution 
         from_key = rand() % (ctx->m_local_key_range_end - ctx->m_local_key_range_start) + ctx->m_local_key_range_start;
-        to_key = rand() % (ctx->m_remote_key_range_end - ctx->m_remote_key_range_start) + ctx->m_remote_key_range_start;
-        m_map->execute_move_txn(from_key, to_key);
+        if (ctx->do_rename_txn()) {
+                to_key = rand() % (ctx->m_remote_key_range_end - ctx->m_remote_key_range_start) + ctx->m_remote_key_range_start;
+                m_map->execute_rename_txn(from_key, to_key);
+
+        } else {
+                m_map->execute_update_txn(from_key);
+        }
 }
 
 write_id read_write_txn::AsyncRun() {

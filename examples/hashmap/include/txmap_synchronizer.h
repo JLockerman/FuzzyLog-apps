@@ -15,13 +15,19 @@ extern "C" {
 
 class TXMapContext: public Context {
 public:
+        double                          m_rename_percent;
         uint64_t                        m_local_key_range_start;
         uint64_t                        m_local_key_range_end;
         uint64_t                        m_remote_key_range_start;
         uint64_t                        m_remote_key_range_end;
 public:
-        TXMapContext(uint64_t lstart, uint64_t lend, uint64_t rstart, uint64_t rend): Context(), m_local_key_range_start(lstart), m_local_key_range_end(lend), m_remote_key_range_start(rstart), m_remote_key_range_end(rend) {}
+        TXMapContext(double rename_percent, uint64_t lstart, uint64_t lend, uint64_t rstart, uint64_t rend): Context(), m_rename_percent(rename_percent), m_local_key_range_start(lstart), m_local_key_range_end(lend), m_remote_key_range_start(rstart), m_remote_key_range_end(rend) {}
         ~TXMapContext() {}
+
+        bool do_rename_txn() {
+                double r = static_cast<double>(rand()) / (RAND_MAX) * 100.0;
+                return r < m_rename_percent;
+        }
 };
 
 typedef struct txmap_record {

@@ -136,7 +136,7 @@ void do_experiment(txmap_config cfg) {
         ColorID remote_color = w.first_color.mycolors[1];
         remote_key_range_start = remote_color * cfg.expt_range;
         remote_key_range_end = remote_key_range_start + cfg.expt_range;
-        TXMapContext ctx(local_key_range_start, local_key_range_end, remote_key_range_start, remote_key_range_end);
+        TXMapContext ctx(cfg.rename_percent, local_key_range_start, local_key_range_end, remote_key_range_start, remote_key_range_end);
 
         // Fuzzymap
         map = new TXMap(&cfg.log_addr, &cfg.workload, &ctx, cfg.replication);
