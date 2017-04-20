@@ -90,6 +90,7 @@ void TXMapSynchronizer::Execute() {
                         while (true) {
                                 next_val = get_next2(m_fuzzylog_client, &size, &locs_read);
                                 if (locs_read == 0) break;
+                                if (size == 1) continue;                // node for client start time synchonization
                                 //assert(next_val.locs[0].entry == next_val.locs[1].entry);
                                 commit_version = std::max(next_val.locs[0].entry, next_val.locs[1].entry);
                                 // readset, writeset

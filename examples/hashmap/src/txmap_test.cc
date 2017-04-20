@@ -136,6 +136,9 @@ void do_experiment(txmap_config cfg) {
         remote_key_range_end = remote_key_range_start + cfg.expt_range;
         TXMapContext ctx(cfg.window_size, cfg.rename_percent, local_key_range_start, local_key_range_end, remote_key_range_start, remote_key_range_end);
 
+        // Synchronize clients
+        wait_signal(cfg);
+
         // Fuzzymap
         map = new TXMap(&cfg.log_addr, &cfg.workload, &ctx, cfg.replication);
 
@@ -146,9 +149,6 @@ void do_experiment(txmap_config cfg) {
         // One worker thread
         flag = true;
         worker = new TXMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size, cfg.expt_duration, cfg.txn_rate);
-
-        // Synchronize clients
-        //wait_signal(cfg);
 
         // Run workers
         worker->run();
