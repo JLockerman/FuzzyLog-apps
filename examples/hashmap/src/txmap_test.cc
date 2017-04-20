@@ -174,6 +174,10 @@ void do_experiment(txmap_config cfg) {
         std::cout << "total committed             : " << ctx.get_num_committed() << std::endl;
         std::cout << "total aborted               : " << ctx.get_num_aborted() << std::endl;
         double abort_rate = (double)ctx.get_num_aborted() / ctx.get_num_executed() * 100.0;
+        std::cout.precision(10);
+        std::cout << "execution time              : " << ctx.get_execution_time() << std::endl; 
+        std::cout << "tput                        : " << ctx.get_throughput() << std::endl; 
+        std::cout << "gput                        : " << ctx.get_goodput() << std::endl; 
         std::cout.precision(2);
         std::cout << "abort rate                  : " << abort_rate << std::endl; 
 

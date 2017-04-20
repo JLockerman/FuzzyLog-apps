@@ -22,7 +22,7 @@ TXMapSynchronizer::TXMapSynchronizer(std::vector<std::string>* log_addr, std::ve
         m_remote_color->numcolors = 1;
         m_remote_color->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
         m_remote_color->mycolors[0] = interesting_colors[1];
-    //  }
+
         this->m_interesting_colors = m_local_color;
         // Initialize fuzzylog connection
         if (m_replication) {
@@ -284,6 +284,8 @@ bool TXMapSynchronizer::validate_txn(txmap_commit_node *commit_node) {
         // After validation, this commit is decided
         TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
         ctx->dec_num_pending_txns();
+        if (ctx->is_all_txn_decided())
+                ctx->end_measure_time();
 
         // DEBUG =======
         log(val_file, "VALIDATION", reinterpret_cast<txmap_node*>(commit_node), 0, latest_key_version, valid);

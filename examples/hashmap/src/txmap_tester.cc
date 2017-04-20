@@ -42,6 +42,8 @@ void TXMapTester::Execute() {
         reset_throttler();
 
         assert(m_async);
+
+        ctx->start_measure_time();
         for (i = 0; *m_flag; i++, i = i % m_num_txns) {
                 // try get completed
                 try_get_completed();
@@ -60,5 +62,6 @@ void TXMapTester::Execute() {
                 m_context->inc_num_executed();
                 ctx->inc_num_pending_txns();
         }
+        ctx->end_issuing();
         m_context->set_finished();
 }

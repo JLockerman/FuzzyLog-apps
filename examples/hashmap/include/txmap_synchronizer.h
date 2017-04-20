@@ -20,15 +20,22 @@ public:
         uint32_t                        m_num_local_only_txns;
         uint32_t                        m_num_dist_txns;
         double                          m_rename_percent;
+        std::atomic<bool>               m_request_issuing_ended;
         uint64_t                        m_local_key_range_start;
         uint64_t                        m_local_key_range_end;
         uint64_t                        m_remote_key_range_start;
         uint64_t                        m_remote_key_range_end;
+        // execution time
+        std::chrono::system_clock::time_point   m_start_time;
+        std::chrono::system_clock::time_point   m_end_time;
+        
+
 public:
         TXMapContext(uint32_t request_window_size, double rename_percent, uint64_t lstart, uint64_t lend, uint64_t rstart, uint64_t rend): Context(), m_request_window_size(request_window_size), m_rename_percent(rename_percent), m_local_key_range_start(lstart), m_local_key_range_end(lend), m_remote_key_range_start(rstart), m_remote_key_range_end(rend) {
                 this->m_num_pending_txns = 0;
                 this->m_num_local_only_txns = 0;
                 this->m_num_dist_txns = 0;
+                this->m_request_issuing_ended = false;
         }
         ~TXMapContext() {}
 
@@ -63,6 +70,35 @@ public:
         bool do_rename_txn() {
                 double r = static_cast<double>(rand()) / (RAND_MAX) * 100.0;
                 return r < m_rename_percent;
+        }
+
+        void end_issuing() {
+                m_request_issuing_ended = true;
+        }
+
+        void start_measure_time() {
+                m_start_time = std::chrono::system_clock::now();
+        }
+
+        void end_measure_time() {
+                m_end_time = std::chrono::system_clock::now();
+        }
+
+        bool is_all_txn_decided() {
+                return m_request_issuing_ended && m_num_pending_txns == 0;
+        }
+
+        double get_execution_time() {
+                std::chrono::duration<double, std::milli> elapsed = m_end_time - m_start_time;
+                return elapsed.count() / 1000.0;
+        }
+
+        double get_throughput() {
+                return get_num_executed() / get_execution_time();
+        }
+
+        double get_goodput() {
+                return get_num_committed() / get_execution_time();
         }
 };
 
