@@ -44,12 +44,12 @@ public:
 
         //MapType get_map_type() { return m_map_type; }
         void init_fuzzylog_client(std::vector<std::string>* log_addr);
+        static DAGHandle* get_connection(std::vector<std::string>* log_addr, struct colors* c, bool replication);
         // Synchronous operations
         void put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);
         void remove(uint64_t key, struct colors* op_color);
         // Asynchronous operations
         write_id async_put(uint64_t key, uint64_t value, struct colors* op_color);
-        void flush_completed_puts();
         write_id try_wait_for_any_put();
         write_id wait_for_any_put();
         void wait_for_all_puts();

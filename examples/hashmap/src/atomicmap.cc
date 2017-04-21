@@ -35,6 +35,16 @@ void AtomicMap::init_synchronizer(std::vector<std::string>* log_addr, std::vecto
         m_synchronizer->run();
 }
 
+void AtomicMap::multiput(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color) {
+        assert(op_color->numcolors == 2);
+        put(key, value, op_color, dep_color);
+}
+
+write_id AtomicMap::async_multiput(uint64_t key, uint64_t value, struct colors* op_color) {
+        assert(op_color->numcolors == 2);
+        return async_put(key, value, op_color);
+}
+
 uint64_t AtomicMap::get(uint64_t key) {
         uint64_t val;
         std::condition_variable cv;
