@@ -187,8 +187,6 @@ void TXMapSynchronizer::append_decision_node_to_remote(uint64_t remote_write_key
         size_t size = 0;
         serialize_decision_record(&decision_node, m_write_buf, &size);
         async_append(m_append_client, m_write_buf, size, m_remote_color, NULL);
-        // DEBUG ==========
-        log(txn_file, "APPEND DECISION RECORD", reinterpret_cast<txmap_node*>(&decision_node));
 }
 
 
@@ -221,9 +219,6 @@ bool TXMapSynchronizer::validate_txn(txmap_commit_node *commit_node) {
         TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
         ctx->dec_num_pending_txns();
 
-        // DEBUG =======
-        log(val_file, "VALIDATION", reinterpret_cast<txmap_node*>(commit_node), get_latest_key_version(commit_node->read_key), valid);
-
         return valid;
 }
 
@@ -232,9 +227,6 @@ uint64_t TXMapSynchronizer::get_latest_key_version(uint64_t key) {
 }
 
 void TXMapSynchronizer::update_map(txmap_commit_node *commit_node) {
-        // DEBUG =========
-        log(val_file, "APPLY", reinterpret_cast<txmap_node*>(commit_node));
-
         if (is_local_key(commit_node->write_key))
                 put(commit_node->write_key, commit_node->commit_version);
         if (is_local_key(commit_node->remote_write_key))
@@ -264,9 +256,6 @@ bool TXMapSynchronizer::needs_buffering(txmap_commit_node *commit_node) {       
 }
 
 void TXMapSynchronizer::buffer_commit_node(txmap_commit_node* node) {
-        // DEBUG =========
-        log(val_file, "BUFFER NODE", reinterpret_cast<txmap_node*>(node));
-
         uint64_t key = 0;
         if (is_decision_possible(node)) {
                 key = node->read_key;  
@@ -291,8 +280,6 @@ void TXMapSynchronizer::buffer_decision_node(txmap_decision_node* node) {
 
 void TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node) {
         assert(m_waiting_for_decision_node.count(decision_node->key) > 0);
-        // DEBUG ========
-        log(val_file, "DECISION NODE ARRIVED", reinterpret_cast<txmap_node*>(decision_node));
 
         TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
         auto buffered_commit_nodes = m_buffered_commit_nodes[decision_node->key];
@@ -301,7 +288,6 @@ void TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
         txmap_commit_node* commit_node = buffered_commit_nodes->front();
         if (commit_node->commit_version != decision_node->commit_version) {
                 // buffer decision node
-                log(val_file, "DECISION NODE NOT MATCHING", reinterpret_cast<txmap_node*>(decision_node));
                 buffer_decision_node(decision_node->clone());
         } else {
                 // apply 
@@ -365,24 +351,4 @@ void TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                 m_waiting_for_decision_node.erase(decision_node->key);
                 assert(m_waiting_for_decision_node.count(decision_node->key) == 0);
         }
-}
-
-void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, LocationInColor latest_key_version, bool decision) {
-//      std::ofstream result_file; 
-//      result_file.open(file_name, std::ios::app | std::ios::out);
-//      result_file << "========== " << prefix << " ==========" << std::endl; 
-//      if (node->node_type == txmap_node::NodeType::COMMIT_RECORD) {
-//              txmap_commit_node* commit_node = reinterpret_cast<txmap_commit_node*>(node);
-//              result_file << "[R] " << commit_node->read_set.log(); 
-//              result_file << "[W] " << commit_node->write_set.log(); 
-//              if (commit_node->commit_version != 0) result_file << "[COMMIT_VER] " << commit_node->commit_version << std::endl;
-//              if (latest_key_version != 0) result_file << "[LATEST_VER] " << latest_key_version << ", DECISION:" << (decision ? "COMMIT" : "ABORT") << std::endl;
-//              bool is_local_commit = is_local_key(commit_node->read_set.set[0].key);
-//              result_file << (is_local_commit ? "[LOCAL COMMIT]" : "[REMOTE COMMIT]") << std::endl;
-
-//      } else if (node->node_type == txmap_node::NodeType::DECISION_RECORD) {
-//              txmap_decision_node* decision_node = reinterpret_cast<txmap_decision_node*>(node);
-//              result_file << "[RD] " << decision_node->commit_version << "," << decision_node->key << "," << decision_node->decision << std::endl; 
-//      }
-//      result_file.close();        
 }

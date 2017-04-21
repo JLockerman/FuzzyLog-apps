@@ -259,5 +259,4 @@ public:
         void buffer_commit_node(txmap_commit_node* commit_node);
         void buffer_decision_node(txmap_decision_node* decision_node);
         void apply_buffered_nodes(txmap_decision_node *decision_node);
-        void log(char *file_name, char *prefix, txmap_node *node, LocationInColor latest_key_version=0, bool decision=false);
 };

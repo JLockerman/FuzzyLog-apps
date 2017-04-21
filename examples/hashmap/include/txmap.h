@@ -23,6 +23,4 @@ public:
         void serialize_commit_record(txmap_commit_node *commit_node, char* out, size_t* out_size);
         void execute_update_txn(uint64_t key);
         void execute_rename_txn(uint64_t from_key, uint64_t to_key);
-
-        void log(txmap_set* rset, txmap_set* wset);
 };
