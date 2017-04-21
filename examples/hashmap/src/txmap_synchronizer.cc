@@ -363,10 +363,10 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                 // apply 
                 if (decision_node->decision == txmap_decision_node::DecisionType::COMMITTED) {
                         update_map(commit_node, decision_node->commit_version);
-                        ctx->inc_num_committed();
+                        //ctx->inc_num_committed();       // this is committed by remote txn. don't count this
 
                 } else if (decision_node->decision == txmap_decision_node::DecisionType::ABORTED) {
-                        ctx->inc_num_aborted();
+                        //ctx->inc_num_aborted();       // this is aborted by remote txn. don't count this
 
                 } else {
                         assert(false);
@@ -405,10 +405,10 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                                         if (commit_version == d->commit_version) {
                                                 if (d->decision == txmap_decision_node::DecisionType::COMMITTED) { 
                                                         update_map(commit_node, d->commit_version);
-                                                        ctx->inc_num_committed();
+                                                        //ctx->inc_num_committed();       // this is committed by remote txn. don't count this
 
                                                 } else if (d->decision == txmap_decision_node::DecisionType::ABORTED) {
-                                                        ctx->inc_num_aborted();
+                                                        //ctx->inc_num_aborted();       // this is aborted by remote txn. don't count this
 
                                                 } else {
                                                         assert(false);
