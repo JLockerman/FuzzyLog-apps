@@ -53,6 +53,7 @@ public class FLZKTester
 
 		if(zk.exists("/abcd",  true)==null)
 			zk.create("/abcd", "AAA".getBytes(), null, CreateMode.PERSISTENT);
+		System.out.println("created abcd!");			
 		zk.setData("/abcd", "ABCD".getBytes(), -1);
 //		System.out.println(zk);
 		Thread.sleep(1000);

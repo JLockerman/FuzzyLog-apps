@@ -21,6 +21,7 @@ abstract class FLZKOp implements Serializable
 	public FLZKOp()
 	{
 		id = new Integer(idcounter.getAndIncrement());
+		System.out.println(this + "::" + this.id);
 	}
 	public boolean equals(FLZKOp cop)
 	{

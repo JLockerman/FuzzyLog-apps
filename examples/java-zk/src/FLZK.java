@@ -248,7 +248,7 @@ public class FLZK implements IZooKeeper, Runnable
 		pendinglist = new HashMap<Object, FLZKOp>();
 		passivelist = new LinkedList<FLZKOp>();
 		callbacklist = new LinkedList<Object>();
-		debugprints = false;
+		debugprints = true;
 		map = new HashMap<File, Node>();
 		map.put(new File("/"), new Node("foobar".getBytes(), "/"));		
 		existswatches = new HashMap<String, Set<Watcher>>();
@@ -380,6 +380,7 @@ public class FLZK implements IZooKeeper, Runnable
 		{
 			boolean tailreached = false;
 			
+			//snapshot mycolor
 			playbackclient.snapshot();
 			
 			while(true)
@@ -408,8 +409,8 @@ public class FLZK implements IZooKeeper, Runnable
 					mycop = pendinglist.remove(zop.id);
 					if(debugprints)
 					{
-						if(mycop!=null) System.out.println("Found pending op!");
-						else System.out.println("Didn't find pending op!");
+						if(mycop!=null) System.out.println("Found pending op!" + zop.id);
+						else System.out.println("Didn't find pending op!" + zop.id);
 					}
 				}
 				else if(passivelist.size()==0) break;
@@ -421,7 +422,7 @@ public class FLZK implements IZooKeeper, Runnable
 				
 				try
 				{
-					if(debugprints) System.out.println("applying op");
+					if(debugprints) System.out.println("applying op" + zop);
 					ret = this.apply(zop);
 					if(mycop!=null)
 						schedulecallback(mycop, null, ret);
@@ -836,9 +837,9 @@ class AsyncToSync implements AsyncCallback.StringCallback, AsyncCallback.StatCal
 	}	
 }
 
-class Node
+class Node implements Serializable
 {
-	Stat stat;
+	transient Stat stat;
 	Lock L;
 	byte data[];
 	boolean ephemeral;
@@ -878,5 +879,5 @@ class Node
 	public String toString()
 	{
 		return path;
-	}
+	}	
 }
