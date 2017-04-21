@@ -393,6 +393,7 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                 while (m_buffered_commit_nodes.size() > 0) {
 
                         commit_node = m_buffered_commit_nodes.front();
+                        assert(commit_node->commit_version != 0);
                         if (is_decision_possible(commit_node)) {
                                 // Validate
                                 bool valid = validate_txn(commit_node);
