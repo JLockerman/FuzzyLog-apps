@@ -168,14 +168,18 @@ typedef struct txmap_node {
 typedef struct txmap_commit_node {
         txmap_node node;
         LocationInColor commit_version;
-        txmap_set read_set;
-        txmap_set write_set;
+        uint64_t read_key;
+        LocationInColor read_key_version;
+        uint64_t write_key;
+        uint64_t remote_write_key;
         txmap_commit_node* clone() {
                 txmap_commit_node* new_node = static_cast<txmap_commit_node*>(malloc(sizeof(txmap_commit_node)));
                 new_node->node = this->node;
                 new_node->commit_version = this->commit_version;
-                new_node->read_set = *this->read_set.clone();
-                new_node->write_set = *this->write_set.clone();
+                new_node->read_key = this->read_key;
+                new_node->read_key_version = this->read_key_version;
+                new_node->write_key = this->write_key;
+                new_node->remote_write_key = this->remote_write_key;
                 return new_node;
         }
 } txmap_commit_node;
@@ -251,7 +255,6 @@ public:
         void update_map(txmap_commit_node *commit_node);
         bool is_local_key(uint64_t key);
         bool is_local_only_txn(txmap_commit_node* commit_node);
-        uint64_t get_remote_write_key(txmap_commit_node* commit_node);
         bool needs_buffering(txmap_commit_node *commit_node);
         void buffer_commit_node(txmap_commit_node* commit_node);
         void buffer_decision_node(txmap_decision_node* decision_node);
