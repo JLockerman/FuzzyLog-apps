@@ -10,7 +10,7 @@
 static char* txn_file = "txns.txt";
 static char* val_file = "val.txt";
 
-TXMapSynchronizer::TXMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, bool replication): m_context(context), m_replication(replication) {
+TXMapSynchronizer::TXMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, DAGHandle* append_client, bool replication): m_append_client(append_client), m_context(context), m_replication(replication) {
         assert(interesting_colors.size() == 2);
         // local color
         m_local_color = static_cast<struct colors*>(malloc(sizeof(struct colors)));
@@ -77,8 +77,6 @@ void TXMapSynchronizer::Execute() {
         LocationInColor commit_version;
         TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
 
-        bool needs_buffering = false;
-
         while (m_running) {
                 // m_pending_queue ==> m_current_queue
           //      swap_queue();
@@ -104,15 +102,15 @@ void TXMapSynchronizer::Execute() {
                                         // Set commit version
                                         commit_node.commit_version = commit_version;
 
-                                        if (needs_buffering) {
+                                        if (needs_buffering(&commit_node)) {
                                                 // buffer node
                                                 buffer_commit_node(commit_node.clone());
                                                 continue;
                                         }
                                         if (!is_decision_possible(&commit_node)) {
                                                 // buffer node
+                                                m_waiting_for_decision_node.insert(get_remote_write_key(&commit_node));
                                                 buffer_commit_node(commit_node.clone());
-                                                needs_buffering = true;                
                                                 continue;
                                         }
 
@@ -135,7 +133,7 @@ void TXMapSynchronizer::Execute() {
                                         txmap_decision_node decision_node;
                                         // Read decision record
                                         deserialize_decision_record(const_cast<uint8_t*>(next_val.data), size, &decision_node);
-                                        needs_buffering = apply_buffered_nodes(&decision_node);
+                                        apply_buffered_nodes(&decision_node);
                                 }
                         }
                 }
@@ -200,6 +198,7 @@ void TXMapSynchronizer::deserialize_commit_record(uint8_t *in, size_t size, txma
 
         buf_commit_version = reinterpret_cast<LocationInColor*>(in + offset);
         commit_node->commit_version = *buf_commit_version;
+        assert(commit_node->commit_version == 0);
         offset += sizeof(LocationInColor);
 
         buf_rset = reinterpret_cast<txmap_set*>(in + offset);
@@ -225,7 +224,7 @@ void TXMapSynchronizer::deserialize_commit_record(uint8_t *in, size_t size, txma
         assert(offset == size);
 }
 
-bool TXMapSynchronizer::is_decision_possible(txmap_commit_node *commit_node) {
+bool TXMapSynchronizer::is_decision_possible(txmap_commit_node *commit_node) {          // OK
         txmap_set *rset;
         rset = &commit_node->read_set;
         assert(rset != NULL);
@@ -235,7 +234,7 @@ bool TXMapSynchronizer::is_decision_possible(txmap_commit_node *commit_node) {
         return is_local_key(r.key);
 }
 
-void TXMapSynchronizer::append_decision_node_to_remote(uint64_t remote_write_key, LocationInColor commit_version, bool committed) {
+void TXMapSynchronizer::append_decision_node_to_remote(uint64_t remote_write_key, LocationInColor commit_version, bool committed) {             // OK
         txmap_decision_node decision_node; 
         decision_node.node.node_type = txmap_node::NodeType::DECISION_RECORD;
         decision_node.commit_version = commit_version;
@@ -243,13 +242,13 @@ void TXMapSynchronizer::append_decision_node_to_remote(uint64_t remote_write_key
         decision_node.decision = committed ? txmap_decision_node::DecisionType::COMMITTED : txmap_decision_node::DecisionType::ABORTED;
         size_t size = 0;
         serialize_decision_record(&decision_node, m_write_buf, &size);
-        async_append(m_fuzzylog_client, m_write_buf, size, m_remote_color, NULL);
+        async_append(m_append_client, m_write_buf, size, m_remote_color, NULL);
         // DEBUG ==========
         log(txn_file, "APPEND DECISION RECORD", reinterpret_cast<txmap_node*>(&decision_node));
 }
 
 
-void TXMapSynchronizer::serialize_decision_record(txmap_decision_node *decision_node, char* out, size_t* out_size) {
+void TXMapSynchronizer::serialize_decision_record(txmap_decision_node *decision_node, char* out, size_t* out_size) {                            // OK
         txmap_decision_node *buf_decision_node;
         buf_decision_node = reinterpret_cast<txmap_decision_node*>(out);
         buf_decision_node->node.node_type = decision_node->node.node_type;
@@ -259,7 +258,7 @@ void TXMapSynchronizer::serialize_decision_record(txmap_decision_node *decision_
         *out_size = sizeof(txmap_decision_node);
 }
 
-void TXMapSynchronizer::deserialize_decision_record(uint8_t *in, size_t size, txmap_decision_node *decision_node) {
+void TXMapSynchronizer::deserialize_decision_record(uint8_t *in, size_t size, txmap_decision_node *decision_node) {                             // OK
         txmap_decision_node *buf_decision_node;
         buf_decision_node = reinterpret_cast<txmap_decision_node*>(in);
         assert(buf_decision_node->node.node_type == txmap_node::NodeType::DECISION_RECORD);
@@ -343,6 +342,16 @@ bool TXMapSynchronizer::is_local_only_txn(txmap_commit_node* commit_node) {
         return is_local;
 }
 
+bool TXMapSynchronizer::needs_buffering(txmap_commit_node *commit_node) {               // OK
+        uint64_t key = 0;
+        if (is_decision_possible(commit_node)) {
+                key = commit_node->read_set.set[0].key;  
+        } else {
+                key = get_remote_write_key(commit_node);
+        }
+        return m_waiting_for_decision_node.count(key) > 0;
+}
+
 uint64_t TXMapSynchronizer::get_remote_write_key(txmap_commit_node* commit_node) {
         txmap_set *wset; 
         wset = &commit_node->write_set;
@@ -354,25 +363,43 @@ void TXMapSynchronizer::buffer_commit_node(txmap_commit_node* node) {
         // DEBUG =========
         log(val_file, "BUFFER NODE", reinterpret_cast<txmap_node*>(node));
 
-        m_buffered_commit_nodes.push_back(node);
+        uint64_t key = 0;
+        if (is_decision_possible(node)) {
+                key = node->read_set.set[0].key;  
+        } else {
+                key = get_remote_write_key(node);
+        }
+        assert(key != 0);
+        if (m_buffered_commit_nodes.count(key) == 0) {
+                m_buffered_commit_nodes[key] = new std::deque<txmap_commit_node*>();
+        }
+        m_buffered_commit_nodes[key]->push_back(node);
 }
 
 void TXMapSynchronizer::buffer_decision_node(txmap_decision_node* node) {
-        m_buffered_decision_nodes.push_back(node);
+        uint64_t key = node->key;
+        assert(key != 0);
+        if (m_buffered_decision_nodes.count(key) == 0) {
+                m_buffered_decision_nodes[key] = new std::deque<txmap_decision_node*>();
+        }
+        m_buffered_decision_nodes[key]->push_back(node);
 }
 
-bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node) {
-        assert(m_buffered_commit_nodes.size() > 0);
+void TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node) {
+        assert(m_waiting_for_decision_node.count(decision_node->key) > 0);
         // DEBUG ========
         log(val_file, "DECISION NODE ARRIVED", reinterpret_cast<txmap_node*>(decision_node));
 
         TXMapContext *ctx = static_cast<TXMapContext*>(m_context);
 
-        txmap_commit_node* commit_node = m_buffered_commit_nodes.front();
+        auto buffered_commit_nodes = m_buffered_commit_nodes[decision_node->key];
+        assert(buffered_commit_nodes->size() > 0);
+
+        txmap_commit_node* commit_node = buffered_commit_nodes->front();
         assert(commit_node->commit_version != 0);
         if (commit_node->commit_version != decision_node->commit_version) {
                 // buffer decision node
-                log(val_file, "DECISION NODE NOT MATCHING", reinterpret_cast<txmap_node*>(decision_node), commit_node->commit_version);
+                log(val_file, "DECISION NODE NOT MATCHING", reinterpret_cast<txmap_node*>(decision_node));
                 buffer_decision_node(decision_node->clone());
         } else {
                 // apply 
@@ -386,13 +413,13 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                 } else {
                         assert(false);
                 }
-                m_buffered_commit_nodes.pop_front();
+                buffered_commit_nodes->pop_front();
                 delete commit_node;
 
                 // Keep applying if possible
-                while (m_buffered_commit_nodes.size() > 0) {
+                while (buffered_commit_nodes->size() > 0) {
 
-                        commit_node = m_buffered_commit_nodes.front();
+                        commit_node = buffered_commit_nodes->front();
                         assert(commit_node->commit_version != 0);
                         if (is_decision_possible(commit_node)) {
                                 // Validate
@@ -408,44 +435,52 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
                                 // Append decision node to remote color if this is not local only commit
                                 if (!is_local_only_txn(commit_node)) 
                                         append_decision_node_to_remote(get_remote_write_key(commit_node), commit_node->commit_version, valid);
-                                m_buffered_commit_nodes.pop_front();
+                                buffered_commit_nodes->pop_front();
                                 delete commit_node;
 
                         } else {
-                                bool decision_record_exists = false;
-                                uint32_t i = 0;
-                                for (auto d : m_buffered_decision_nodes) {
-                                        if (commit_node->commit_version == d->commit_version) {
-                                                if (d->decision == txmap_decision_node::DecisionType::COMMITTED) { 
-                                                        update_map(commit_node);
-                                                        //ctx->inc_num_committed();       // this is committed by remote txn. don't count this
+                                if (m_buffered_decision_nodes.count(decision_node->key) > 0) {
+                                        bool decision_record_exists = false;
+                                        uint32_t i = 0;
+                                        auto buffered_decision_nodes = m_buffered_decision_nodes[decision_node->key];
+                                        for (auto d : *buffered_decision_nodes) {
+                                                if (commit_node->commit_version == d->commit_version) {
+                                                        if (d->decision == txmap_decision_node::DecisionType::COMMITTED) { 
+                                                                update_map(commit_node);
+                                                                //ctx->inc_num_committed();       // this is committed by remote txn. don't count this
 
-                                                } else if (d->decision == txmap_decision_node::DecisionType::ABORTED) {
-                                                        //ctx->inc_num_aborted();       // this is aborted by remote txn. don't count this
+                                                        } else if (d->decision == txmap_decision_node::DecisionType::ABORTED) {
+                                                                //ctx->inc_num_aborted();       // this is aborted by remote txn. don't count this
 
-                                                } else {
-                                                        assert(false);
+                                                        } else {
+                                                                assert(false);
+                                                        }
+                                                        decision_record_exists = true; 
+                                                        break;
                                                 }
-                                                decision_record_exists = true; 
-                                                break;
+                                                i++;
                                         }
-                                        i++;
-                                }
-                                if (decision_record_exists) {
-                                        // Remove decision record from this buffer
-                                        m_buffered_decision_nodes.erase(m_buffered_decision_nodes.begin() + i); 
-                                        m_buffered_commit_nodes.pop_front();
-                                        delete commit_node;
+                                        if (decision_record_exists) {
+                                                // Remove decision record from this buffer
+                                                buffered_decision_nodes->erase(buffered_decision_nodes->begin() + i); 
+                                                buffered_commit_nodes->pop_front();
+                                                delete commit_node;
+                                        }
+
                                 } else {
                                         break;
                                 }
                         }
                 }
         }
-        return m_buffered_commit_nodes.size() > 0;
+        // If all buffered commit records for a given key are all validated, then it doesn't need buffering
+        if (buffered_commit_nodes->size() == 0) {
+                m_waiting_for_decision_node.erase(decision_node->key);
+                assert(m_waiting_for_decision_node.count(decision_node->key) == 0);
+        }
 }
 
-void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, LocationInColor commit_version, LocationInColor latest_key_version, bool decision) {
+void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, LocationInColor latest_key_version, bool decision) {
 //      std::ofstream result_file; 
 //      result_file.open(file_name, std::ios::app | std::ios::out);
 //      result_file << "========== " << prefix << " ==========" << std::endl; 
@@ -453,7 +488,7 @@ void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, Loc
 //              txmap_commit_node* commit_node = reinterpret_cast<txmap_commit_node*>(node);
 //              result_file << "[R] " << commit_node->read_set.log(); 
 //              result_file << "[W] " << commit_node->write_set.log(); 
-//              if (commit_version != 0) result_file << "[COMMIT_VER] " << commit_version << std::endl;
+//              if (commit_node->commit_version != 0) result_file << "[COMMIT_VER] " << commit_node->commit_version << std::endl;
 //              if (latest_key_version != 0) result_file << "[LATEST_VER] " << latest_key_version << ", DECISION:" << (decision ? "COMMIT" : "ABORT") << std::endl;
 //              bool is_local_commit = is_local_key(commit_node->read_set.set[0].key);
 //              result_file << (is_local_commit ? "[LOCAL COMMIT]" : "[REMOTE COMMIT]") << std::endl;
@@ -461,7 +496,6 @@ void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, Loc
 //      } else if (node->node_type == txmap_node::NodeType::DECISION_RECORD) {
 //              txmap_decision_node* decision_node = reinterpret_cast<txmap_decision_node*>(node);
 //              result_file << "[RD] " << decision_node->commit_version << "," << decision_node->key << "," << decision_node->decision << std::endl; 
-//              if (commit_version != 0) result_file << "[BUFFERED_HEAD_COMMIT_VER] " << commit_version << std::endl;
 //      }
 //      result_file.close();        
 }

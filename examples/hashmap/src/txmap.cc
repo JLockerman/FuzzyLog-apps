@@ -29,7 +29,7 @@ void TXMap::get_interesting_colors(std::vector<workload_config>* workload, std::
 }
 
 void TXMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, bool replication) {
-        m_synchronizer = new TXMapSynchronizer(log_addr, interesting_colors, context, replication);
+        m_synchronizer = new TXMapSynchronizer(log_addr, interesting_colors, context, m_fuzzylog_client, replication);
         m_synchronizer->run();
 }
 
@@ -192,8 +192,8 @@ void TXMap::execute_rename_txn(uint64_t from_key, uint64_t to_key) {
         serialize_commit_record(&commit_node, m_buf, &size);
 
         // Append commit record
-        //async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_dist_txn_color, NULL, 0);
-        async_append(m_fuzzylog_client, m_buf, size, &m_dist_txn_color, NULL);
+        async_no_remote_append(m_fuzzylog_client, m_buf, size, &m_dist_txn_color, NULL, 0);
+        //async_append(m_fuzzylog_client, m_buf, size, &m_dist_txn_color, NULL);
 }
 
 void TXMap::log(txmap_set* rset, txmap_set* wset) {

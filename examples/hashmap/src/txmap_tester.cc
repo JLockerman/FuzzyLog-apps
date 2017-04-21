@@ -62,6 +62,7 @@ void TXMapTester::Execute() {
                 ctx->inc_num_executed();
                 ctx->inc_num_pending_txns();
         }
+        ctx->end_execution_measure_time();
         ctx->set_finished();
 }
 

@@ -7,6 +7,7 @@
 #include <queue>
 #include <condition_variable>
 #include <unordered_map>
+#include <set>
 #include <request.h>
 
 extern "C" {
@@ -28,7 +29,8 @@ public:
         uint64_t                        m_remote_key_range_end;
         // execution time
         std::chrono::system_clock::time_point   m_start_time;
-        std::chrono::system_clock::time_point   m_end_time;
+        std::chrono::system_clock::time_point   m_validation_end_time;
+        std::chrono::system_clock::time_point   m_execution_end_time;
         
 
 public:
@@ -47,7 +49,7 @@ public:
 
         void inc_num_committed() {
                 m_num_committed++;
-                end_measure_time();             // memorize last time when committ is decided
+                end_validation_measure_time();             // memorize last time when committ is decided
         }
 
         uint64_t get_num_aborted() {
@@ -56,7 +58,7 @@ public:
 
         void inc_num_aborted() {
                 m_num_aborted++;
-                end_measure_time();             // memorize last time when committ is decided
+                end_validation_measure_time();             // memorize last time when committ is decided
         }
 
         void inc_num_pending_txns() {
@@ -96,21 +98,30 @@ public:
                 m_start_time = std::chrono::system_clock::now();
         }
 
-        void end_measure_time() {
-                m_end_time = std::chrono::system_clock::now();
+        void end_execution_measure_time() {
+                m_execution_end_time = std::chrono::system_clock::now();
+        }
+
+        void end_validation_measure_time() {
+                m_validation_end_time = std::chrono::system_clock::now();
         }
 
         double get_execution_time() {
-                std::chrono::duration<double, std::milli> elapsed = m_end_time - m_start_time;
+                std::chrono::duration<double, std::milli> elapsed = m_execution_end_time - m_start_time;
+                return elapsed.count() / 1000.0;
+        }
+
+        double get_validation_time() {
+                std::chrono::duration<double, std::milli> elapsed = m_validation_end_time - m_start_time;
                 return elapsed.count() / 1000.0;
         }
 
         double get_throughput() {
-                return get_num_executed() / get_execution_time();
+                return get_num_executed() / get_validation_time();
         }
 
         double get_goodput() {
-                return get_num_committed() / get_execution_time();
+                return get_num_committed() / get_validation_time();
         }
 };
 
@@ -196,6 +207,7 @@ private:
         std::mutex                                                              m_queue_mtx;
 
         DAGHandle*                                                              m_fuzzylog_client;
+        DAGHandle*                                                              m_append_client;
         struct colors*                                                          m_interesting_colors;
         struct colors*                                                          m_local_color;
         struct colors*                                                          m_remote_color;
@@ -206,13 +218,15 @@ private:
         std::atomic_bool                                                        m_running;
         std::unordered_map<uint64_t, uint64_t>                                  m_local_map;    // Hack: let's store version into value 
         std::mutex                                                              m_local_map_mtx;
-        std::deque<txmap_commit_node*>                                          m_buffered_commit_nodes;
-        std::deque<txmap_decision_node*>                                        m_buffered_decision_nodes;
+
+        std::set<uint64_t>                                                      m_waiting_for_decision_node;
+        std::unordered_map<uint64_t, std::deque<txmap_commit_node*>*>           m_buffered_commit_nodes;
+        std::unordered_map<uint64_t, std::deque<txmap_decision_node*>*>         m_buffered_decision_nodes;
 
         bool                                                                    m_replication;
         
 public:
-        TXMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, bool replication);
+        TXMapSynchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, Context* context, DAGHandle* append_client, bool replication);
         ~TXMapSynchronizer() {}
         virtual void run();
         virtual void join();
@@ -238,8 +252,9 @@ public:
         bool is_local_key(uint64_t key);
         bool is_local_only_txn(txmap_commit_node* commit_node);
         uint64_t get_remote_write_key(txmap_commit_node* commit_node);
+        bool needs_buffering(txmap_commit_node *commit_node);
         void buffer_commit_node(txmap_commit_node* commit_node);
         void buffer_decision_node(txmap_decision_node* decision_node);
-        bool apply_buffered_nodes(txmap_decision_node *decision_node);
-        void log(char *file_name, char *prefix, txmap_node *node, LocationInColor commit_version=0, LocationInColor latest_key_version=0, bool decision=false);
+        void apply_buffered_nodes(txmap_decision_node *decision_node);
+        void log(char *file_name, char *prefix, txmap_node *node, LocationInColor latest_key_version=0, bool decision=false);
 };

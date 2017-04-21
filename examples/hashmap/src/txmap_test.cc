@@ -155,7 +155,7 @@ void do_experiment(txmap_config cfg) {
         
         // Measure
         if (cfg.expt_duration > 0) {
-                std::this_thread::sleep_for(std::chrono::seconds(5));
+                //std::this_thread::sleep_for(std::chrono::seconds(5));
                 measure_fn(worker, cfg.expt_duration, executed_results, committed_results);
                 // Stop worker
                 flag = false;
@@ -175,6 +175,7 @@ void do_experiment(txmap_config cfg) {
         double abort_rate = (double)ctx.get_num_aborted() / ctx.get_num_executed() * 100.0;
         ss.precision(8);
         ss << "execution time              : " << ctx.get_execution_time() << std::endl; 
+        ss << "validation time             : " << ctx.get_validation_time() << std::endl; 
         ss << "tput                        : " << ctx.get_throughput() << std::endl; 
         ss << "gput                        : " << ctx.get_goodput() << std::endl; 
         ss.precision(2);
