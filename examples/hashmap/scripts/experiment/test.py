@@ -115,7 +115,7 @@ class FuzzyMapTestCase(unittest.TestCase):
                 launch_str += ',' + str(role)
                 launch_str += ',' + str(replication) 
                 return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])
- 
+
         # ---------------
         # Data management
         # ---------------
@@ -453,10 +453,124 @@ class ReplicatedNetworkPartitionTestCase(NetworkPartitionTestCase):
 
                 time.sleep(5)
 
+class TransactionTestCase(FuzzyMapTestCase):
+        results = []
+ 
+        def launch_txmap(self, fabhost, keyfile, logaddr, expt_range, expt_duration, num_clients, client_id, workload, async, window_size, rename_percent, replication=False):
+                launch_str = 'txmap_proc:' + logaddr
+                launch_str += ',' + str(expt_range)
+                launch_str += ',' + str(expt_duration)
+                launch_str += ',' + str(num_clients)
+                launch_str += ',' + str(client_id)
+                launch_str += ',' + workload
+                launch_str += ',' + str(async)
+                launch_str += ',' + str(window_size) 
+                launch_str += ',' + str(rename_percent) 
+                launch_str += ',' + str(replication) 
+                return subprocess.Popen(['fab', '-D', '-i', keyfile, '-H', self.fabhost_prefix + fabhost, launch_str])
+
+        def gather_statistics(self, dirname):
+                stats = {}
+                num_files = 0
+                for f in os.listdir(dirname):
+                        filename = os.path.join(dirname, f)
+                        with open(filename) as fd:
+                                contents = fd.readlines()
+                        contents = map(lambda x: float(x.split()[-1]), contents)
+                        stats[filename] = contents
+                        num_files += 1
+                return stats, num_files
+
+        # (expt_duration, window_size, num_clients, rename_percent, key_range)
+        @parameterized.expand([
+                (10, 1000, 2, 1, 1000000),
+                (10, 1000, 2, 1, 100000),
+                (10, 1000, 2, 1, 10000),
+                (10, 1000, 2, 1, 1000),
+                (10, 1000, 2, 1, 100),
+                (10, 1000, 2, 1, 10),
+        ])
+        def test_transaction(self, expt_duration, window_size, num_clients, rename_percent, key_range):
+                async = True
+                num_servers = 2
+                op_count = 1000000
+                # run clients
+                test_region = settings.REGIONS[0]
+                client_procs = []
+                client_ips = self.client_ips[test_region]
+                available_servers = self.server_ips[test_region]
+                self.assertTrue(len(available_servers) == num_servers)
+
+                log_addr = self.get_log_addr(self.server_ips[test_region][:num_servers])
+                round_robin = [i % len(client_ips) for i in range(num_clients)]
+                # operation ratio
+
+                colors = [i if i > 0 else num_clients for i in range(num_clients)]
+
+                remote_colors = defaultdict(list)
+                for i in range(num_clients):
+                        local_color = colors[i]
+                        client_id = local_color
+                        while True:
+                                remote_color = random.choice(colors)
+                                if remote_color != local_color:
+                                        break
+                        # remember
+                        remote_colors[remote_color].append(local_color)
+
+                        workload = "put@{local_color}:{remote_color}\={op_count}".format(local_color=local_color, remote_color=remote_color, op_count=op_count)
+                        proc = self.launch_txmap(client_ips[round_robin[i]]['public'], self.keyfile[test_region], log_addr, key_range, expt_duration, num_clients, client_id, workload, async, window_size, rename_percent)
+                        time.sleep(0.1)
+                        client_procs.append(proc) 
+
+                for c in client_procs:
+                        c.wait()
+
+                # gather statistics
+                outdir = 'tmp'
+                interested = [(test_region, i) for i in set(round_robin)]
+                self.download_output_files(interested, outdir)
+                stats, num_files = self.gather_statistics(outdir)
+                self.assertTrue(num_files == num_clients)
+                
+                aggr_throughput = 0
+                aggr_goodput = 0
+
+                # sanity check
+                for i in range(num_clients):
+                        local_color = colors[i]
+                        client_id = local_color
+                        local_stats = stats['{0}/{1}.txt'.format(outdir, local_color)]
+                        #dist_txns_from_remote = sum(stats['{0}/{1}.txt'.format(outdir, c)][2] for c in remote_colors[local_color])
+
+                        # 1) total executed txns = local txns + dist txns 
+                        # 2) total committed txns + total aborted txns = local txns + dist txns (by local)
+                        executed, local, dist, committed, aborted, duration, tput, gput, abort_rate = local_stats
+                        self.assertTrue(executed == local + dist)
+                        self.assertTrue(committed + aborted == local + dist)
+
+                        aggr_throughput += tput
+                        aggr_goodput += gput
+        
+                TransactionTestCase.results.append((window_size, rename_percent, key_range, aggr_throughput, aggr_goodput))
+
+        # Called once after all test cases finished
+        @staticmethod
+        def write_output(filename):
+                results = TransactionTestCase.results
+                with open('../data/%s.txt' % filename, 'w') as f:
+                        for r in results:
+                                line = ' '.join(map(lambda x: str(x), r)) + '\n'
+                                f.write(line) 
+
+        @classmethod
+        def tearDownClass(cls):
+                TransactionTestCase.write_output('txn')
 
 if __name__ == '__main__':
         #suite = unittest.defaultTestLoader.loadTestsFromTestCase(ScalabilityTestCase)
         #suite = unittest.defaultTestLoader.loadTestsFromTestCase(NetworkPartitionTestCase)
-        suite = unittest.defaultTestLoader.loadTestsFromTestCase(ReplicatedNetworkPartitionTestCase)
+        #suite = unittest.defaultTestLoader.loadTestsFromTestCase(ReplicatedNetworkPartitionTestCase)
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(TransactionTestCase)
         runner = unittest.TextTestRunner(verbosity=2)
         runner.run(suite)

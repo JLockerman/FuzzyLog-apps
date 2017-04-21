@@ -91,3 +91,20 @@ def capmap_proc(log_addr, exp_range, exp_duration, num_clients, client_id, workl
         if replication == "True":
             args += ' --replication'
         run(args)
+
+def txmap_proc(log_addr, exp_range, exp_duration, num_clients, client_id, workload, async, window_size, rename_percent, replication):
+    with cd('~/fuzzylog/delos-apps/examples/hashmap'):
+        args = 'build/txmap '
+        args += '--log_addr=' + str(log_addr) + ' '
+        args += '--expt_range=' + str(exp_range) + ' '
+        args += '--expt_duration=' + str(exp_duration) + ' '
+        args += '--num_clients=' + str(num_clients) + ' '
+        args += '--client_id=' + str(client_id) + ' '
+        args += '--workload=' + str(workload) + ' '
+        if async == "True":
+            args += '--async '
+            args += '--window_size=' + str(window_size)
+        args += ' --rename_percent=' + str(rename_percent) + ' '
+        if replication == "True":
+            args += ' --replication'
+        run(args)
