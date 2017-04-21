@@ -156,11 +156,13 @@ typedef struct txmap_node {
 
 typedef struct txmap_commit_node {
         txmap_node node;
+        LocationInColor commit_version;
         txmap_set read_set;
         txmap_set write_set;
         txmap_commit_node* clone() {
                 txmap_commit_node* new_node = static_cast<txmap_commit_node*>(malloc(sizeof(txmap_commit_node)));
                 new_node->node = this->node;
+                new_node->commit_version = this->commit_version;
                 new_node->read_set = *this->read_set.clone();
                 new_node->write_set = *this->write_set.clone();
                 return new_node;
@@ -205,7 +207,6 @@ private:
         std::unordered_map<uint64_t, uint64_t>                                  m_local_map;    // Hack: let's store version into value 
         std::mutex                                                              m_local_map_mtx;
         std::deque<txmap_commit_node*>                                          m_buffered_commit_nodes;
-        std::deque<LocationInColor>                                             m_buffered_commit_versions;
         std::deque<txmap_decision_node*>                                        m_buffered_decision_nodes;
 
         bool                                                                    m_replication;
@@ -233,11 +234,11 @@ public:
         void deserialize_decision_record(uint8_t *in, size_t size, txmap_decision_node *decision_node);
         bool validate_txn(txmap_commit_node *commit_node);
         uint64_t get_latest_key_version(uint64_t key);
-        void update_map(txmap_commit_node *commit_node, LocationInColor commit_version);
+        void update_map(txmap_commit_node *commit_node);
         bool is_local_key(uint64_t key);
         bool is_local_only_txn(txmap_commit_node* commit_node);
         uint64_t get_remote_write_key(txmap_commit_node* commit_node);
-        void buffer_commit_node(txmap_commit_node* commit_node, LocationInColor commit_version);
+        void buffer_commit_node(txmap_commit_node* commit_node);
         void buffer_decision_node(txmap_decision_node* decision_node);
         bool apply_buffered_nodes(txmap_decision_node *decision_node);
         void log(char *file_name, char *prefix, txmap_node *node, LocationInColor commit_version=0, LocationInColor latest_key_version=0, bool decision=false);

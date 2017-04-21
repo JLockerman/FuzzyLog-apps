@@ -73,6 +73,7 @@ void TXMap::serialize_commit_record(txmap_commit_node *commit_node, char* out, s
         txmap_set *buf_rset, *buf_wset;
         txmap_set *rset, *wset;
         txmap_record *buf_record;
+        LocationInColor* buf_commit_version;
         txmap_node *buf_node;
 
         rset = &commit_node->read_set;
@@ -82,6 +83,10 @@ void TXMap::serialize_commit_record(txmap_commit_node *commit_node, char* out, s
         buf_node = reinterpret_cast<txmap_node*>(out + offset);
         buf_node->node_type = commit_node->node.node_type;
         offset += sizeof(txmap_node);
+
+        buf_commit_version = reinterpret_cast<LocationInColor*>(out + offset); 
+        *buf_commit_version = commit_node->commit_version;
+        offset += sizeof(LocationInColor);
 
         buf_rset = reinterpret_cast<txmap_set*>(out + offset);
         buf_rset->num_entry = rset->num_entry;
@@ -107,6 +112,9 @@ void TXMap::execute_update_txn(uint64_t key) {
 
         // node type
         commit_node.node.node_type = txmap_node::NodeType::COMMIT_RECORD;
+
+        // commit version
+        commit_node.commit_version = 0;         // will be filled when validation
 
         // readset
         uint64_t update_key_version;
@@ -145,6 +153,9 @@ void TXMap::execute_rename_txn(uint64_t from_key, uint64_t to_key) {
 
         // node type
         commit_node.node.node_type = txmap_node::NodeType::COMMIT_RECORD;
+
+        // commit version
+        commit_node.commit_version = 0;         // will be filled when validation
 
         // readset
         uint64_t from_key_version;
