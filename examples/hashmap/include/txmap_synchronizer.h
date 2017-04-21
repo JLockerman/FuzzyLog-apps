@@ -174,11 +174,13 @@ typedef struct txmap_decision_node {
         };
         txmap_node node;
         LocationInColor commit_version;
+        uint64_t key;
         uint32_t decision;
         txmap_decision_node* clone() {
                 txmap_decision_node* new_node = static_cast<txmap_decision_node*>(malloc(sizeof(txmap_decision_node)));
                 new_node->node = this->node;
                 new_node->commit_version = this->commit_version;
+                new_node->key = this->key;
                 new_node->decision = this->decision;
                 return new_node;
         }
@@ -226,7 +228,7 @@ public:
         // Txn validation
         void deserialize_commit_record(uint8_t *in, size_t size, txmap_commit_node *commit_node);
         bool is_decision_possible(txmap_commit_node *commit_node);
-        void append_decision_node_to_remote(LocationInColor commit_version, bool committed);
+        void append_decision_node_to_remote(uint64_t remote_write_key, LocationInColor commit_version, bool committed);
         void serialize_decision_record(txmap_decision_node *decision_node, char* out, size_t* out_size);
         void deserialize_decision_record(uint8_t *in, size_t size, txmap_decision_node *decision_node);
         bool validate_txn(txmap_commit_node *commit_node);
@@ -234,6 +236,7 @@ public:
         void update_map(txmap_commit_node *commit_node, LocationInColor commit_version);
         bool is_local_key(uint64_t key);
         bool is_local_only_txn(txmap_commit_node* commit_node);
+        uint64_t get_remote_write_key(txmap_commit_node* commit_node);
         void buffer_commit_node(txmap_commit_node* commit_node, LocationInColor commit_version);
         void buffer_decision_node(txmap_decision_node* decision_node);
         bool apply_buffered_nodes(txmap_decision_node *decision_node);

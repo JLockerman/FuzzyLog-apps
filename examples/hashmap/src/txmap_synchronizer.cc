@@ -126,7 +126,7 @@ void TXMapSynchronizer::Execute() {
 
                                         // Append decision node to remote color if this is not local only commit
                                         if (!is_local_only_txn(&commit_node)) 
-                                                append_decision_node_to_remote(commit_version, valid);
+                                                append_decision_node_to_remote(get_remote_write_key(&commit_node), commit_version, valid);
 
                                 } else if (node.node_type == txmap_node::NodeType::DECISION_RECORD) {
                                         assert(locs_read == 1);
@@ -228,10 +228,11 @@ bool TXMapSynchronizer::is_decision_possible(txmap_commit_node *commit_node) {
         return is_local_key(r.key);
 }
 
-void TXMapSynchronizer::append_decision_node_to_remote(LocationInColor commit_version, bool committed) {
+void TXMapSynchronizer::append_decision_node_to_remote(uint64_t remote_write_key, LocationInColor commit_version, bool committed) {
         txmap_decision_node decision_node; 
         decision_node.node.node_type = txmap_node::NodeType::DECISION_RECORD;
         decision_node.commit_version = commit_version;
+        decision_node.key = remote_write_key;
         decision_node.decision = committed ? txmap_decision_node::DecisionType::COMMITTED : txmap_decision_node::DecisionType::ABORTED;
         size_t size = 0;
         serialize_decision_record(&decision_node, m_write_buf, &size);
@@ -246,6 +247,7 @@ void TXMapSynchronizer::serialize_decision_record(txmap_decision_node *decision_
         buf_decision_node = reinterpret_cast<txmap_decision_node*>(out);
         buf_decision_node->node.node_type = decision_node->node.node_type;
         buf_decision_node->commit_version = decision_node->commit_version;
+        buf_decision_node->key = decision_node->key;
         buf_decision_node->decision = decision_node->decision;
         *out_size = sizeof(txmap_decision_node);
 }
@@ -256,6 +258,7 @@ void TXMapSynchronizer::deserialize_decision_record(uint8_t *in, size_t size, tx
         assert(buf_decision_node->node.node_type == txmap_node::NodeType::DECISION_RECORD);
         decision_node->node.node_type = buf_decision_node->node.node_type;
         decision_node->commit_version = buf_decision_node->commit_version;
+        decision_node->key = buf_decision_node->key;
         decision_node->decision = buf_decision_node->decision;
         assert(sizeof(txmap_decision_node) == size);
 }
@@ -333,6 +336,13 @@ bool TXMapSynchronizer::is_local_only_txn(txmap_commit_node* commit_node) {
         return is_local;
 }
 
+uint64_t TXMapSynchronizer::get_remote_write_key(txmap_commit_node* commit_node) {
+        txmap_set *wset; 
+        wset = &commit_node->write_set;
+        assert(wset->num_entry == 2);
+        return wset->set[1].key;
+}
+
 void TXMapSynchronizer::buffer_commit_node(txmap_commit_node* node, LocationInColor commit_version) {
         // DEBUG =========
         log(val_file, "BUFFER NODE", reinterpret_cast<txmap_node*>(node), commit_version);
@@ -393,7 +403,7 @@ bool TXMapSynchronizer::apply_buffered_nodes(txmap_decision_node* decision_node)
 
                                 // Append decision node to remote color if this is not local only commit
                                 if (!is_local_only_txn(commit_node)) 
-                                        append_decision_node_to_remote(commit_version, valid);
+                                        append_decision_node_to_remote(get_remote_write_key(commit_node), commit_version, valid);
                                 m_buffered_commit_nodes.pop_front();
                                 m_buffered_commit_versions.pop_front();
                                 delete commit_node;
@@ -449,7 +459,7 @@ void TXMapSynchronizer::log(char *file_name, char *prefix, txmap_node *node, Loc
 
 //      } else if (node->node_type == txmap_node::NodeType::DECISION_RECORD) {
 //              txmap_decision_node* decision_node = reinterpret_cast<txmap_decision_node*>(node);
-//              result_file << "[RD] " << decision_node->commit_version << "," << decision_node->decision << std::endl; 
+//              result_file << "[RD] " << decision_node->commit_version << "," << decision_node->key << "," << decision_node->decision << std::endl; 
 //              if (commit_version != 0) result_file << "[BUFFERED_HEAD_COMMIT_VER] " << commit_version << std::endl;
 //      }
 //      result_file.close();        
