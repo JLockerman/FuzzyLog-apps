@@ -1,4 +1,4 @@
-# AtomicMap, CAPMap
+# OR-Set 
 
 ### Prerequisites
 Download delos repository and set `DELOS_RUST_LOC` to its root directory.
