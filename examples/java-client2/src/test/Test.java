@@ -7,8 +7,10 @@ import com.sun.jna.*;
 import com.sun.jna.ptr.PointerByReference;
 import c_link.*;
 
-import java.nio.ByteBuffer;
+import fuzzy_log.FuzzyLog;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class Test {
@@ -76,6 +78,35 @@ public class Test {
             }
         }
         FuzzyLogLibrary.INSTANCE.close_dag_handle(handle);
+
+        System.out.println("HL test.");
+
+        FuzzyLog log = new FuzzyLog(new String[] {"127.0.0.1:13890\0"}, new int[] {5, 6, 7});
+        {
+            log.async_append(new int[]{6}, new byte[] {(byte)2, (byte)3, (byte)1});
+            log.wait_any_append();
+        }
+        {
+            log.async_append(new int[]{5}, new byte[] {(byte)122});
+            log.wait_any_append();
+        }
+        {
+            log.async_append(new int[]{7}, new byte[] {(byte)3, (byte)3, (byte)3, (byte)3, (byte)3, (byte)3});
+            log.wait_any_append();
+        }
+        {
+            byte[] end_data = new byte[4];
+            for(int i = 0; i < end_data.length; i++) end_data[i] = (byte)ThreadLocalRandom.current().nextInt();
+            log.async_append(new int[] {5, 6, 7}, end_data);
+            log.wait_any_append();
+        }
+
+        log.snapshot();
+
+        FuzzyLog.Events events = log.get_events();
+        for(FuzzyLog.Event event: events) {
+            System.out.println("read: " + Arrays.toString(event.data) + " locs: " + Arrays.toString(event.locations));
+        }
 
         System.out.println("Done.");
     }

@@ -112,7 +112,7 @@ public interface FuzzyLogLibrary extends Library {
 	 * <i>native declaration : fuzzy_log.h:51</i><br>
 	 * @deprecated use the safer methods {@link #do_append(com.sun.jna.ptr.PointerByReference, java.nio.ByteBuffer, com.ochafik.lang.jnaerator.runtime.size_t, c_link.colors, c_link.colors, byte)} and {@link #do_append(com.sun.jna.ptr.PointerByReference, com.sun.jna.Pointer, com.ochafik.lang.jnaerator.runtime.size_t, c_link.colors, c_link.colors, byte)} instead
 	 */
-	@Deprecated
+	//@Deprecated
 	c_link.write_id.ByValue do_append(Pointer handle, Pointer data, size_t data_size, colors.ByReference inhabits,
 			colors.ByReference depends_on, byte async);
 
@@ -120,7 +120,7 @@ public interface FuzzyLogLibrary extends Library {
 	 * Original signature : <code>write_id do_append(DAGHandle*, char*, size_t, colors*, colors*, uint8_t)</code><br>
 	 * <i>native declaration : fuzzy_log.h:51</i>
 	 */
-	c_link.write_id.ByValue do_append(PointerByReference handle, ByteBuffer data, size_t data_size, colors.ByReference inhabits,
+	c_link.write_id.ByValue do_append(Pointer handle, ByteBuffer data, size_t data_size, colors.ByReference inhabits,
 			colors.ByReference depends_on, byte async);
 
 	/**
@@ -223,7 +223,7 @@ public interface FuzzyLogLibrary extends Library {
 	 * Original signature : <code>write_id async_simple_causal_append(DAGHandle*, char*, size_t, colors*, colors*)</code><br>
 	 * <i>native declaration : fuzzy_log.h:86</i>
 	 */
-	c_link.write_id.ByValue async_simple_causal_append(PointerByReference handle, ByteBuffer data, size_t data_size,
+	c_link.write_id.ByValue async_simple_causal_append(Pointer handle, ByteBuffer data, size_t data_size,
 			colors.ByReference inhabits, colors.ByReference happens_after);
 
 	/**
