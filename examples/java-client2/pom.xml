@@ -1,0 +1,8 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>edu.yale.fuzzy_log_client</groupId>
+  <artifactId>my-fuzzy_log_client</artifactId>
+  <version>1</version>
+
+  <additionalClasspathElement>${basedir}/lib/*</additionalClasspathElement>
+</project>
