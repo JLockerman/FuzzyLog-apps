@@ -1,7 +1,5 @@
 import java.io.*;
 import java.util.*;
-import client.ProxyClient;
-import client.WriteID;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.CreateMode;
@@ -21,7 +19,7 @@ abstract class FLZKOp implements Serializable
 	public FLZKOp()
 	{
 		id = new Integer(idcounter.getAndIncrement());
-		System.out.println(this + "::" + this.id);
+		//System.out.println(this + "::" + this.id);
 	}
 	public boolean equals(FLZKOp cop)
 	{

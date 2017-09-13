@@ -1,10 +1,14 @@
 <project name="flzk" basedir="." default="main">
+	<property environment="env"/>
+
 	<property name="src.dir" 		value="src"/>
 	<property name="build.dir"		value="build"/>
-	<property name="lib.dir" 		value="lib"/>	
+	<property name="lib.dir" 		value="lib"/>
 	<property name="classes.dir"		value="${build.dir}/classes"/>
 
 	<property name="main-class"		value="FLZKTester"/>
+
+	<property name="build.sysclasspath" value="last"/>
 
 	<target name="clean">
 		<delete dir="${build.dir}"/>
@@ -14,33 +18,41 @@
                 <fileset dir="${lib.dir}">
                         <include name="**/*.jar" />
                 </fileset>
-                <pathelement location="../java-client/java-client/build/classes" />
+		<fileset dir="../java-client2/lib">
+                        <include name="**/*.jar" />
+                </fileset>
+                <!-- <pathelement location="../java-client/java-client/build/classes" /> -->
+		<pathelement location="../java-client2/build/classes" />
         </path>
         <path id="run.classpath">
                 <fileset dir="${lib.dir}">
                         <include name="**/*.jar" />
                 </fileset>
-                <pathelement location="../java-client/java-client/build/classes" />
-                <pathelement location="build/classes" />                
+		<fileset dir="../java-client2/lib">
+                        <include name="**/*.jar" />
+                </fileset>
+                <!-- <pathelement location="../java-client/java-client/build/classes" /> -->
+		<pathelement location="../java-client2/build/classes" />
+                <pathelement location="build/classes" />
         </path>
 
-	
+
 	<target name="compile">
-		<mkdir dir="${classes.dir}"/>		
+		<mkdir dir="${classes.dir}"/>
 		<javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="build.classpath"/>
 	</target>
 
 	<target name="run" depends="compile">
 		<java classname="FLZKTester" classpathref="run.classpath">
-	      <arg value="${hostname}"/>
-    	  <arg value="${port}"/>
-		<arg value="${testtype}"/>    	  
-		<arg value="${color}"/>
-		<arg value="${othercolor}"/>		
-      	</java>		
+			<sysproperty key="jna.library.path" value="${env.DELOS_RUST_LOC}/examples/c_linking/target/release/:${env.PATH}"/>
+			<arg value="${hostname}"/>
+			<arg value="${testtype}"/>
+			<arg value="${color}"/>
+			<arg value="${othercolor}"/>
+		</java>
 	</target>
 
 	<target name="clean-build" depends="clean"/>
-	
+
 	<target name="main" depends="clean,run"/>
 </project>

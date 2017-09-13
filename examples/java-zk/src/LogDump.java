@@ -1,5 +1,5 @@
-import client.ProxyClient;
-import client.WriteID;
+import fuzzy_log.FuzzyLog;
+import java.util.Arrays;
 
 public class LogDump
 {
@@ -7,28 +7,23 @@ public class LogDump
 	{
 		if(args.length<1)
 		{
-			System.out.println("Usage: java LogDump [proxyport]");
+			System.out.println("Usage: java LogDump [server addr]");
 			System.exit(0);
 		}
-		ProxyClient client = new ProxyClient(Integer.parseInt(args[0]));
-		
+		FuzzyLog client = new FuzzyLog(new String[] {args[0]});
+
 		int[] acolors = new int[1]; acolors[0] = 1;
 		byte[] adata = new byte[10]; adata[0] = 123;
-		client.async_append(acolors, adata, new WriteID());
-		WriteID ack_wid = new WriteID(0,0);
-		client.wait_any_append(ack_wid);
+		client.async_append(acolors, adata);
+		client.wait_any_append();
 
-		
+
 		client.snapshot();
-		//sizes hardcoded for now, ugh
-		byte[] data = new byte[4096];
-		int[] colors = new int[512];
-		int[] results = new int[2];
-		while(client.get_next(data, colors, results))
-		{
-			System.out.println(colors + "::" + data);
-		}
-		
+		FuzzyLog.Events events = client.get_events();
+        for(FuzzyLog.Event event: events) {
+            System.out.println(Arrays.toString(event.locations) + "::" + Arrays.toString(event.data));
+        }
+
 		System.out.println("hello world!");
 	}
 }

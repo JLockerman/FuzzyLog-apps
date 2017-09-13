@@ -1,7 +1,5 @@
 import java.io.*;
 import java.util.*;
-import client.ProxyClient;
-import client.WriteID;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.CreateMode;
@@ -14,18 +12,19 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import fuzzy_log.FuzzyLog;
 
 public class FLZKCausal extends FLZK
-{	
+{
 	int othercolors[];
-	public FLZKCausal(ProxyClient tclient, ProxyClient tclient2, int tmycolor, Watcher W, int[] tothercolors) throws Exception, KeeperException
+	public FLZKCausal(FuzzyLog tclient, FuzzyLog tclient2, int tmycolor, Watcher W, int[] tothercolors) throws Exception, KeeperException
 	{
 		super(tclient, tclient2, tmycolor, W);
 		othercolors = tothercolors;
-		System.out.println("Creating FLZKCausal instance...");		
+		System.out.println("Creating FLZKCausal instance...");
 	}
-	
-	
+
+
 	void processAsync(FLZKOp flop, boolean mutate)
 	{
 		//signal to learning thread
@@ -38,10 +37,10 @@ public class FLZKCausal extends FLZK
 				//client.append(ObjectToBytes(flop));
 				try
 				{
-					appendclient.async_append_causal(colors, othercolors, ObjectToBytes(flop), new WriteID());
-					appendclient.wait_any_append(new WriteID());
+					appendclient.async_append_causal(colors, othercolors, ObjectToBytes(flop));
+					appendclient.wait_any_append();
 					//we don't have to wait for the append to finish;
-					//we just wait for it to appear in the learner thread					
+					//we just wait for it to appear in the learner thread
 				}
 				catch (Exception E)
 				{

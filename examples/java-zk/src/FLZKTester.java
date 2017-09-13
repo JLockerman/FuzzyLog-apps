@@ -1,4 +1,3 @@
-import client.ProxyClient;
 
 import java.util.List;
 
@@ -16,24 +15,33 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.data.Stat;
 
+import fuzzy_log.FuzzyLog;
+
 public class FLZKTester
 {
 	public static void main(String[] args) throws Exception
 	{
-		if(args.length<3)
+		if(args.length<4)
 		{
-			System.out.println("Usage: java FLZK [hostname] [proxyport] [testtype] [color] [othercolor]");
+			System.out.println("Usage: java FLZK [server addr] [testtype] [color] [othercolor]");
 			System.exit(0);
 		}
-		ProxyClient appendclient = new ProxyClient(args[0], Integer.parseInt(args[1]));
+		int testtype = Integer.parseInt(args[1]);
+		int color = Integer.parseInt(args[2]);
+		int secondcolor = Integer.parseInt(args[3]);
+		int[] colors;
+		if(testtype == 0) {
+			colors = new int[] {color};
+		} else {
+			colors = new int[] {color, secondcolor};
+		}
+		FuzzyLog appendclient = new FuzzyLog(new String[]{args[0]}, new int[]{color, secondcolor});
 //		ProxyClient client2 = new ProxyClient(args[0], Integer.parseInt(args[1])+1);
-		ProxyClient playbackclient = appendclient;
-		int testtype = Integer.parseInt(args[2]);
-		int color = Integer.parseInt(args[3]);
-		int secondcolor = Integer.parseInt(args[4]);
-		
+		FuzzyLog playbackclient = appendclient;
+		;
+
 		IZooKeeper zk=null;
-		
+
 		if(testtype==0)
 		{
 			zk = new FLZK(appendclient, playbackclient, color, null);
@@ -47,20 +55,20 @@ public class FLZKTester
 		{
 			zk = new FLZKCAP(appendclient, playbackclient, color, null, secondcolor);
 		}
-		
-			
+
+
 		System.out.println("hello world!");
 
 		if(zk.exists("/abcd",  true)==null)
 			zk.create("/abcd", "AAA".getBytes(), null, CreateMode.PERSISTENT);
-		System.out.println("created abcd!");			
+		System.out.println("created abcd!");
 		zk.setData("/abcd", "ABCD".getBytes(), -1);
 //		System.out.println(zk);
 		Thread.sleep(1000);
-		
+
 		if(testtype==2)
 		{
-		
+
 			Thread.sleep(1000);
 			for(int i=0;i<100;i++)
 			{
@@ -103,9 +111,9 @@ public class FLZKTester
 					//fail silently
 				}
 			}
-			
+
 		}
-		
+
 
 
 		System.out.println("starting synchronous test!");
@@ -134,33 +142,33 @@ public class FLZKTester
 			System.out.println("Batch [" + j + "/" + numbatches + "] Create done in " + (stoptime-starttime) + ": " + ((double)(stoptime-starttime)/(double)batchsize) + " ms per op.");
 		}
 	//		System.out.println(zk);
-			
-		starttime = System.currentTimeMillis();			
+
+		starttime = System.currentTimeMillis();
 		for(int i=0;i<100;i++)
 			zk.setData("/abcd/" + i, "BBB".getBytes(), -1);
-		stoptime = System.currentTimeMillis();			
-		System.out.println("SetData done in " + (stoptime-starttime));			
+		stoptime = System.currentTimeMillis();
+		System.out.println("SetData done in " + (stoptime-starttime));
 //		System.out.println(zk);
-		
+
 		starttime = System.currentTimeMillis();
 		for(int i=0;i<100;i++)
 			zk.exists("/abcd/" + i, false);
-		stoptime = System.currentTimeMillis();		
-		System.out.println("Exists done in " + (stoptime-starttime));			
+		stoptime = System.currentTimeMillis();
+		System.out.println("Exists done in " + (stoptime-starttime));
 //		System.out.println(zk);
-		
+
 		starttime = System.currentTimeMillis();
 		for(int i=0;i<100;i++)
 			zk.delete("/abcd/" + i, -1);
 		stoptime = System.currentTimeMillis();
-//		System.out.println("Delete done in " + (stoptime-starttime));						
+//		System.out.println("Delete done in " + (stoptime-starttime));
 
-			
+
 //		zk.setData("/abcd", "ABCD".getBytes(), -1);
 		System.out.println(zk);
 		System.out.println("Synchronous Test done");
-		
-		
+
+
 		//asynchronous testing
 		TesterCB dcb = new TesterCB();
 		int numtests = 10000;
@@ -172,14 +180,14 @@ public class FLZKTester
 		}
 		testtime = dcb.waitforcompletion();
 		System.out.println("Throughput (create): " + (1000.0*(double)numtests/(double)testtime));
-		
+
 		dcb.start(numtests);
 		for(int i=0;i<numtests;i++)
 		{
 			zk.setData("/abcd/" + i, "BBB".getBytes(), -1, dcb, null);
 		}
 		testtime = dcb.waitforcompletion();
-		System.out.println("Throughput (setdata): " + (1000.0*(double)numtests/(double)testtime));		
+		System.out.println("Throughput (setdata): " + (1000.0*(double)numtests/(double)testtime));
 
 		dcb.start(numtests);
 		for(int i=0;i<numtests;i++)
@@ -187,7 +195,7 @@ public class FLZKTester
 			zk.exists("/abcd/" + i, false, dcb, null);
 		}
 		testtime = dcb.waitforcompletion();
-		System.out.println("Throughput (exists): " + (1000.0*(double)numtests/(double)testtime));		
+		System.out.println("Throughput (exists): " + (1000.0*(double)numtests/(double)testtime));
 
 		dcb.start(numtests);
 		for(int i=0;i<numtests;i++)
@@ -195,15 +203,15 @@ public class FLZKTester
 			zk.getData("/abcd/" + i, false, dcb, null);
 		}
 		testtime = dcb.waitforcompletion();
-		System.out.println("Throughput (getdata): " + (1000.0*(double)numtests/(double)testtime));		
-		
-		dcb.start(numtests);		
+		System.out.println("Throughput (getdata): " + (1000.0*(double)numtests/(double)testtime));
+
+		dcb.start(numtests);
 		for(int i=0;i<numtests;i++)
 		{
 			zk.getChildren("/abcd/" + i, false, dcb, null);
 		}
 		testtime = dcb.waitforcompletion();
-		System.out.println("Throughput (getchildren): " + (1000.0*(double)numtests/(double)testtime));		
+		System.out.println("Throughput (getchildren): " + (1000.0*(double)numtests/(double)testtime));
 
 		dcb.start(numtests);
 		for(int i=0;i<numtests;i++)
@@ -211,11 +219,11 @@ public class FLZKTester
 			zk.delete("/abcd/" + i, -1, dcb, null);
 		}
 		testtime = dcb.waitforcompletion();
-		System.out.println("Throughput (delete): " + (1000.0*(double)numtests/(double)testtime));		
-		
-		
+		System.out.println("Throughput (delete): " + (1000.0*(double)numtests/(double)testtime));
+
+
 		System.exit(0);
-	}	
+	}
 }
 
 class TesterCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCallback, AsyncCallback.StatCallback, AsyncCallback.DataCallback, AsyncCallback.ChildrenCallback
@@ -225,23 +233,23 @@ class TesterCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCallba
 	long starttime;
 	long stoptime;
 	boolean debugprints = false;
-	
+
 	public TesterCB()
 	{
 		numdone = new AtomicInteger();
 	}
-	
+
 	public void start(int t)
 	{
-		starttime = System.currentTimeMillis();	
+		starttime = System.currentTimeMillis();
 		numtowaitfor = t;
 	}
-	
+
 	public synchronized boolean done()
 	{
 		return numdone.get()>=numtowaitfor;
 	}
-	
+
 	public long waitforcompletion()
 	{
 		synchronized(this)
@@ -262,10 +270,10 @@ class TesterCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCallba
 		}
 		return stoptime-starttime;
 	}
-	
-	
+
+
 	@Override
-	public void processResult(int rc, String path, Object ctx, String name) 
+	public void processResult(int rc, String path, Object ctx, String name)
 	{
 		if(debugprints) System.out.println(Code.get(rc) + " create " + path + " " + numdone);
 		bump();
@@ -274,23 +282,23 @@ class TesterCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCallba
 
 	@Override
 	public void processResult(int rc, String path, Object ctx)
-	{	
+	{
 		if(debugprints) System.out.println(Code.get(rc) + " delete: " + path + " " + numdone);
 		bump();
 	}
 
 
 	@Override
-	public void processResult(int rc, String path, Object ctx, Stat stat) 
+	public void processResult(int rc, String path, Object ctx, Stat stat)
 	{
 		if(debugprints) System.out.println(Code.get(rc) + " setdata/exists: " + path + " " + numdone);
-		bump();		
+		bump();
 	}
 
 
 	@Override
 	public void processResult(int rc, String path, Object ctx, byte[] data,
-			Stat stat) 
+			Stat stat)
 	{
 		if(debugprints) System.out.println(Code.get(rc) + " getdata: " + path + " " + numdone);
 		bump();
@@ -298,13 +306,13 @@ class TesterCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCallba
 
 
 	@Override
-	public void processResult(int rc, String path, Object ctx, List<String> children) 
+	public void processResult(int rc, String path, Object ctx, List<String> children)
 	{
 		if(debugprints) System.out.println(Code.get(rc) + " getchildren: " + path + " " + numdone);
 		bump();
-		
+
 	}
-	
+
 	void bump()
 	{
 		if(numdone.incrementAndGet()>=numtowaitfor)
@@ -313,8 +321,8 @@ class TesterCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCallba
 			{
 				this.notify();
 			}
-		}	
+		}
 	}
-	
-	
+
+
 }

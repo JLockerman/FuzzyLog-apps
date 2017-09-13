@@ -1,7 +1,5 @@
 import java.io.*;
 import java.util.*;
-import client.ProxyClient;
-import client.WriteID;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.CreateMode;
@@ -14,6 +12,8 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import fuzzy_log.FuzzyLog;
+import c_link.write_id;
 
 public class FLZKCAP extends FLZK
 {
@@ -23,8 +23,8 @@ public class FLZKCAP extends FLZK
 	int bothcolors[] = new int[2];
 	List<FLZKOp> buffer;
 	HashMap<File, Node> mapclone;
-	
-	public FLZKCAP(ProxyClient tclient, ProxyClient tclient2, int tprimarycolor, Watcher W, int tsecondarycolor) throws Exception, KeeperException
+
+	public FLZKCAP(FuzzyLog tclient, FuzzyLog tclient2, int tprimarycolor, Watcher W, int tsecondarycolor) throws Exception, KeeperException
 	{
 		super(tclient, tclient2, tprimarycolor, W);
 		primarycolor[0] = tprimarycolor;
@@ -32,9 +32,9 @@ public class FLZKCAP extends FLZK
 		bothcolors[0] = primarycolor[0];
 		bothcolors[1] = secondarycolor[0];
 
-		System.out.println("Creating FLZKCAP instance...");		
+		System.out.println("Creating FLZKCAP instance...");
 	}
-	
+
 	public void disconnect()
 	{
 		try
@@ -46,7 +46,7 @@ public class FLZKCAP extends FLZK
 			throw new RuntimeException(e);
 		}
 	}
-	
+
 	public void reconnect()
 	{
 		try
@@ -56,70 +56,56 @@ public class FLZKCAP extends FLZK
 		catch(KeeperException e)
 		{
 			throw new RuntimeException(e);
-		}		
+		}
 	}
-	
+
 	public void fork() throws KeeperException
 	{
 		Object[] results = new Object[1];
 		this.fork(new AsyncToSync(), results);
-		waitForResults(results);	
+		waitForResults(results);
 	}
 
 
 	public void fork(AsyncCallback.VoidCallback cb, Object ctxt)
 	{
-		try
+		synchronized(this)
 		{
-			synchronized(this)
-			{
-				ForkOp fop = new ForkOp(cb, ctxt);
-				pendinglist.put(fop.id, fop);
-				appendclient.async_append_causal(secondarycolor, primarycolor, ObjectToBytes(fop), new WriteID());
-				appendclient.wait_any_append(new WriteID());
-				this.notify(); //wake up sync thread to process entries
-			}
-		}
-		catch(IOException E)
-		{
-			throw new RuntimeException(E);
+			ForkOp fop = new ForkOp(cb, ctxt);
+			pendinglist.put(fop.id, fop);
+			appendclient.async_append_causal(secondarycolor, primarycolor, ObjectToBytes(fop));
+			appendclient.wait_any_append();
+			this.notify(); //wake up sync thread to process entries
 		}
 	}
-	
-	
+
+
 	public void join() throws KeeperException
 	{
 		Object[] results = new Object[1];
 		this.join(new AsyncToSync(), results);
-		waitForResults(results);	
+		waitForResults(results);
 	}
-	
+
 	public void join(AsyncCallback.VoidCallback cb, Object ctxt)
 	{
-		try
+		synchronized(this)
 		{
-			synchronized(this)
-			{
-				//for this to be accurate, we may have to wait until all secondary appends
-				//have completed;
-				//replacing all wait_any_append with waiting for a specific append 
-				//might solve that, or we might need more complex logic.
-				JoinOp jop = new JoinOp(cb, ctxt);
-				pendinglist.put(jop.id, jop);
-				appendclient.async_append_causal(primarycolor, secondarycolor, ObjectToBytes(jop), new WriteID());
-				appendclient.wait_any_append(new WriteID());
-				this.notify(); //wake up sync thread to process entries
-			}
-		}
-		catch(IOException E)
-		{
-			throw new RuntimeException(E);
+			//for this to be accurate, we may have to wait until all secondary appends
+			//have completed;
+			//replacing all wait_any_append with waiting for a specific append
+			//might solve that, or we might need more complex logic.
+			JoinOp jop = new JoinOp(cb, ctxt);
+			pendinglist.put(jop.id, jop);
+			appendclient.async_append_causal(primarycolor, secondarycolor, ObjectToBytes(jop));
+			appendclient.wait_any_append();
+			this.notify(); //wake up sync thread to process entries
 		}
 	}
-	
 
-	
-	
+
+
+
 	void processAsync(FLZKOp flop, boolean mutate)
 	{
 		//signal to learning thread
@@ -135,16 +121,16 @@ public class FLZKCAP extends FLZK
 				{
 					if(!netpart)
 					{
-						appendclient.async_append(primarycolor, ObjectToBytes(wop), new WriteID());
-						appendclient.wait_any_append(new WriteID());											
+						appendclient.async_append(primarycolor, ObjectToBytes(wop));
+						appendclient.wait_any_append();
 					}
 					else
 					{
-						appendclient.async_append(secondarycolor, ObjectToBytes(wop), new WriteID());
-						appendclient.wait_any_append(new WriteID());
+						appendclient.async_append(secondarycolor, ObjectToBytes(wop));
+						appendclient.wait_any_append();
 					}
 					//we don't have to wait for the append to finish;
-					//we just wait for it to appear in the learner thread					
+					//we just wait for it to appear in the learner thread
 				}
 				catch (Exception E)
 				{
@@ -159,10 +145,10 @@ public class FLZKCAP extends FLZK
 			this.notify(); //wake up sync thread to process entries
 		}
 	}
-	
+
 	public Object apply(FLZKOp cop) throws KeeperException
 	{
-		System.out.println("Playing op!" + cop);	
+		System.out.println("Playing op!" + cop);
 		//inefficient -- fix later
 		if(cop instanceof JoinOp) return apply((JoinOp)cop);
 		else if(cop instanceof ForkOp) return apply((ForkOp)cop);
@@ -176,13 +162,13 @@ public class FLZKCAP extends FLZK
 		}
 		else
 		{
-			System.out.println("super apply op!" + cop);		
+			System.out.println("super apply op!" + cop);
 			Object R = super.apply(cop);
-			System.out.println("Played op!" + cop);		
+			System.out.println("Played op!" + cop);
 			return R;
-		}		
+		}
 	}
-	
+
 	public Object apply(ForkOp forkop)
 	{
 		System.out.println("Played fork op!");
@@ -191,10 +177,10 @@ public class FLZKCAP extends FLZK
 		System.out.println("Switching to color " + secondarycolor[0]);
 		mapclone = (HashMap<File, Node>)deepclone(map);
 		buffer = new LinkedList<FLZKOp>();
-		System.out.println("Done playing fork op!");		
+		System.out.println("Done playing fork op!");
 		return null;
 	}
-	
+
 	public Object apply(JoinOp joinop)
 	{
 		System.out.println("Played join op!");
@@ -204,7 +190,7 @@ public class FLZKCAP extends FLZK
 		//apply primary ops first and secondary ops next
 		for(int i=0;i<2;i++)
 		{
-			Iterator it = buffer.iterator();		
+			Iterator it = buffer.iterator();
 			while(it.hasNext())
 			{
 				WrapperOp wop = (WrapperOp)it.next();
@@ -224,10 +210,10 @@ public class FLZKCAP extends FLZK
 		}
 		return null;
 	}
-	
+
 	public Object deepclone(Object O)
 	{
-		try 
+		try
 		{
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			ObjectOutputStream oos = new ObjectOutputStream(baos);
@@ -236,17 +222,17 @@ public class FLZKCAP extends FLZK
 			ObjectInputStream ois = new ObjectInputStream(bais);
 			return ois.readObject();
 		}
-		catch (IOException e) 
+		catch (IOException e)
 		{
 			throw new RuntimeException(e);
-		} 
-		catch (ClassNotFoundException e) 
+		}
+		catch (ClassNotFoundException e)
 		{
 			throw new RuntimeException(e);
 		}
 	}
 
-	
+
 }
 
 class ForkOp extends FLZKOp implements Serializable
@@ -258,13 +244,13 @@ class ForkOp extends FLZKOp implements Serializable
 		this.cb = cb;
 		this.ctxt = ctxt;
 	}
-	
+
 	public void callback(KeeperException ke, Object O)
 	{
 		if(ke!=null)
 			cb.processResult(ke.code().intValue(), null, ctxt);
 		else
-			cb.processResult(Code.OK.intValue(), null, ctxt);	
+			cb.processResult(Code.OK.intValue(), null, ctxt);
 	}
 	private void writeObject(java.io.ObjectOutputStream out) throws IOException
 	{
@@ -284,13 +270,13 @@ class JoinOp extends FLZKOp implements Serializable
 		this.cb = cb;
 		this.ctxt = ctxt;
 	}
-	
+
 	public void callback(KeeperException ke, Object O)
 	{
 		if(ke!=null)
 			cb.processResult(ke.code().intValue(), null, ctxt);
 		else
-			cb.processResult(Code.OK.intValue(), null, ctxt);		
+			cb.processResult(Code.OK.intValue(), null, ctxt);
 	}
 	private void writeObject(java.io.ObjectOutputStream out) throws IOException
 	{
@@ -312,5 +298,5 @@ class WrapperOp extends FLZKOp implements Serializable
 	public void callback(KeeperException ke, Object O)
 	{
 	}
-	
+
 }
