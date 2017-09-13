@@ -9,9 +9,12 @@ import java.util.Arrays;
 
 import java.lang.Iterable;
 
+import fuzzy_log.ReadHandle;
+import fuzzy_log.WriteHandle;
+
 public class FuzzyLog {
 
-    Pointer handle;
+    private Pointer handle;
     public FuzzyLog(String[] servers, int... intersting_colors) {
         colors.ByReference interesting = Utils.new_colors(intersting_colors);
         this.handle = FuzzyLogLibrary.INSTANCE.new_dag_handle_with_skeens(new size_t(servers.length), servers, interesting);
@@ -26,6 +29,17 @@ public class FuzzyLog {
         }
         colors.ByReference interesting = Utils.new_colors(intersting_colors);
         this.handle = FuzzyLogLibrary.INSTANCE.new_dag_handle_with_replication(new size_t(num_servers), server_heads, server_tails, interesting);
+    }
+
+    public ReadHandleAndWriteHandle split() {
+        System.out.println(handle);
+        reader_and_writer.ByValue raw = FuzzyLogLibrary.INSTANCE.split_dag_handle(this.handle);
+        System.out.println(raw);
+        this.handle = Pointer.NULL;
+        System.out.println(raw);
+        ReadHandle read = new ReadHandle(raw.reader.share(0));
+        WriteHandle write = new WriteHandle(raw.writer.share(0));
+        return new ReadHandleAndWriteHandle(read, write);
     }
 
     public write_id async_append(int[] append_colors, byte[] buffer) {
@@ -159,6 +173,15 @@ public class FuzzyLog {
         }
     }
 
+    public static class ReadHandleAndWriteHandle {
+        public final ReadHandle reader;
+        public final WriteHandle writer;
+
+        ReadHandleAndWriteHandle(ReadHandle readHandle, WriteHandle writeHandle) {
+            this.reader = readHandle;
+            this.writer = writeHandle;
+        }
+    }
     /*public static class WriteId {
         public final long p1;
         public final long p2;

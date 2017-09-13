@@ -107,6 +107,9 @@ public interface FuzzyLogLibrary extends Library {
 	Pointer new_dag_handle_with_replication(size_t num_chain_servers, String chain_server_head_ips[],
 			String chain_server_tail_ips[], colors.ByReference interesting_colors);
 
+
+	c_link.reader_and_writer.ByValue split_dag_handle(Pointer handle);
+
 	/**
 	 * Original signature : <code>write_id do_append(DAGHandle*, char*, size_t, colors*, colors*, uint8_t)</code><br>
 	 * <i>native declaration : fuzzy_log.h:51</i><br>
@@ -263,7 +266,6 @@ public interface FuzzyLogLibrary extends Library {
 	 * <i>native declaration : fuzzy_log.h:100</i><br>
 	 * @deprecated use the safer method {@link #get_next2(com.sun.jna.ptr.PointerByReference, com.ochafik.lang.jnaerator.runtime.size_tByReference, com.ochafik.lang.jnaerator.runtime.size_tByReference)} instead
 	 */
-	@Deprecated
 	c_link.get_next_val.ByValue get_next2(Pointer handle, size_tByReference data_size,
 			size_tByReference locs_read);
 
@@ -331,7 +333,7 @@ public interface FuzzyLogLibrary extends Library {
 	 * <i>native declaration : fuzzy_log.h:120</i><br>
 	 * @deprecated use the safer method {@link #wait_for_any_append(com.sun.jna.ptr.PointerByReference)} instead
 	 */
-	@Deprecated
+
 	c_link.write_id.ByValue wait_for_any_append(Pointer handle);
 
 	/**
@@ -603,6 +605,28 @@ public interface FuzzyLogLibrary extends Library {
 	 * <i>native declaration : fuzzy_log.h:209</i>
 	 */
 	ChainAndEntry.ByValue fuzzy_log_play_forward(FuzzyLogLibrary.FuzzyLog log, IntBuffer chain);
+
+	///////////////////////////////////
+
+	c_link.write_id.ByValue wh_async_append(Pointer handle, ByteBuffer data, size_t data_size, int inhabits);
+
+	c_link.write_id.ByValue wh_async_multiappend(Pointer handle, ByteBuffer data, size_t data_size, colors.ByReference inhabits);
+
+	c_link.write_id.ByValue wh_async_no_remote_multiappend(Pointer handle, ByteBuffer data, size_t data_size, colors.ByReference inhabits);
+
+	void wh_flush_completed_appends(Pointer handle);
+
+	c_link.write_id.ByValue wh_wait_for_any_append(Pointer handle);
+
+	///////////////
+
+	void rh_snapshot(Pointer handle);
+
+	void rh_snapshot_colors(Pointer handle, colors.ByReference colors);
+
+	c_link.get_next_val.ByValue rh_get_next2(Pointer handle, size_tByReference data_size, size_tByReference locs_read);
+
+	///////////////////////////////////
 
 	public static class FuzzyLog extends PointerType {
 		public FuzzyLog(Pointer address) {

@@ -7,7 +7,8 @@ import com.sun.jna.*;
 import com.sun.jna.ptr.PointerByReference;
 import c_link.*;
 
-import fuzzy_log.FuzzyLog;
+import fuzzy_log.*;
+import fuzzy_log.FuzzyLog.ReadHandleAndWriteHandle;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -105,6 +106,35 @@ public class Test {
 
         FuzzyLog.Events events = log.get_events();
         for(FuzzyLog.Event event: events) {
+            System.out.println("read: " + Arrays.toString(event.data) + " locs: " + Arrays.toString(event.locations));
+        }
+
+        System.out.println("split test");
+
+        ReadHandleAndWriteHandle raw = new FuzzyLog(new String[] {"127.0.0.1:13890\0"}, new int[] {8, 9, 10}).split();
+        {
+            raw.writer.async_append(new int[]{9}, new byte[] {(byte)2, (byte)3, (byte)1});
+            raw.writer.wait_any_append();
+        }
+        {
+            raw.writer.async_append(new int[]{8}, new byte[] {(byte)122});
+            raw.writer.wait_any_append();
+        }
+        {
+            raw.writer.async_append(new int[]{10}, new byte[] {(byte)3, (byte)3, (byte)3, (byte)3, (byte)3, (byte)3});
+            raw.writer.wait_any_append();
+        }
+        {
+            byte[] end_data = new byte[4];
+            for(int i = 0; i < end_data.length; i++) end_data[i] = (byte)ThreadLocalRandom.current().nextInt();
+            raw.writer.async_append(new int[] {8, 9, 10}, end_data);
+            raw.writer.wait_any_append();
+        }
+
+        raw.reader.snapshot();
+
+        ReadHandle.Events revents = raw.reader.get_events();
+        for(ReadHandle.Event event: revents) {
             System.out.println("read: " + Arrays.toString(event.data) + " locs: " + Arrays.toString(event.locations));
         }
 
