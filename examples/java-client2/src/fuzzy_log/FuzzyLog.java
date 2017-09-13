@@ -137,5 +137,50 @@ public class FuzzyLog {
         public String toString() {
             return "{color = " + this.color + ", entry = " + this.entry + "}";
         }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null) return false;
+
+            if(!(obj instanceof Location)) { return false; }
+            Location other = (Location)obj;
+            return this.color == other.color && this.entry == other.entry;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + color;
+            result = prime * result + entry;
+            return result;
+        }
     }
+
+    /*public static class WriteId {
+        public final long p1;
+        public final long p2;
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null) return false;
+
+            if(!(obj instanceof WriteId)) { return false; }
+            WriteId other = (WriteId)obj;
+            return this.p1 == other.p1 && this.entry == other.entry;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + color;
+            result = prime * result + entry;
+            return result;
+        }
+    }*/
 }
