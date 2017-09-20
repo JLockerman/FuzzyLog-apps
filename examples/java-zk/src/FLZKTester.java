@@ -62,8 +62,11 @@ public class FLZKTester
 
 		System.out.println("hello world!");
 
-		if(zk.exists("/abcd",  true)==null)
+		if(zk.exists("/abcd",  true)==null) {
+			System.out.println("needs create");
 			zk.create("/abcd", "AAA".getBytes(), null, CreateMode.PERSISTENT);
+		}
+
 		System.out.println("created abcd!");
 		/*zk.setData("/abcd", "ABCD".getBytes(), -1);
 //		System.out.println(zk);
@@ -173,7 +176,7 @@ public class FLZKTester
 */
 		int numtests = 10_000;
 		long testtime = 0;
-		System.out.println("local tests.");
+		/*System.out.println("local tests.");
 		{
 			((FLZK) zk).localCreate("/abcQ", "AAA".getBytes(), null, CreateMode.PERSISTENT);
 			long start = System.nanoTime();
@@ -183,7 +186,7 @@ public class FLZKTester
 			testtime = (System.nanoTime() - start)/1_000_000;
 			System.out.println("Done in " + testtime + " milliseconds.");
 			System.out.println("Throughput (local create): " + (1000.0*(double)numtests/(double)testtime));
-		}
+		}*/
 
 		System.out.println("start async tests.");
 		//asynchronous testing
@@ -331,7 +334,6 @@ class CountingCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCall
 	public final void processResult(int rc, String path, Object ctx, List<String> children)
 	{
 		bump();
-
 	}
 
 	private final void bump()

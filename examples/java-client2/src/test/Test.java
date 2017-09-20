@@ -259,6 +259,35 @@ public class Test {
             System.out.println("got " + gotten + " in " + elapsed + " ns, " + (1_000_000_000.0 * ((double)gotten) / (double)elapsed) + " Hz");
         }
 
+        {
+            System.out.println("Direct");
+
+            ReadHandleAndWriteHandle raw = new FuzzyLog(new String[] {"127.0.0.1:13890\0"}, new int[] {53}).split();
+            long start = System.nanoTime();
+            Thread writer = new Thread(() -> {
+                byte[] data = new byte[32];
+                for(int i = 0; i < numAppends; i ++) {
+                    raw.writer.async_append(56, data);
+                    raw.writer.flush_completed_appends();
+                }
+            });
+            writer.start();
+            Thread.yield();
+            int gotten = 0;
+            while(gotten < numAppends) {
+                ReadHandle.Buffers buffers = raw.reader.snapshot_and_get_buffer();
+                for (ByteBuffer b: buffers) gotten += 1;
+            }
+
+            try {
+                writer.join();
+            } catch(InterruptedException e) {}
+
+
+            long elapsed = System.nanoTime() - start;
+            System.out.println("got " + gotten + " in " + elapsed + " ns, " + (1_000_000_000.0 * ((double)gotten) / (double)elapsed) + " Hz");
+        }
+
         /*{
             System.out.println("Proxy");
 
@@ -322,7 +351,7 @@ public class Test {
         {
             System.out.println("ProxyHandle");
 
-            try(ProxyHandle h = new ProxyHandle("172.31.5.104:13289", 13349, 1l, 7)) {
+            try(ProxyHandle h = new ProxyHandle("127.0.0.1:13890", 13349, 1l, 7)) {
 
                 long start = System.nanoTime();
                 Thread writer = new Thread(() -> {

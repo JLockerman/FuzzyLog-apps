@@ -6,9 +6,11 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.Inet4Address;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -25,6 +27,8 @@ public final class ProxyHandle implements AutoCloseable {
 
     private final DataOutputStream snapshot;
     private final DataInputStream recv;
+
+    private final ByteBufferOutputStream bbos;
 
     public ProxyHandle(String serverAddr, int port, int... chains) {
         this(serverAddr, port, 0, chains);
@@ -48,6 +52,7 @@ public final class ProxyHandle implements AutoCloseable {
 
             pb.directory(proxDir);
             proxy = pb.start();
+            bbos = new ByteBufferOutputStream();
         } catch(IOException e) {
             throw new RuntimeException(e);
         }
@@ -93,7 +98,9 @@ public final class ProxyHandle implements AutoCloseable {
     public <V extends ProxyHandle.Data> void append(int chain, V data) {
         try {
             append.writeInt(chain);
-            data.writeData(append);
+            DataOutputStream dos = new DataOutputStream(bbos);
+            data.writeData(dos);
+            bbos.writeTo(append);
             append.flush();
         } catch(IOException e) {
             throw new RuntimeException(e);
@@ -115,7 +122,9 @@ public final class ProxyHandle implements AutoCloseable {
             for(int i: chain) {
                 append.writeInt(i);
             }
-            data.writeData(append);
+            DataOutputStream dos = new DataOutputStream(bbos);
+            data.writeData(dos);
+            bbos.writeTo(append);
             append.flush();
         } catch(IOException e) {
             throw new RuntimeException(e);
@@ -250,6 +259,10 @@ public final class ProxyHandle implements AutoCloseable {
         public void writeData(DataOutputStream out) throws IOException;
 
         public Data readData(DataInputStream in)  throws IOException;
+
+        default public void readFields(DataInputStream in)  throws IOException {
+            readData(in);
+        }
     }
 
     public static class ByteArrayData implements Data {
@@ -283,4 +296,44 @@ public final class ProxyHandle implements AutoCloseable {
             return new ByteArrayData(array);
         }
     }
+
+
+    private final static class ByteBufferOutputStream extends java.io.OutputStream {
+		private ByteBuffer buffer = ByteBuffer.allocate(512);
+
+		public final void write(byte[] b) {
+			write(ByteBuffer.wrap(b));
+		}
+
+		public final void write(byte[] b, int off, int len) {
+			write(ByteBuffer.wrap(b, off, len));
+		}
+
+		public final void write(ByteBuffer b) {
+			if(buffer.remaining() < b.remaining()) {
+				int newCap = buffer.capacity() * 2;
+				if (newCap - buffer.remaining() < b.remaining()) {
+					newCap = buffer.capacity() + b.remaining();
+				}
+				ByteBuffer newBuffer = ByteBuffer.allocate(newCap);
+				this.buffer.flip();
+				newBuffer.put(this.buffer);
+				this.buffer = newBuffer;
+			}
+
+			this.buffer.put(b);
+		}
+
+		public final void write(int b) {
+			this.buffer.put((byte) b);
+        }
+
+        public final void writeTo(DataOutputStream os) throws IOException {
+            this.buffer.flip();
+            int len = this.buffer.remaining();
+            os.writeInt(len);
+            os.write(this.buffer.array(), 0, len);
+            this.buffer.clear();
+        }
+	}
 }

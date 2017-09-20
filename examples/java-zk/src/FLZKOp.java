@@ -13,14 +13,36 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-abstract class FLZKOp implements Serializable
+import fuzzy_log.ProxyHandle;
+
+abstract class FLZKOp implements Serializable, ProxyHandle.Data
 {
+
+	public static final FLZKOp INSTANCE = new NoOp(0, (byte)0);
+
+	private static final class NoOp extends FLZKOp{
+		NoOp(int id, byte kind) { super(id, kind); }
+		public void callback(KeeperException k, Object O) {}
+		public boolean hasCallback() { return false; }
+		public final byte kind() { return 0; }
+	}
+
 	static AtomicInteger idcounter = new AtomicInteger();
-	int id;
+	public final int id;
+	public final byte kind;
 	public FLZKOp()
 	{
 		//FIXME distringuish clients
 		id = idcounter.getAndIncrement();
+		kind = 0;
+		//System.out.println(this + "::" + this.id);
+	}
+
+	public FLZKOp(int id, byte kind)
+	{
+		//FIXME distringuish clients
+		this.id = id;
+		this.kind = kind;
 		//System.out.println(this + "::" + this.id);
 	}
 
@@ -36,12 +58,18 @@ abstract class FLZKOp implements Serializable
 
 	public abstract boolean hasCallback();
 
-	/*
-	public ByteBuffer writeBytes(ByteBuffer out) {
-		return out.putInt(this.id);
+	public abstract byte kind();
+
+	@Override
+	public void writeData(DataOutputStream out) throws IOException {
+		out.write(this.kind());
+		out.writeInt(id);
 	}
 
-	public int readId(ByteBuffer in) {
-		return in.getInt();
-	}*/
+	@Override
+	public FLZKOp readData(DataInputStream in) throws IOException {
+		byte kind = in.readByte();
+		int id = in.readInt();
+		return new NoOp(id, kind);
+	}
 }
