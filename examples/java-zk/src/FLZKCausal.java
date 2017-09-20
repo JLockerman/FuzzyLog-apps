@@ -14,7 +14,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import fuzzy_log.FuzzyLog;
 
-public class FLZKCausal extends FLZK
+public class FLZKCausal{}/* extends FLZK
 {
 	int othercolors[];
 	public FLZKCausal(FuzzyLog tclient, FuzzyLog tclient2, int tmycolor, Watcher W, int[] tothercolors) throws Exception, KeeperException
@@ -55,4 +55,4 @@ public class FLZKCausal extends FLZK
 			this.notify(); //wake up sync thread to process entries
 		}
 	}
-}
+}*/

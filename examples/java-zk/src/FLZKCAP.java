@@ -15,8 +15,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import fuzzy_log.FuzzyLog;
 import c_link.write_id;
 
-public class FLZKCAP extends FLZK
-{
+public class FLZKCAP{}// extends FLZK
+/*{
 	boolean netpart;
 	int primarycolor[] = new int[1];
 	int secondarycolor[] = new int[1];
@@ -299,4 +299,4 @@ class WrapperOp extends FLZKOp implements Serializable
 	{
 	}
 
-}
+}*/

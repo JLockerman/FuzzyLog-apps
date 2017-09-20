@@ -43,8 +43,9 @@
 	</target>
 
 	<target name="run" depends="compile">
-		<java classname="FLZKTester" classpathref="run.classpath">
+		<java classname="FLZKTester" fork="true" classpathref="run.classpath">
 			<sysproperty key="jna.library.path" value="${env.DELOS_RUST_LOC}/examples/c_linking/target/release/:${env.PATH}"/>
+			<!-- <jvmarg value="-Xverify:none"/> -->
 			<arg value="${hostname}"/>
 			<arg value="${testtype}"/>
 			<arg value="${color}"/>

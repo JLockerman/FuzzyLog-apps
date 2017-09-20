@@ -43,7 +43,7 @@
 	</target>
 
 	<target name="run" depends="compile">
-		<java classname="test.Test" classpathref="run.classpath">
+		<java classname="test.Test" fork="true" classpathref="run.classpath">
 			<sysproperty key="jna.library.path" value="${env.DELOS_RUST_LOC}/examples/c_linking/target/release/:${env.PATH}"/>
 		</java>
 	</target>

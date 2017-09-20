@@ -1,4 +1,5 @@
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.*;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.KeeperException;
@@ -15,19 +16,32 @@ import java.util.concurrent.locks.ReentrantLock;
 abstract class FLZKOp implements Serializable
 {
 	static AtomicInteger idcounter = new AtomicInteger();
-	Object id;
+	int id;
 	public FLZKOp()
 	{
-		id = new Integer(idcounter.getAndIncrement());
+		//FIXME distringuish clients
+		id = idcounter.getAndIncrement();
 		//System.out.println(this + "::" + this.id);
 	}
+
 	public boolean equals(FLZKOp cop)
 	{
-		return cop.id.equals(this.id);
+		return cop.id == this.id;
 	}
 	public void callback(KeeperException ke)
 	{
 		callback(ke, null);
 	}
 	public abstract void callback(KeeperException k, Object O);
+
+	public abstract boolean hasCallback();
+
+	/*
+	public ByteBuffer writeBytes(ByteBuffer out) {
+		return out.putInt(this.id);
+	}
+
+	public int readId(ByteBuffer in) {
+		return in.getInt();
+	}*/
 }

@@ -17,9 +17,10 @@ public class FuzzyLog {
     private Pointer handle;
     public FuzzyLog(String[] servers, int... intersting_colors) {
         colors.ByReference interesting = Utils.new_colors(intersting_colors);
-        this.handle = FuzzyLogLibrary.INSTANCE.new_dag_handle_with_skeens(new size_t(servers.length), servers, interesting);
+        StringArray arr = new StringArray(servers);
+        this.handle = FuzzyLogLibrary.new_dag_handle_with_skeens(new size_t(servers.length), arr, interesting);
     }
-
+/*
     public FuzzyLog(String[] server_heads, String[] server_tails, int... intersting_colors) {
         int num_servers;
         if (server_heads.length <= server_tails.length) {
@@ -28,41 +29,38 @@ public class FuzzyLog {
             num_servers = server_tails.length;
         }
         colors.ByReference interesting = Utils.new_colors(intersting_colors);
-        this.handle = FuzzyLogLibrary.INSTANCE.new_dag_handle_with_replication(new size_t(num_servers), server_heads, server_tails, interesting);
+        this.handle = FuzzyLogLibrary.new_dag_handle_with_replication(new size_t(num_servers), server_heads, server_tails, interesting);
     }
-
+*/
     public ReadHandleAndWriteHandle split() {
-        System.out.println(handle);
-        reader_and_writer.ByValue raw = FuzzyLogLibrary.INSTANCE.split_dag_handle(this.handle);
-        System.out.println(raw);
+        reader_and_writer.ByValue raw = FuzzyLogLibrary.split_dag_handle(this.handle);
         this.handle = Pointer.NULL;
-        System.out.println(raw);
         ReadHandle read = new ReadHandle(raw.reader.share(0));
         WriteHandle write = new WriteHandle(raw.writer.share(0));
         return new ReadHandleAndWriteHandle(read, write);
     }
-
+/*
     public write_id async_append(int[] append_colors, byte[] buffer) {
         colors.ByReference inhabits = Utils.new_colors(append_colors);
-        return FuzzyLogLibrary.INSTANCE.do_append(handle, ByteBuffer.wrap(buffer), new size_t(buffer.length), inhabits, null, (byte)1);
+        return FuzzyLogLibrary.do_append(handle, ByteBuffer.wrap(buffer), new size_t(buffer.length), inhabits, null, (byte)1);
     }
 
     public write_id async_append_causal(int[] append_colors, int[] causal_colors, byte[] buffer) {
         colors.ByReference inhabits = Utils.new_colors(append_colors);
         colors.ByReference happens_after = Utils.new_colors(append_colors);
-        return FuzzyLogLibrary.INSTANCE.async_simple_causal_append(handle, ByteBuffer.wrap(buffer), new size_t(buffer.length), inhabits, happens_after);
+        return FuzzyLogLibrary.async_simple_causal_append(handle, ByteBuffer.wrap(buffer), new size_t(buffer.length), inhabits, happens_after);
 	}
 
 	public write_id wait_any_append() {
-        return FuzzyLogLibrary.INSTANCE.wait_for_any_append(handle);
+        return FuzzyLogLibrary.wait_for_any_append(handle);
 	}
 
 	public write_id try_wait_any_append() {
-        return FuzzyLogLibrary.INSTANCE.try_wait_for_any_append(handle);
+        return FuzzyLogLibrary.try_wait_for_any_append(handle);
 	}
 
 	public void snapshot() {
-        FuzzyLogLibrary.INSTANCE.snapshot(handle);
+        FuzzyLogLibrary.snapshot(handle);
 	}
 
 	public Events get_events() {
@@ -70,7 +68,7 @@ public class FuzzyLog {
     }
 
     public void close() {
-        FuzzyLogLibrary.INSTANCE.close_dag_handle(handle);
+        FuzzyLogLibrary.close_dag_handle(handle);
         handle = Pointer.NULL;
     }
 
@@ -102,7 +100,7 @@ public class FuzzyLog {
         private void fetch_next() {
             size_tByReference data_size = new size_tByReference();
             size_tByReference locs_read = new size_tByReference();
-            get_next_val next_val = FuzzyLogLibrary.INSTANCE.get_next2(FuzzyLog.this.handle, data_size, locs_read);
+            get_next_val next_val = FuzzyLogLibrary.get_next2(FuzzyLog.this.handle, data_size, locs_read);
             if(locs_read.getValue() == 0) {
                 this.done = true;
                 this.got_next = false;
@@ -171,7 +169,7 @@ public class FuzzyLog {
             result = prime * result + entry;
             return result;
         }
-    }
+    }*/
 
     public static class ReadHandleAndWriteHandle {
         public final ReadHandle reader;

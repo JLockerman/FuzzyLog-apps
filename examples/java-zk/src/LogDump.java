@@ -5,6 +5,7 @@ public class LogDump
 {
 	public static void main(String[] args) throws Exception
 	{
+		/*
 		if(args.length<1)
 		{
 			System.out.println("Usage: java LogDump [server addr]");
@@ -25,5 +26,6 @@ public class LogDump
         }
 
 		System.out.println("hello world!");
+		*/
 	}
 }

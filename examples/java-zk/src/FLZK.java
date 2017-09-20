@@ -1,26 +1,31 @@
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.*;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
+import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
 import org.apache.zookeeper.AsyncCallback;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import fuzzy_log.FuzzyLog;
+import fuzzy_log.*;
+import fuzzy_log.FuzzyLog.ReadHandleAndWriteHandle;
+import fuzzy_log.ReadHandle.*;
 import c_link.write_id;
 
-class Pair<A,B>
+final class Pair<A,B>
 {
-	A first;
-	B second;
+	public final A first;
+	public final B second;
 	Pair(A first, B second)
 	{
 		this.first = first;
@@ -43,6 +48,7 @@ final class SetOp extends FLZKOp implements Serializable
 		this.cb = cb;
 		this.ctx = ctx;
 	}
+
 	public void callback(KeeperException ke, Object O)
 	{
 		if(ke!=null)
@@ -64,6 +70,37 @@ final class SetOp extends FLZKOp implements Serializable
 		path = (String)in.readObject();
 	}
 
+	public boolean hasCallback() {
+		return cb != null;
+	}
+
+	/*public final ByteBuffer writeBytes(ByteBuffer out) {
+		if(out.remaining() < size()) {
+			ByteBuffer newOut = ByteBuffer.allocateDirect(out.limit() + size());
+			out.flip();
+			newOut.put(out);
+			out = newOut;
+
+		}
+		out.put((byte)1);
+		super.writeBytes(out)
+			.put(path.getBytes(Charset.UTF_8))
+			.put(data)
+			.putInt(version);
+	}
+
+	public final SetOp readBytes(ByteBuffer in) {
+		int id = super.readId(in);
+		byte[] path_b = in.getByteArray();
+		String path = new String(path_b, Charset.UTF_8);
+		byte[] data = in.getByteArray();
+		int version = in.getInt();
+		return new SetOp(id, path, data, version, null, null);
+	}
+
+	private final int size() {
+		return 4 + 1 + 4 + this.path.length() * 4 + 4 + data.length + 4;
+	}*/
 }
 
 
@@ -106,6 +143,10 @@ final class CreateOp extends FLZKOp implements Serializable
 		acl = (List<ACL>)in.readObject();
 		path = (String)in.readObject();
 	}
+
+	public boolean hasCallback() {
+		return cb != null;
+	}
 }
 
 final class GetChildrenOp extends FLZKOp
@@ -127,6 +168,9 @@ final class GetChildrenOp extends FLZKOp
 			cb.processResult(Code.OK.intValue(), path, ctx, (List<String>)O); //what about stat?
 	}
 
+	public boolean hasCallback() {
+		return cb != null;
+	}
 }
 
 final class GetOp extends FLZKOp
@@ -160,6 +204,9 @@ final class GetOp extends FLZKOp
 		}
 	}
 
+	public boolean hasCallback() {
+		return cb != null;
+	}
 }
 
 
@@ -188,6 +235,9 @@ final class ExistsOp extends FLZKOp
 			cb.processResult(Code.OK.intValue(), path, ctx, (Stat)O);
 	}
 
+	public boolean hasCallback() {
+		return cb != null;
+	}
 }
 
 final class DeleteOp extends FLZKOp implements Serializable
@@ -221,6 +271,10 @@ final class DeleteOp extends FLZKOp implements Serializable
 		path = (String)in.readObject();
 		version = ((Integer)in.readObject()).intValue();
 	}
+
+	public boolean hasCallback() {
+		return cb != null;
+	}
 }
 
 final class MarkerOp extends FLZKOp
@@ -235,6 +289,10 @@ final class MarkerOp extends FLZKOp
 	private void writeObject(java.io.ObjectOutputStream out) throws IOException {}
 
 	private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {}
+
+	public boolean hasCallback() {
+		return false;
+	}
 }
 
 final class WakeOp extends FLZKOp
@@ -249,42 +307,73 @@ final class WakeOp extends FLZKOp
 	private void writeObject(java.io.ObjectOutputStream out) throws IOException {}
 
 	private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {}
+
+	public boolean hasCallback() {
+		return false;
+	}
 }
 
 
+final class Sequenced<T> {
+	public final long sequenceNumber;
+	public final T t;
+
+	public Sequenced(long sequenceNumber, T t) {
+		this.sequenceNumber = sequenceNumber;
+		this.t = t;
+	}
+
+	@Override
+	public final String toString() {
+		return "(" + sequenceNumber + ", " + t + ")";
+	}
+}
 
 public final class FLZK implements IZooKeeper, Runnable
 {
-	protected FuzzyLog appendclient;
-	protected FuzzyLog playbackclient;
-	HashMap<File, Node> map;
+	protected final ProxyHandle client;
+	private final HashMap<File, Node> map;
 
-	HashMap<Object, FLZKOp> pendinglist;  //mutating operations, must sunchronize on appendclient
-	LinkedBlockingQueue<FLZKOp> passivelist; //non-mutating operations
+	private final ConcurrentHashMap<Object, FLZKOp> pendinglist;  //mutating operations, must sunchronize on appendclient
+	private final LinkedBlockingQueue<FLZKOp> passivelist; //non-mutating operations
 
-	LinkedBlockingQueue<Object> callbacklist;
-	Watcher defaultwatcher;
-	Map<String, Set<Watcher>> existswatches;
+	private final LinkedBlockingQueue<Object> callbacklist;
+	private final Watcher defaultwatcher;
+	private final Map<String, Set<Watcher>> existswatches;
 
-	long numentries=0;
+	private final ArrayList<LinkedBlockingQueue<FLZKOp>> toSer;
+	private final LinkedBlockingQueue<byte[]> fromSer;
+	private int nextSer = 0;
 
-	int mycolor = 0;
+	private final ArrayList<LinkedBlockingQueue<Sequenced<byte[]>>> toDe;
+	private final LinkedBlockingQueue<Sequenced<FLZKOp>> fromDe;
+	private int nextDe = 0;
 
-	final boolean debugprints;
+	private final int serDeThreads = 4;
 
-	public FLZK(FuzzyLog tclient, FuzzyLog tclient2, int tmycolor, Watcher W) throws Exception, KeeperException
+	private byte[] writeBuffer;
+
+	private long numentries=0;
+
+
+	private int mycolor = 0;
+
+	private final boolean debugprints = false;
+
+	public FLZK(ProxyHandle client, int tmycolor, Watcher W) throws Exception, KeeperException
 	{
+		this.client = client;
+
 		defaultwatcher = W;
-		pendinglist = new HashMap<Object, FLZKOp>();
+		pendinglist = new ConcurrentHashMap<Object, FLZKOp>();
 		passivelist = new LinkedBlockingQueue<FLZKOp>();
 		callbacklist = new LinkedBlockingQueue<Object>();
-		debugprints = false;
 		map = new HashMap<File, Node>();
 		map.put(new File("/"), new Node("foobar".getBytes(), "/"));
 		existswatches = new HashMap<String, Set<Watcher>>();
-		appendclient = tclient;
-		playbackclient = tclient2;
 		mycolor = tmycolor;
+
+		writeBuffer = new byte[512];
 
 		//IO Thread
 		(new Thread(this)).start();
@@ -326,6 +415,123 @@ public final class FLZK implements IZooKeeper, Runnable
 
 			}
 		}).start();
+
+		fromSer = new LinkedBlockingQueue<>();
+		fromDe = new LinkedBlockingQueue<>();
+
+		new Thread(() -> {
+			while(true) {
+				try {
+					byte[] op = fromSer.take();
+					client.append(mycolor, op);
+					passivelist.add(WakeOp.Instance);
+				} catch(InterruptedException e) { }
+			}
+		}).start();
+
+		new Thread(() -> {
+			long nextSequnceNumber = 0;
+			// PriorityQueue<Sequenced<FLZKOp>> pendingEvents = new PriorityQueue<>((a, b) -> {
+			// 	if(a.sequenceNumber < b.sequenceNumber) return -1;
+			// 	else if(b.sequenceNumber < a.sequenceNumber) return 1;
+			// 	else return 0;
+			// });
+			HashMap<Long, FLZKOp> pendingEvents = new HashMap<>();
+			while(true) {
+				try {
+					Sequenced<FLZKOp> szop = fromDe.take();
+					// System.out.println("n " + nextSequnceNumber + " c " + szop.sequenceNumber);
+					// System.out.println(pendingEvents);
+					if(szop.sequenceNumber == nextSequnceNumber) {
+						nextSequnceNumber += 1;
+						FLZKOp zop = szop.t;
+						Object ret = null;
+						try
+						{
+							if(debugprints) System.out.println("applying op" + zop);
+							ret = this.apply(zop);
+							if(zop.hasCallback()) schedulecallback(zop, null, ret);
+								//mycop.callback(null, ret);
+						}
+						catch(KeeperException ke)
+						{
+							if(zop.hasCallback()) schedulecallback(zop, ke, ret);
+								//mycop.callback(ke, ret);
+						}
+						//while(!pendingEvents.isEmpty() && pendingEvents.peek().sequenceNumber == nextSequnceNumber) {
+						while(pendingEvents.containsKey(nextSequnceNumber)) {
+							//zop = pendingEvents.remove().t;
+							zop = pendingEvents.remove(nextSequnceNumber);
+							nextSequnceNumber += 1;
+							try
+							{
+								if(debugprints) System.out.println("applying op" + zop);
+								ret = this.apply(zop);
+								if(zop.hasCallback()) schedulecallback(zop, null, ret);
+									//mycop.callback(null, ret);
+							}
+							catch(KeeperException ke)
+							{
+								if(zop.hasCallback()) schedulecallback(zop, ke, ret);
+									//mycop.callback(ke, ret);
+							}
+						}
+					} else {
+						// pendingEvents.add(szop);
+						pendingEvents.put(szop.sequenceNumber, szop.t);
+						// System.out.println(pendingEvents.size());
+					}
+
+
+				} catch(InterruptedException e) { }
+			}
+		}).start();
+
+		toSer = new ArrayList<>(serDeThreads);
+		toDe = new ArrayList<>(serDeThreads);
+		for(int i = 0; i < serDeThreads; i++) {
+			final int threadNum = i;
+			toSer.add(new LinkedBlockingQueue<>());
+			new Thread(() -> {
+				while(true) {
+					try {
+						FLZKOp flop = toSer.get(threadNum).take();
+						byte[] out = ObjectToBytes(flop);
+						pendinglist.put(flop.id, flop);
+						fromSer.offer(out);
+					} catch(InterruptedException e) { }
+				}
+			}).start();
+
+			toDe.add(new LinkedBlockingQueue<>());
+			new Thread(() -> {
+				while(true) {
+					try {
+						Sequenced<byte[]> sbytes = toDe.get(threadNum).take();
+						byte[] bytes = sbytes.t;
+						long sequenceNumber = sbytes.sequenceNumber;
+						ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
+						FLZKOp zop =(FLZKOp)ois.readObject();
+						//is this a pending operation?
+						FLZKOp mycop = pendinglist.remove(zop.id);
+
+						if(debugprints)
+						{
+							if(mycop!=null) System.out.println("Found pending op!" + zop.id);
+							else System.out.println("Didn't find pending op!" + zop.id);
+						}
+						if(mycop != null) {
+							fromDe.offer(new Sequenced<>(sequenceNumber, mycop));
+						} else {
+							fromDe.offer(new Sequenced<>(sequenceNumber, zop));
+						}
+					} catch(InterruptedException e) {
+					} catch(ClassNotFoundException | IOException e) {
+						throw new RuntimeException(e);
+					}
+				}
+			}).start();
+		}
 	}
 
 	public synchronized String toString()
@@ -338,28 +544,19 @@ public final class FLZK implements IZooKeeper, Runnable
 	void processAsync(FLZKOp flop, boolean mutate)
 	{
 		//signal to learning thread
-		if(debugprints) System.out.println("process");
+		// if(debugprints) System.out.println("process");
 		if(mutate)
 		{
-			synchronized(appendclient) //sync can't run in parallel; flproxy is not threadsafe
-			{
-				pendinglist.put(flop.id, flop);
-				int[] colors = new int[1]; colors[0] = mycolor;
-				//client.append(ObjectToBytes(flop));
-				try
-				{
-					appendclient.async_append(colors, ObjectToBytes(flop));
-					appendclient.wait_any_append();
-					//we don't have to wait for the append to finish;
-					//we just wait for it to appear in the learner thread
-				}
-				catch (Exception E)
-				{
-					//do what here?
-					throw new RuntimeException(E);
-				}
-			}
-			passivelist.add(WakeOp.Instance);
+			toSer.get(nextSer % serDeThreads).offer(flop);
+			nextSer += 1;
+			// client.append(mycolor, ObjectToBytes(flop));
+			// CacheArrayOutputStream out = ObjectToBytes(flop, this.writeBuffer);
+			// pendinglist.put(flop.id, flop);
+			// client.append(mycolor, out.buffer(), out.length());
+			// passivelist.add(WakeOp.Instance);
+			// this.writeBuffer = out.buffer();
+			//we don't have to wait for the append to finish;
+			//we just wait for it to appear in the learner thread
 		}
 		else
 		{
@@ -376,13 +573,6 @@ public final class FLZK implements IZooKeeper, Runnable
 			try
 			{
 				this.sync();
-				// synchronized(this)
-				// {
-				// 	sync();
-				// 	//wait for a signal to sync
-				// 	this.wait();
-				// 	if(debugprints) System.out.println(passivelist.size() + ":" + pendinglist.size());
-				// }
 			}
 			catch(InterruptedException e)
 			{
@@ -396,86 +586,51 @@ public final class FLZK implements IZooKeeper, Runnable
 
 	}
 
-
-	private /*synchronized*/ void sync() throws IOException, InterruptedException
+	private void sync() throws IOException, InterruptedException
 	{
-		try
-		{
-			while(true) {
-				FLZKOp pop = passivelist.take();
-				boolean tailreached = false;
-
-				//snapshot mycolor
-				synchronized(appendclient) {
-					playbackclient.snapshot();
-
-					FuzzyLog.Events events = playbackclient.get_events();
-
-					if(debugprints) System.out.println("sync");
-
-					passivelist.add(MarkerOp.Instance);
-					for(FuzzyLog.Event event: events) {
-						numentries++;
-						if(debugprints) System.out.println("Tail not reached");
-						ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(event.data));
-						FLZKOp zop =(FLZKOp)ois.readObject();
-						//is this a pending operation?
-						FLZKOp mycop = pendinglist.remove(zop.id);
-						if(debugprints)
-						{
-							if(mycop!=null) System.out.println("Found pending op!" + zop.id);
-							else System.out.println("Didn't find pending op!" + zop.id);
-						}
-
-						Object ret = null;
-						try
-						{
-							if(debugprints) System.out.println("applying op" + zop);
-							ret = this.apply(zop);
-							if(mycop!=null)
-								schedulecallback(mycop, null, ret);
-								//mycop.callback(null, ret);
-						}
-						catch(KeeperException ke)
-						{
-							if(mycop!=null)
-								schedulecallback(mycop, ke, ret);
-								//mycop.callback(ke, ret);
-						}
-					}
-				}
-
-
-				handle_passive: for(; pop != null && pop != MarkerOp.Instance; pop = passivelist.poll()) {
-					if (pop == WakeOp.Instance) { continue handle_passive; }
-					FLZKOp mycop = pop;
-					Object ret = null;
-					try
-					{
-						if(debugprints) System.out.println("applying op" + pop);
-						ret = this.apply(pop);
-						if(mycop!=null)
-							schedulecallback(mycop, null, ret);
-							//mycop.callback(null, ret);
-					}
-					catch(KeeperException ke)
-					{
-						if(mycop!=null)
-							schedulecallback(mycop, ke, ret);
-							//mycop.callback(ke, ret);
-					}
-				}
-
-				if(debugprints) synchronized(appendclient) {
-					System.out.println("finished sync: " + passivelist.size() + ", " + pendinglist.size());
-				}
+		long seq = 0;
+		while(true) {
+			FLZKOp pop;
+			if (pendinglist.isEmpty()) {
+				pop = passivelist.take();
+			} else {
+				pop = passivelist.poll();
 			}
-		}
-		catch(ClassNotFoundException c)
-		{
-			throw new RuntimeException(c);
-		}
+			if(pendinglist.isEmpty() && pop == MarkerOp.Instance) {
+				pop = passivelist.take();
+			}
 
+			// if(debugprints) System.out.println("sync");
+			// int objectsFound = 0;
+			// new passive events must wait for the next snapshot
+			passivelist.offer(MarkerOp.Instance);
+			// snapshot mycolor
+			ProxyHandle.Bytes events = client.snapshot_and_get();
+			for(byte[] event: events) {
+				// objectsFound += 1;
+				numentries++;
+				if(debugprints) System.out.println("Tail not reached");
+				toDe.get(nextDe % serDeThreads).offer(new Sequenced<>(seq, event));
+				nextDe += 1;
+				seq += 1;
+				// long fetchTime = System.nanoTime() - startTime;
+				// System.out.println("loop time: " + fetchTime + "ns ");
+				// startTime = System.nanoTime();
+			}
+			// long fetchTime = System.nanoTime() - startTime;
+			// double hz = 1_000_000_000.0 * (double)objectsFound / (double)fetchTime;
+			// /*if(objectsFound != 0)*/ System.out.println("fetch time: " + fetchTime + "ns " + objectsFound + " events " + hz + "hz");
+
+			handle_passive: for(; pop != null && pop != MarkerOp.Instance; pop = passivelist.poll()) {
+				if (pop == WakeOp.Instance) { continue handle_passive; }
+				if (pop == MarkerOp.Instance) { break handle_passive; }
+				//TODO we don't need passive ops to be totally ordered
+				fromDe.offer(new Sequenced<>(seq, pop));
+				seq += 1;
+			}
+
+			// if(debugprints) System.out.println("finished sync: " + passivelist.size() + ", " + pendinglist.size());
+		}
 	}
 
 	public void schedulecallback(FLZKOp cop, KeeperException ke, Object ret)
@@ -500,7 +655,7 @@ public final class FLZK implements IZooKeeper, Runnable
 
 	}
 
-	public synchronized Object apply(CreateOp cop) throws KeeperException
+	public Object apply(CreateOp cop) throws KeeperException
 	{
 		String path = cop.path;
 		File f = new File(path);
@@ -546,7 +701,7 @@ public final class FLZK implements IZooKeeper, Runnable
 		return path;
 	}
 
-	public synchronized Object apply(DeleteOp dop) throws KeeperException
+	public Object apply(DeleteOp dop) throws KeeperException
 	{
 		File F = new File(dop.path);
 		if(!map.containsKey(F))
@@ -570,7 +725,7 @@ public final class FLZK implements IZooKeeper, Runnable
 
 
 
-	public synchronized Object apply(ExistsOp eop) throws KeeperException
+	public Object apply(ExistsOp eop) throws KeeperException
 	{
 		File F = new File(eop.path);
 		if(!map.containsKey(F))
@@ -595,7 +750,7 @@ public final class FLZK implements IZooKeeper, Runnable
 		return x; //todo -- return copy of stat?
 	}
 
-	public synchronized Object apply(SetOp sop) throws KeeperException
+	public Object apply(SetOp sop) throws KeeperException
 	{
 		File f = new File(sop.path);
 		if(!map.containsKey(f))
@@ -614,7 +769,7 @@ public final class FLZK implements IZooKeeper, Runnable
 
 	}
 
-		public synchronized Object apply(GetOp gop) throws KeeperException
+		public Object apply(GetOp gop) throws KeeperException
 	{
 		File F = new File(gop.path);
 		if(!map.containsKey(F))
@@ -629,7 +784,7 @@ public final class FLZK implements IZooKeeper, Runnable
 
 	}
 
-	public synchronized Object apply(GetChildrenOp gcop) throws KeeperException
+	public Object apply(GetChildrenOp gcop) throws KeeperException
 	{
 		File F = new File(gcop.path);
 		if(!map.containsKey(F))
@@ -675,7 +830,7 @@ public final class FLZK implements IZooKeeper, Runnable
 	{
 		try
 		{
-			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			ByteArrayOutputStream baos = new ByteArrayOutputStream(512);
 			ObjectOutputStream oos = new ObjectOutputStream(baos);
 			oos.writeObject(O);
 			byte[] b = baos.toByteArray();
@@ -684,6 +839,116 @@ public final class FLZK implements IZooKeeper, Runnable
 		catch(IOException ioe)
 		{
 			throw new RuntimeException(ioe);
+		}
+	}
+
+	static ByteBuffer ObjectToBytes(FLZKOp O, ByteBuffer buffer)
+	{
+		try
+		{
+			buffer.clear();
+			ByteBufferOutputStream baos = new ByteBufferOutputStream(buffer);
+			ObjectOutputStream oos = new ObjectOutputStream(baos);
+			oos.writeObject(O);
+			buffer.flip();
+			return baos.buffer;
+		}
+		catch(IOException ioe)
+		{
+			throw new RuntimeException(ioe);
+		}
+	}
+
+	static CacheArrayOutputStream ObjectToBytes(FLZKOp O, byte[] buffer)
+	{
+		try
+		{
+			CacheArrayOutputStream baos = new CacheArrayOutputStream(buffer);
+			ObjectOutputStream oos = new ObjectOutputStream(baos);
+			oos.writeObject(O);
+			return baos;
+		}
+		catch(IOException ioe)
+		{
+			throw new RuntimeException(ioe);
+		}
+	}
+
+	private final static class ByteBufferOutputStream extends java.io.OutputStream {
+		private ByteBuffer buffer;
+
+		ByteBufferOutputStream(ByteBuffer b) {
+			buffer = b;
+		}
+
+		public final void write(byte[] b) {
+			write(ByteBuffer.wrap(b));
+		}
+
+		public final void write(byte[] b, int off, int len) {
+			write(ByteBuffer.wrap(b, off, len));
+		}
+
+		public final void write(ByteBuffer b) {
+			if(buffer.remaining() < b.remaining()) {
+				int newCap = buffer.capacity() * 2;
+				if (newCap - buffer.remaining() < b.remaining()) {
+					newCap = buffer.capacity() + b.remaining();
+				}
+				ByteBuffer newBuffer = ByteBuffer.allocateDirect(newCap);
+				this.buffer.flip();
+				newBuffer.put(this.buffer);
+				this.buffer = newBuffer;
+			}
+
+			this.buffer.put(b);
+		}
+
+		public final void write(int b) {
+			this.buffer.put((byte) b);
+		}
+	}
+
+	private final static class CacheArrayOutputStream extends java.io.OutputStream {
+		private ByteBuffer buffer;
+
+		CacheArrayOutputStream(byte[] b) {
+			buffer = ByteBuffer.wrap(b);
+		}
+
+		public final void write(byte[] b) {
+			write(ByteBuffer.wrap(b));
+		}
+
+		public final void write(byte[] b, int off, int len) {
+			write(ByteBuffer.wrap(b, off, len));
+		}
+
+		public final void write(ByteBuffer b) {
+			if(buffer.remaining() < b.remaining()) {
+				int newCap = buffer.capacity() * 2;
+				if (newCap - buffer.remaining() < b.remaining()) {
+					newCap = buffer.capacity() + b.remaining();
+				}
+				ByteBuffer newBuffer = ByteBuffer.allocate(newCap);
+				this.buffer.flip();
+				newBuffer.put(this.buffer);
+				this.buffer = newBuffer;
+			}
+
+			this.buffer.put(b);
+		}
+
+		public final void write(int b) {
+			this.buffer.put((byte) b);
+		}
+
+		public byte[] buffer() {
+			return this.buffer.array();
+		}
+
+		public int length() {
+			return this.buffer.position();
 		}
 	}
 
@@ -716,6 +981,14 @@ public final class FLZK implements IZooKeeper, Runnable
 		this.create(path, data, acl, createMode, new AsyncToSync(), results);
 		waitForResults(results);
 		return (String)results[1];
+	}
+
+	public Object localCreate(String path, byte[] data, List<ACL> acl, CreateMode createMode) throws KeeperException, InterruptedException
+	{
+		Object[] results = new Object[2];
+		//call asynchronous version
+		CreateOp cop = new CreateOp(path, data, acl, createMode, new AsyncToSync(), null);
+		return this.apply(cop);
 	}
 
 	public Stat setData(String path, byte[] data, int version) throws KeeperException, InterruptedException
