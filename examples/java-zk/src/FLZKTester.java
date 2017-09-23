@@ -38,10 +38,11 @@ public class FLZKTester
 //		ProxyClient client2 = new ProxyClient(args[0], Integer.parseInt(args[1])+1);
 		//FuzzyLog playbackclient = appendclient;
 
-		System.out.println("make handle: server addr " + args[0] +  ", color " + color + ", wait for " + num_clients);
+		String[] serverAddrs = args[0].split(",");
+		System.out.println("make handle: server addrs " + Arrays.toString(serverAddrs) +  ", color " + color + ", wait for " + num_clients);
 		final ProxyHandle client;
-		if(testtype == 0) client = new ProxyHandle(args[0], 13337, color);
-		else if(testtype == 1) client = new ProxyHandle(args[0], 13337, num_clients, color);
+		if(testtype == 0) client = new ProxyHandle(serverAddrs, 13337, color);
+		else if(testtype == 1) client = new ProxyHandle(serverAddrs, 13337, num_clients, color);
 		else throw new RuntimeException("Unknown test type " + testtype);
 
 		// System.out.println("start testing");

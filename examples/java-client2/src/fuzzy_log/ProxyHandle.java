@@ -11,6 +11,8 @@ import java.net.Inet4Address;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -31,10 +33,14 @@ public final class ProxyHandle implements AutoCloseable {
     private final ByteBufferOutputStream bbos;
 
     public ProxyHandle(String serverAddr, int port, int... chains) {
-        this(serverAddr, port, 0, chains);
+        this(new String[] {serverAddr}, port, 0, chains);
     }
 
     public ProxyHandle(String serverAddr, int port, long total_clients, int... chains) {
+        this(new String[] {serverAddr}, port, 0, chains);
+    }
+
+    public ProxyHandle(String[] serverAddr, int port, long total_clients, int... chains) {
         boolean waitForSync = total_clients > 0;
         try {
             String delosLoc = System.getenv("DELOS_RUST_LOC");
@@ -42,12 +48,17 @@ public final class ProxyHandle implements AutoCloseable {
             File proxDir = new File(delosLoc, "examples/java_proxy");
             // System.out.println(proxDir);
 
-            ProcessBuilder pb;
+            ArrayList<String> args = new ArrayList<>(4 + serverAddr.length);
+            args.add("./target/release/java_proxy");
+            args.addAll(Arrays.asList(serverAddr));
+            args.add("-p");
+            args.add("" + port);
+
             if(waitForSync) {
-                pb = new ProcessBuilder("./target/release/java_proxy", serverAddr, "" + port, "-y", "" + total_clients);
-            } else {
-                pb = new ProcessBuilder("./target/release/java_proxy", serverAddr, "" + port);
+                args.add("-y");
+                args.add("" + total_clients);
             }
+            final ProcessBuilder pb = new ProcessBuilder(args);
             // pb.inheritIO();
 
             pb.directory(proxDir);
