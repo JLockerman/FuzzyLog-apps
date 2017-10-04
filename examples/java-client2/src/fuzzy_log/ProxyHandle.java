@@ -33,14 +33,14 @@ public final class ProxyHandle implements AutoCloseable {
     private final ByteBufferOutputStream bbos;
 
     public ProxyHandle(String serverAddr, int port, int... chains) {
-        this(new String[] {serverAddr}, port, 0, chains);
+        this(serverAddr, port, 0, chains);
     }
+
+    //public ProxyHandle(String serverAddr, int port, long total_clients, int... chains) {
+    //    this(new String[] {serverAddr}, port, 0, chains);
+    //}
 
     public ProxyHandle(String serverAddr, int port, long total_clients, int... chains) {
-        this(new String[] {serverAddr}, port, 0, chains);
-    }
-
-    public ProxyHandle(String[] serverAddr, int port, long total_clients, int... chains) {
         boolean waitForSync = total_clients > 0;
         try {
             String delosLoc = System.getenv("DELOS_RUST_LOC");
@@ -48,9 +48,9 @@ public final class ProxyHandle implements AutoCloseable {
             File proxDir = new File(delosLoc, "examples/java_proxy");
             // System.out.println(proxDir);
 
-            ArrayList<String> args = new ArrayList<>(4 + serverAddr.length);
+            ArrayList<String> args = new ArrayList<>(5);
             args.add("./target/release/java_proxy");
-            args.addAll(Arrays.asList(serverAddr));
+            args.add(serverAddr);
             args.add("-p");
             args.add("" + port);
 
@@ -60,6 +60,7 @@ public final class ProxyHandle implements AutoCloseable {
             }
             final ProcessBuilder pb = new ProcessBuilder(args);
             // pb.inheritIO();
+            // pb.environment().put("RUST_BACKTRACE", "short");
 
             pb.directory(proxDir);
             proxy = pb.start();

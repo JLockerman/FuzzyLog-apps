@@ -38,8 +38,8 @@ public class FLZKTester
 //		ProxyClient client2 = new ProxyClient(args[0], Integer.parseInt(args[1])+1);
 		//FuzzyLog playbackclient = appendclient;
 
-		String[] serverAddrs = args[0].split(",");
-		System.out.println("make handle: server addrs " + Arrays.toString(serverAddrs) +  ", color " + color + ", wait for " + num_clients);
+		String serverAddrs = args[0];
+		System.out.println("make handle: server addrs " + serverAddrs +  ", color " + color + ", wait for " + num_clients);
 		final ProxyHandle client;
 		if(testtype == 0) client = new ProxyHandle(serverAddrs, 13337, color);
 		else if(testtype == 1) client = new ProxyHandle(serverAddrs, 13337, num_clients, color);
@@ -248,45 +248,57 @@ public class FLZKTester
 	}
 
 	private final static void runCreateTest(final FLZK zk, int clientNum) {
-		// System.out.println("create scaling test start");
+		System.out.println("create scaling test start");
 		final String dirname = "/foo" + clientNum;
 		final String dir = dirname + "/";
 		try { zk.create(dir, "AAA".getBytes(), null, CreateMode.PERSISTENT); }
 		catch(KeeperException | InterruptedException e) { throw new RuntimeException(e); }
 
 		AtomicBoolean done = new AtomicBoolean(false);
+		AtomicBoolean stopped_send = new AtomicBoolean(false);
+		AtomicInteger numSent = new AtomicInteger(0);
 
 		CountingCB cb = new CountingCB();
 
 		Thread createThread = new Thread(() -> {
 			int fileNum = 0;
 			while(!done.get()) {
-				for(int i = 0; i < 20; i++) {
+				for(int i = 0; i < 500; i++) {
 					zk.create(dir + i, "AAA".getBytes(), null, CreateMode.PERSISTENT, cb, null);
 					fileNum++;
 				}
 			}
+			numSent.set(fileNum);
+			stopped_send.set(true);
 		});
 		createThread.start();
 		final int numRounds = 10;
+		int total_completed = 0;
 		final int[] complete = new int[numRounds];
 		for(int round = 0; round < numRounds; round++) {
-			try { Thread.sleep(1000); }
+			try { Thread.sleep(3000); }
 			catch(InterruptedException e) { throw new RuntimeException(e); }
 			complete[round] = cb.take();
+			total_completed += complete[round];
 		}
-		try { Thread.sleep(1000); }
+		try { Thread.sleep(3000); }
 		catch(InterruptedException e) { }
 		done.set(true);
-		try { Thread.sleep(1000); }
+		try { Thread.sleep(3000); }
 		catch(InterruptedException e) { }
 
 		long total = 0;
 		// System.out.println(Arrays.toString(complete));
-		for(int i = 0; i < complete.length; i++) total += complete[i];
+		for(int i = 0; i < complete.length; i++) total += (complete[i] / 3);
 		long avg = total / complete.length;
-		System.out.printf("%d: %6d Hz\n", clientNum, avg);
+		System.out.printf("> %d: %6d Hz\n", clientNum, avg);
 		//System.out.println(clientNum + ": " + avg + " Hz");
+		// while(!stopped_send.get()) { Thread.yield(); }
+		// int fileNum = numSent.get();
+		// while(total_completed < fileNum) {
+		// 	total_completed += cb.take();
+		// 	Thread.yield();
+		// }
 	}
 }
 
