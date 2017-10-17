@@ -53,6 +53,42 @@
 		</java>
 	</target>
 
+	<target name="view" depends="compile">
+		<java classname="FVTester" fork="true" classpathref="run.classpath">
+			<sysproperty key="jna.library.path" value="${env.DELOS_RUST_LOC}/examples/c_linking/target/release/:${env.PATH}"/>
+			<jvmarg value="-server"/>
+			<jvmarg value="-d64"/>
+			<jvmarg value="-Xverify:none"/>
+			<jvmarg value="-Xbatch"/>
+			<jvmarg value="-Xcomp"/>
+			<jvmarg value="-XX:InitialHeapSize=2g"/>
+			<!-- <jvmarg value="-Xms8g"/>
+			<jvmarg value="-Xmx8g"/> -->
+			<!-- <jvmarg value="-XX:+AlwaysPreTouch"/> -->
+			<jvmarg value="-XX:MaxHeapFreeRatio=99"/>
+			<jvmarg value="-XX:+UseConcMarkSweepGC"/>
+			<jvmarg value="-XX:+CMSParallelRemarkEnabled"/>
+			<jvmarg value="-XX:+UseCMSInitiatingOccupancyOnly"/>
+			<jvmarg value="-XX:CMSInitiatingOccupancyFraction=70"/>
+			<jvmarg value="-XX:+ScavengeBeforeFullGC"/>
+			<jvmarg value="-XX:+CMSScavengeBeforeRemark"/>
+			<jvmarg value="-XX:+UseBiasedLocking"/>
+			<jvmarg value="-XX:SurvivorRatio=8"/>
+			<jvmarg value="-XX:TargetSurvivorRatio=90"/>
+			<jvmarg value="-XX:MaxTenuringThreshold=15"/>
+			<jvmarg value="-XX:+DisableExplicitGC"/>
+
+
+
+			<!-- <jvmarg value="-XX:+UseG1GC"/> -->
+			<arg value="${hostname}"/>
+			<arg value="${client_num}"/>
+			<arg value="${num_files}"/>
+			<arg value="${send_interval}"/>
+
+		</java>
+	</target>
+
 	<target name="clean-build" depends="clean"/>
 
 	<target name="main" depends="clean,run"/>

@@ -454,7 +454,7 @@ final class Sequenced<T> {
 public final class FLZK implements IZooKeeper, Runnable
 {
 	protected final ProxyHandle client;
-	private final HashMap<File, Node> map;
+	private final Map<File, Node> map;
 
 	private final ConcurrentHashMap<Object, FLZKOp> pendinglist;  //mutating operations, must sunchronize on appendclient
 	private final LinkedBlockingQueue<FLZKOp> passivelist; //non-mutating operations
@@ -470,11 +470,19 @@ public final class FLZK implements IZooKeeper, Runnable
 	private long numentries=0;
 
 
-	private int mycolor = 0;
+	private final int mycolor;
+	private final int[] bothColors;
 
 	private final boolean debugprints = false;
 
-	public FLZK(ProxyHandle client, int tmycolor, Watcher W) throws Exception, KeeperException
+	private final boolean justSend;
+
+	public FLZK(ProxyHandle client, int tmycolor, int othercolor, Watcher W) throws Exception, KeeperException
+	{
+		this(client, tmycolor, othercolor, W, false);
+	}
+
+	public FLZK(ProxyHandle client, int tmycolor, int othercolor, Watcher W, boolean justSend) throws Exception, KeeperException
 	{
 		this.client = client;
 
@@ -482,10 +490,13 @@ public final class FLZK implements IZooKeeper, Runnable
 		pendinglist = new ConcurrentHashMap<Object, FLZKOp>();
 		passivelist = new LinkedBlockingQueue<FLZKOp>();
 		callbacklist = new LinkedBlockingQueue<Object>();
-		map = new HashMap<File, Node>();
+		map = new TreeMap<File, Node>();
+		// map = new HashMap<File, Node>(10_000_000);
 		map.put(new File("/"), new Node("foobar".getBytes(), "/"));
 		existswatches = new HashMap<String, Set<Watcher>>();
 		mycolor = tmycolor;
+		bothColors = new int[] {mycolor, othercolor};
+		this.justSend = justSend;
 
 		writeBuffer = new byte[512];
 
@@ -544,17 +555,20 @@ public final class FLZK implements IZooKeeper, Runnable
 					{
 						// if(debugprints) System.out.println("applying op" + zop);
 						ret = this.apply(zop);
-						if(zop.hasCallback()) {
+						//if(zop.hasCallback()) {
 							// objectsApplied += 1;
-							schedulecallback(zop, null, ret);
+						//	schedulecallback(zop, null, ret);
 							//mycop.callback(null, ret);
 							// System.out.println("objects applied " + objectsApplied);
+						//}
+						if((zop.hasCallback())) {
+							zop.callback(null, ret);
 						}
-
 					}
 					catch(KeeperException ke)
 					{
-						if(zop.hasCallback()) schedulecallback(zop, ke, ret);
+						if(zop.hasCallback()) zop.callback(ke, ret);
+						//if(zop.hasCallback()) schedulecallback(zop, ke, ret);
 							//mycop.callback(ke, ret);
 					}
 
@@ -568,7 +582,6 @@ public final class FLZK implements IZooKeeper, Runnable
 		String x = map.toString();
 		return x;
 	}
-
 
 	void processAsync(FLZKOp flop, boolean mutate)
 	{
@@ -586,14 +599,20 @@ public final class FLZK implements IZooKeeper, Runnable
 			//we just wait for it to appear in the learner thread
 			// if(debugprints) System.out.println("process " + flop);
 			pendinglist.put(flop.id, flop);
-			client.append(mycolor, flop);
-			passivelist.add(WakeOp.Instance);
+			if(flop instanceof CreateOp) {
+				// System.out.println("> " + Arrays.toString(bothColors));
+				client.append(bothColors, flop);
+			} else {
+				// System.out.println("> " + mycolor);
+				client.append(mycolor, flop);
+			}
+
+			if(!justSend) passivelist.add(WakeOp.Instance);
 		}
 		else
 		{
 			passivelist.add(flop);
 		}
-
 	}
 
 	@Override
@@ -631,14 +650,14 @@ public final class FLZK implements IZooKeeper, Runnable
 			}
 
 			// if(debugprints) System.out.println("sync");
-			int objectsFound = 0;
+			// int objectsFound = 0;
 			// long startTime = System.nanoTime();
 			// new passive events must wait for the next snapshot
 			passivelist.offer(MarkerOp.Instance);
 			// snapshot mycolor
 			ProxyHandle.DataStream<OpData> events = client.snapshot_and_get_data(OpData.BUILDER);
 			for(OpData event: events) {
-				objectsFound += 1;
+				// objectsFound += 1;
 				numentries++;
 				// if(debugprints) System.out.println("Tail not reached");
 				fromDe.offer(event.op);
@@ -648,17 +667,23 @@ public final class FLZK implements IZooKeeper, Runnable
 			}
 			// long fetchTime = System.nanoTime() - startTime;
 			// double hz = 1_000_000_000.0 * (double)objectsFound / (double)fetchTime;
-			// if(objectsFound != 0) System.out.println("fetch time: " + fetchTime + "ns " + objectsFound + " events " + hz + "hz");
+			// if(objectsFound != 0) System.out.println("> fetch time: " + fetchTime + "ns " + objectsFound + " events " + hz + "hz");
+			// System.out.println("> fetch time: " + fetchTime + "ns " + objectsFound + " events " + hz + "hz");
 
-			handle_passive: for(; pop != null && pop != MarkerOp.Instance; pop = passivelist.poll()) {
-				if (pop == WakeOp.Instance) { continue handle_passive; }
-				if (pop == MarkerOp.Instance) { break handle_passive; }
+
+			handle_passive: for(; pop != MarkerOp.Instance; pop = passivelist.poll()) {
+				if (pop == null || pop == WakeOp.Instance) continue handle_passive;
+				if (pop == MarkerOp.Instance) break handle_passive;
 				//TODO we don't need passive ops to be totally ordered
 				fromDe.offer(pop);
 			}
 			// if(debugprints && objectsFound != 0) System.out.println("finished sync: " + numentries);
 			// if(debugprints) System.out.println("finished sync: " + passivelist.size() + ", " + pendinglist.size());
 		}
+	}
+
+	public long getNumEvents() {
+		return numentries;
 	}
 
 	public void schedulecallback(FLZKOp cop, KeeperException ke, Object ret)
@@ -677,7 +702,7 @@ public final class FLZK implements IZooKeeper, Runnable
 		else if(cop instanceof GetChildrenOp) return apply((GetChildrenOp)cop);
 		else
 		{
-			System.out.println(cop.getClass());
+			// System.out.println(cop.getClass());
 			throw new RuntimeException("This should never get called");
 		}
 	}
@@ -686,45 +711,51 @@ public final class FLZK implements IZooKeeper, Runnable
 	{
 		String path = cop.path;
 		File f = new File(path);
-		if(map.containsKey(f))
-			throw new KeeperException.NodeExistsException();
-
-		if(!map.containsKey(f.getParentFile()))
-			throw new KeeperException.NoNodeException();
+		path = f.getPath();
 
 		Node N = map.get(f.getParentFile());
+		if(N == null) throw new KeeperException.NoNodeException();
 
 		if(cop.cm.isEphemeral()) throw new RuntimeException("not yet supported!");
-		if(N.isEphemeral())
-			throw new KeeperException.NoChildrenForEphemeralsException();
+		if(N.isEphemeral()) throw new KeeperException.NoChildrenForEphemeralsException();
 
 
 		if(cop.cm.isSequential())
 		{
-			AtomicInteger I = N.sequentialcounters.get(f);
+			NodeAux aux = N.aux.getOrInit();
+			AtomicInteger I = aux.sequentialcounters.get(f);
 			if(I==null)
 			{
 				I = new AtomicInteger(0);
-				N.sequentialcounters.put(f,  I);
+				aux.sequentialcounters.put(f,  I);
 			}
 			int x = I.getAndIncrement();
 			String y = String.format("%010d", x);
 			path = path + y;
 			f = new File(path);
+			path = f.getPath();
 		}
 
-
+		Node newnode = new Node(cop.data, path);
+		Node old = map.put(f, newnode); //map is synchronized on 'this'
+		if(old != null) {
+			map.put(f, old);
+			throw new KeeperException.NodeExistsException();
+		}
 
 //		N.lock();
-		Node newnode = new Node(cop.data, path);
 		newnode.stat.setCzxid(numentries); //copy stat either here or on read
 		//TODO: is it okay to use numentries here? will this be problematic if different clients see nodes in different orders?
-		N.children.add(newnode);
+		N.aux.getOrInit().children.add(newnode);
 		//existswatches is synchronized on 'this'
-		triggerwatches(existswatches.get(newnode.path), new WatchedEvent(Watcher.Event.EventType.NodeCreated, KeeperState.SyncConnected,newnode.path));
-		triggerwatches(N.childrenwatches, new WatchedEvent(Watcher.Event.EventType.NodeChildrenChanged, KeeperState.SyncConnected, N.path));
+		if(existswatches.isEmpty()) return path;
+		Set<Watcher> watches = existswatches.get(newnode.path);
+		if(watches != null && !watches.isEmpty())
+			triggerwatches(watches, new WatchedEvent(Watcher.Event.EventType.NodeCreated, KeeperState.SyncConnected,newnode.path));
+		if(watches != null && !N.aux.get().childrenwatches.isEmpty())
+			triggerwatches(N.aux.get().childrenwatches, new WatchedEvent(Watcher.Event.EventType.NodeChildrenChanged, KeeperState.SyncConnected, N.path));
 //		N.unlock();
-		map.put(f, newnode); //map is synchronized on 'this'
+
 		return path;
 	}
 
@@ -737,25 +768,26 @@ public final class FLZK implements IZooKeeper, Runnable
 //		N.lock();
 		if(dop.version!=-1 && N.stat.getVersion()!=dop.version)
 			throw new KeeperException.BadVersionException();
-		if(N.children.size()>0)
+		NodeAux aux = N.aux.get();
+		if(aux != null && aux.children.size()>0)
 			throw new KeeperException.NotEmptyException();
 		Node parent = map.get(F.getParentFile());
 //		parent.lock();
-		parent.children.remove(N);
-		triggerwatches(parent.childrenwatches, new WatchedEvent(Watcher.Event.EventType.NodeChildrenChanged, KeeperState.SyncConnected, parent.path));
+		parent.aux.get().children.remove(N);
+		triggerwatches(parent.aux.get().childrenwatches, new WatchedEvent(Watcher.Event.EventType.NodeChildrenChanged, KeeperState.SyncConnected, parent.path));
 //		parent.unlock();
-		triggerwatches(N.datawatches, new WatchedEvent(Watcher.Event.EventType.NodeDeleted, KeeperState.SyncConnected, N.path));
+		if(aux != null && aux.datawatches != null && !aux.datawatches.isEmpty())
+			triggerwatches(aux.datawatches, new WatchedEvent(Watcher.Event.EventType.NodeDeleted, KeeperState.SyncConnected, N.path));
 //		N.unlock();
 		map.remove(F);
 		return null;
 	}
 
-
-
 	public Object apply(ExistsOp eop) throws KeeperException
 	{
 		File F = new File(eop.path);
-		if(!map.containsKey(F))
+		Node N = map.get(F);
+		if(N == null)
 		{
 			if(eop.watch && defaultwatcher!=null)
 			{
@@ -769,10 +801,9 @@ public final class FLZK implements IZooKeeper, Runnable
 			}
 			return null;
 		}
-		Node N = map.get(F);
 //		N.lock();
 		Stat x = N.stat;
-		if(eop.watch && defaultwatcher!=null) N.datawatches.add(defaultwatcher);
+		if(eop.watch && defaultwatcher!=null) N.aux.getOrInit().datawatches.add(defaultwatcher);
 //		N.unlock();
 		return x; //todo -- return copy of stat?
 	}
@@ -780,9 +811,8 @@ public final class FLZK implements IZooKeeper, Runnable
 	public Object apply(SetOp sop) throws KeeperException
 	{
 		File f = new File(sop.path);
-		if(!map.containsKey(f))
-			throw new KeeperException.NoNodeException();
 		Node N = map.get(f);
+		if(N == null) throw new KeeperException.NoNodeException();
 //		N.lock();
 		if(sop.version!=-1 && sop.version!=N.stat.getVersion())
 			throw new KeeperException.BadVersionException();
@@ -790,22 +820,23 @@ public final class FLZK implements IZooKeeper, Runnable
 		N.stat.setMzxid(numentries); //todo: can this cause problems since we don't use curpos?
 		Stat x = N.stat;
 		//mb: triggers both 'exists' and 'getdata' watches
-		triggerwatches(N.datawatches, new WatchedEvent(Watcher.Event.EventType.NodeDataChanged, KeeperState.SyncConnected, N.path));
+		NodeAux aux = N.aux.get();
+		if(aux != null && aux.datawatches != null && !aux.datawatches.isEmpty())
+			triggerwatches(aux.datawatches, new WatchedEvent(Watcher.Event.EventType.NodeDataChanged, KeeperState.SyncConnected, N.path));
 //		N.unlock();
 		return x; //handle stat copying either here or at modification
-
 	}
 
 		public Object apply(GetOp gop) throws KeeperException
 	{
 		File F = new File(gop.path);
-		if(!map.containsKey(F))
-			throw new KeeperException.NoNodeException();
 		Node N = map.get(F);
+		if(N == null) throw new KeeperException.NoNodeException();
+
 //		N.lock();
 		Stat x = N.stat;
 		byte[] y = N.data;
-		if(gop.watch && defaultwatcher!=null) N.datawatches.add(defaultwatcher);
+		if(gop.watch && defaultwatcher!=null) N.aux.getOrInit().datawatches.add(defaultwatcher);
 //		N.unlock();
 		return new Pair<byte[], Stat>(y, x); //todo -- copy data and stat
 
@@ -814,19 +845,29 @@ public final class FLZK implements IZooKeeper, Runnable
 	public Object apply(GetChildrenOp gcop) throws KeeperException
 	{
 		File F = new File(gcop.path);
-		if(!map.containsKey(F))
-				throw new KeeperException.NoNodeException();
 		Node N = map.get(F);
+		if(N == null) throw new KeeperException.NoNodeException();
+
 //		N.lock();
-		LinkedList<String> children = new LinkedList<String>();
-		Iterator<Node> it = N.children.iterator();
-		while(it.hasNext())
-		{
-			children.add(it.next().path);
+
+		final List<String> childNames;
+		NodeAux aux = N.aux.get();
+		if(aux == null) {
+			if(gcop.watch && defaultwatcher!=null) {
+				N.aux.getOrInit().childrenwatches.add(defaultwatcher);
+			}
+			return Collections.emptyList();
 		}
-		if(gcop.watch && defaultwatcher!=null) N.childrenwatches.add(defaultwatcher);
+
+		List<Node> children = aux.children;
+		if(children.isEmpty()) childNames = Collections.emptyList();
+		else {
+			childNames = new ArrayList<>(children.size());
+			for(Node n: children) childNames.add(n.path);
+		}
+		if(gcop.watch && defaultwatcher!=null) aux.childrenwatches.add(defaultwatcher);
 //		N.unlock();
-		return children;
+		return childNames;
 	}
 
 
@@ -979,11 +1020,11 @@ public final class FLZK implements IZooKeeper, Runnable
 		}
 	}
 
-	public void waitForResults(Object[] results) throws KeeperException
+	public void waitForResults(Results results) throws KeeperException
 	{
 		synchronized(results)
 		{
-			while(results[0]==null)
+			while(!results.ready)
 			{
 				try
 				{
@@ -995,48 +1036,48 @@ public final class FLZK implements IZooKeeper, Runnable
 				}
 			}
 		}
-		int x = ((Integer)results[0]).intValue();
-		if(x!=0)
-			throw KeeperException.create(Code.get(x));
+		if(results.code != 0) throw KeeperException.create(Code.get(results.code));
 	}
 
 	//synchronous methods -- create, exists, setdata:
 	public String create(String path, byte[] data, List<ACL> acl, CreateMode createMode) throws KeeperException, InterruptedException
 	{
-		Object[] results = new Object[2];
+		Results results = AsyncToSync.ret.get();
+		results.ready = false;
 		//call asynchronous version
 		this.create(path, data, acl, createMode, new AsyncToSync(), results);
 		waitForResults(results);
-		return (String)results[1];
+		return (String)results.val;
 	}
 
 	public Object localCreate(String path, byte[] data, List<ACL> acl, CreateMode createMode) throws KeeperException, InterruptedException
 	{
-		Object[] results = new Object[2];
-		//call asynchronous version
 		CreateOp cop = new CreateOp(path, data, acl, createMode, new AsyncToSync(), null);
 		return this.apply(cop);
 	}
 
 	public Stat setData(String path, byte[] data, int version) throws KeeperException, InterruptedException
 	{
-		Object[] results = new Object[2];
+		Results results = AsyncToSync.ret.get();
+		results.ready = false;
 		this.setData(path, data, version, new AsyncToSync(), results);
 		waitForResults(results);
-		return (Stat)results[1];
+		return (Stat)results.val;
 	}
 
 	public Stat exists(String path, boolean watcher) throws KeeperException, InterruptedException
 	{
-		Object[] results = new Object[2];
+		Results results = AsyncToSync.ret.get();
+		results.ready = false;
 		this.exists(path, watcher, new AsyncToSync(), results);
 		waitForResults(results);
-		return (Stat)results[1];
+		return (Stat)results.val;
 	}
 
 	public void delete(String path, int version) throws KeeperException
 	{
-		Object[] results = new Object[1];
+		Results results = AsyncToSync.ret.get();
+		results.ready = false;
 		this.delete(path, version, new AsyncToSync(), results);
 		waitForResults(results);
 	}
@@ -1044,18 +1085,20 @@ public final class FLZK implements IZooKeeper, Runnable
 	public byte[] getData(String path, boolean watcher, Stat stat) throws KeeperException, InterruptedException
 	{
 		//todo -- what about stat?
-		Object[] results = new Object[2];
+		Results results = AsyncToSync.ret.get();
+		results.ready = false;
 		this.getData(path, watcher, new AsyncToSync(), results);
 		waitForResults(results);
-		return (byte[])results[1];
+		return (byte[])results.val;
 	}
 
 	public List<String> getChildren(String path, boolean watch) throws KeeperException, InterruptedException
 	{
-		Object[] results = new Object[2];
+		Results results = AsyncToSync.ret.get();
+		results.ready = false;
 		this.getChildren(path, watch, new AsyncToSync(), results);
 		waitForResults(results);
-		return (List<String>)results[1];
+		return (List<String>)results.val;
 	}
 
 
@@ -1100,17 +1143,30 @@ public final class FLZK implements IZooKeeper, Runnable
 
 }
 
+final class Results {
+	public boolean ready = false;
+	public int code = 0;
+	public Object val = null;
+}
+
 class AsyncToSync implements AsyncCallback.StringCallback, AsyncCallback.StatCallback, AsyncCallback.VoidCallback, AsyncCallback.DataCallback, AsyncCallback.ChildrenCallback
 {
+	static final ThreadLocal<Results> ret =
+		new ThreadLocal<Results>() {
+			@Override protected final Results initialValue() {
+					return new Results();
+			}
+		};
 
 	@Override
 	public void processResult(int rc, String path, Object ctx, String name)
 	{
-		Object[] results = (Object[])ctx;
+		Results results = (Results)ctx;
 		synchronized(results)
 		{
-			results[0] = new Integer(rc);
-			results[1] = name;
+			results.code = rc;
+			results.val = name;
+			results.ready = true;
 			results.notify();
 		}
 	}
@@ -1118,11 +1174,12 @@ class AsyncToSync implements AsyncCallback.StringCallback, AsyncCallback.StatCal
 	@Override
 	public void processResult(int rc, String path, Object ctx, Stat stat)
 	{
-		Object[] results = (Object[])ctx;
+		Results results = (Results)ctx;
 		synchronized(results)
 		{
-			results[0] = new Integer(rc);
-			results[1] = stat;
+			results.code = rc;
+			results.val = stat;
+			results.ready = true;
 			results.notify();
 		}
 	}
@@ -1130,10 +1187,12 @@ class AsyncToSync implements AsyncCallback.StringCallback, AsyncCallback.StatCal
 	@Override
 	public void processResult(int rc, String path, Object ctx)
 	{
-		Object[] results = (Object[])ctx;
+		Results results = (Results)ctx;
 		synchronized(results)
 		{
-			results[0] = new Integer(rc);
+			results.code = rc;
+			results.val = null;
+			results.ready = true;
 			results.notify();
 		}
 	}
@@ -1142,11 +1201,12 @@ class AsyncToSync implements AsyncCallback.StringCallback, AsyncCallback.StatCal
 	public void processResult(int rc, String path, Object ctx, byte[] data,
 			Stat stat)
 	{
-		Object[] results = (Object[])ctx;
+		Results results = (Results)ctx;
 		synchronized(results)
 		{
-			results[0] = new Integer(rc);
-			results[1] = data;
+			results.code = rc;
+			results.val = data;
+			results.ready = true;
 			results.notify();
 		}
 	}
@@ -1154,47 +1214,74 @@ class AsyncToSync implements AsyncCallback.StringCallback, AsyncCallback.StatCal
 	@Override
 	public void processResult(int rc, String path, Object ctx, List<String> children)
 	{
-		Object[] results = (Object[])ctx;
+		Results results = (Results)ctx;
 		synchronized(results)
 		{
-			results[0] = new Integer(rc);
-			results[1] = children;
+			results.code = rc;
+			results.val = children;
+			results.ready = true;
 			results.notify();
 		}
 	}
 }
 
+abstract class Lazy<T> {
+	private T val = null;
+
+	public final T get() {
+		return val;
+	}
+
+	public final T getOrInit() {
+		if(val == null) val = init();
+		return val;
+	}
+
+	protected abstract T init();
+}
+
+class NodeAux {
+	final List<Node> children = new LinkedList<Node>();
+	final Map<File, AtomicInteger> sequentialcounters = new HashMap<File, AtomicInteger>();
+	final Set<Watcher> datawatches = new HashSet<Watcher>();
+	final Set<Watcher> childrenwatches = new HashSet<Watcher>();
+}
+
 class Node implements Serializable
 {
 	transient Stat stat;
-	Lock L;
+	// Lock L;
 	byte data[];
-	boolean ephemeral;
-	List<Node> children;
-	Map<File, AtomicInteger> sequentialcounters;
-	String path;
-	Set<Watcher> datawatches;
-	Set<Watcher> childrenwatches;
+	final boolean ephemeral;
+	final String path;
+
+	Lazy<NodeAux> aux =
+	 new Lazy<NodeAux>() {
+		@Override protected NodeAux init() {
+			return new NodeAux();
+		}
+	 };
+
 	public Node(byte data[], String tpath)
 	{
 		ephemeral = false;
 		this.data = data;
-		children = new ArrayList<Node>();
-		L = new ReentrantLock();
+		// children = new LinkedList<Node>();
+		// L = new ReentrantLock();
 		stat = new Stat();
 		path = tpath;
-		datawatches = new HashSet<Watcher>();
-		childrenwatches = new HashSet<Watcher>();
-		sequentialcounters = new HashMap<File, AtomicInteger>();
+		// datawatches = new HashSet<Watcher>();
+		// childrenwatches = new HashSet<Watcher>();
+		// sequentialcounters = new HashMap<File, AtomicInteger>();
 	}
-	public void lock()
+	/*public void lock()
 	{
 		L.lock();
 	}
 	public void unlock()
 	{
 		L.unlock();
-	}
+	}*/
 	public byte[] getData()
 	{
 		return data;

@@ -77,6 +77,9 @@ public final class ProxyHandle implements AutoCloseable {
         try {
             appendSocket = new Socket("localhost", port);
             recvSocket = new Socket("localhost", port);
+
+            // appendSocket.setTcpNoDelay(true);
+            recvSocket.setTcpNoDelay(true);
         } catch(UnknownHostException e) {
             throw new RuntimeException(e);
         } catch(IOException e) {
