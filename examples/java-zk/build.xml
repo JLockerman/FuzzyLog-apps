@@ -64,7 +64,7 @@
 			<jvmarg value="-XX:InitialHeapSize=2g"/>
 			<!-- <jvmarg value="-Xms8g"/>
 			<jvmarg value="-Xmx8g"/> -->
-			<!-- <jvmarg value="-XX:+AlwaysPreTouch"/> -->
+			<jvmarg value="-XX:+AlwaysPreTouch"/>
 			<jvmarg value="-XX:MaxHeapFreeRatio=99"/>
 			<jvmarg value="-XX:+UseConcMarkSweepGC"/>
 			<jvmarg value="-XX:+CMSParallelRemarkEnabled"/>

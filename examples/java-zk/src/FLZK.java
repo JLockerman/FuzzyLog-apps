@@ -490,8 +490,8 @@ public final class FLZK implements IZooKeeper, Runnable
 		pendinglist = new ConcurrentHashMap<Object, FLZKOp>();
 		passivelist = new LinkedBlockingQueue<FLZKOp>();
 		callbacklist = new LinkedBlockingQueue<Object>();
-		map = new TreeMap<File, Node>();
-		// map = new HashMap<File, Node>(10_000_000);
+		// map = new TreeMap<File, Node>();
+		map = new HashMap<File, Node>(10_000_000);
 		map.put(new File("/"), new Node("foobar".getBytes(), "/"));
 		existswatches = new HashMap<String, Set<Watcher>>();
 		mycolor = tmycolor;
