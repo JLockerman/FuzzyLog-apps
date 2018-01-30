@@ -22,9 +22,10 @@ abstract class FLZKOp implements Serializable, ProxyHandle.Data
 
 	private static final class NoOp extends FLZKOp{
 		NoOp(int id, byte kind) { super(id, kind); }
-		public void callback(KeeperException k, Object O) {}
-		public boolean hasCallback() { return false; }
+		public final void callback(KeeperException k, Object O) {}
+		public final boolean hasCallback() { return false; }
 		public final byte kind() { return 0; }
+		public final String path() { return null; }
 	}
 
 	static AtomicInteger idcounter = new AtomicInteger();
@@ -59,6 +60,11 @@ abstract class FLZKOp implements Serializable, ProxyHandle.Data
 	public abstract boolean hasCallback();
 
 	public abstract byte kind();
+
+	public abstract String path();
+	public String path2() {
+		return null;
+	}
 
 	@Override
 	public void writeData(DataOutputStream out) throws IOException {

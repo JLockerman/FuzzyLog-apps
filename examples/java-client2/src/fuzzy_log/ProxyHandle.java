@@ -7,6 +7,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.ThreadLocal;
 import java.net.Inet4Address;
 import java.net.Socket;
 import java.net.UnknownHostException;
@@ -30,7 +31,12 @@ public final class ProxyHandle implements AutoCloseable {
     private final DataOutputStream snapshot;
     private final DataInputStream recv;
 
-    private final ByteBufferOutputStream bbos;
+    private final ThreadLocal<ByteBufferOutputStream> bbos =
+        new ThreadLocal<ByteBufferOutputStream>(){
+            @Override protected ByteBufferOutputStream initialValue() {
+                    return new ByteBufferOutputStream();
+            }
+        };
 
     public ProxyHandle(String serverAddr, int port, int... chains) {
         this(serverAddr, port, 0, chains);
@@ -41,7 +47,7 @@ public final class ProxyHandle implements AutoCloseable {
     //}
 
     public ProxyHandle(String serverAddr, int port, long total_clients, int... chains) {
-        boolean waitForSync = total_clients > 0;
+        boolean waitForSync = total_clients > 1;
         try {
             String delosLoc = System.getenv("DELOS_RUST_LOC");
             if(delosLoc == null) throw new NullPointerException("DELOS_RUST_LOC must exist");
@@ -64,7 +70,6 @@ public final class ProxyHandle implements AutoCloseable {
 
             pb.directory(proxDir);
             proxy = pb.start();
-            bbos = new ByteBufferOutputStream();
         } catch(IOException e) {
             throw new RuntimeException(e);
         }
@@ -77,6 +82,7 @@ public final class ProxyHandle implements AutoCloseable {
         try {
             appendSocket = new Socket("localhost", port);
             recvSocket = new Socket("localhost", port);
+            recvSocket.setTcpNoDelay(true);
         } catch(UnknownHostException e) {
             throw new RuntimeException(e);
         } catch(IOException e) {
@@ -109,11 +115,14 @@ public final class ProxyHandle implements AutoCloseable {
 
     public <V extends ProxyHandle.Data> void append(int chain, V data) {
         try {
-            append.writeInt(chain);
+            ByteBufferOutputStream bbos = this.bbos.get();
             DataOutputStream dos = new DataOutputStream(bbos);
             data.writeData(dos);
-            bbos.writeTo(append);
-            append.flush();
+            synchronized(append) {
+                append.writeInt(chain);
+                bbos.writeTo(append);
+                append.flush();
+            }
         } catch(IOException e) {
             throw new RuntimeException(e);
         }
@@ -130,14 +139,17 @@ public final class ProxyHandle implements AutoCloseable {
 
     public <V extends ProxyHandle.Data> void append(int[] chain, V data) {
         try {
-            append.writeInt(-chain.length);
-            for(int i: chain) {
-                append.writeInt(i);
-            }
+            ByteBufferOutputStream bbos = this.bbos.get();
             DataOutputStream dos = new DataOutputStream(bbos);
             data.writeData(dos);
-            bbos.writeTo(append);
-            append.flush();
+            synchronized(append) {
+                append.writeInt(-chain.length);
+                for(int i: chain) {
+                    append.writeInt(i);
+                }
+                bbos.writeTo(append);
+                append.flush();
+            }
         } catch(IOException e) {
             throw new RuntimeException(e);
         }

@@ -3,6 +3,7 @@ import java.util.List;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
@@ -40,24 +41,58 @@ public class FLZKTester
 
 		String serverAddrs = args[0];
 		System.out.println("make handle: server addrs " + serverAddrs +  ", color " + color + ", wait for " + num_clients);
+		final HashMap<String,Integer> partitions = new HashMap<>();
+		final String myRoot;
 		final ProxyHandle client;
-		if(testtype == 0) client = new ProxyHandle(serverAddrs, 13337, color);
-		else if(testtype == 1) client = new ProxyHandle(serverAddrs, 13337, num_clients, color);
-		else throw new RuntimeException("Unknown test type " + testtype);
+		// if(testtype == 0) {
+		// 	partitions.put("/abcd", color);
+		// 	partitions.put("/efgh", color + 1);
+		// 	myRoot = "/abcd";
+		// 	client = new ProxyHandle(serverAddrs, 13337, color);
+		// }
+		// else if(testtype == 1) {
+		// 	for(int i = 0; i < num_clients; i++) {
+		// 		partitions.put("/foo" + i, i + 1);
+		// 	}
+		// 	myRoot = "/foo" + client_num;
+		// 	client = new ProxyHandle(serverAddrs, 13337, num_clients, color);
+		// }
+		// else throw new RuntimeException("Unknown test type " + testtype);
+		switch (testtype) {
+			case 0:
+			case 2: {
+				partitions.put("/abcd", color);
+				partitions.put("/efgh", color + 1);
+				myRoot = "/abcd";
+				client = new ProxyHandle(serverAddrs, 13337, color);
+				break;
+			}
+			case 1: {
+				for(int i = 0; i < num_clients; i++) {
+					partitions.put("/foo" + i, i + 1);
+				}
+				myRoot = "/foo" + client_num;
+				client = new ProxyHandle(serverAddrs, 13337, num_clients, color);
+				break;
+			}
+			default:
+				throw new RuntimeException("Unknown test type " + testtype);
+		}
 
 		// System.out.println("start testing");
 
-		final FLZK zk = new FLZK(client, color, null);
+		final FLZK zk = new FLZK(client, color, myRoot, partitions, null);
 
-		if(testtype==0) {}
-		else if(testtype==1)
-		{
-			// System.out.println("create test");
-			runCreateTest(zk, client_num);
-			System.exit(0);
-		}
-		else {
-			throw new RuntimeException();
+		switch (testtype) {
+			case 0: break;
+			case 1:
+				runCreateTest(zk, myRoot, client_num);
+				System.exit(0);
+			case 2:
+				runRegressionTest(zk, myRoot, client_num);
+				System.exit(0);
+			default:
+				throw new RuntimeException("Unknown test type " + testtype);
 		}
 
 
@@ -247,9 +282,8 @@ public class FLZKTester
 		System.exit(0);
 	}
 
-	private final static void runCreateTest(final FLZK zk, int clientNum) {
+	private final static void runCreateTest(final FLZK zk, final String dirname, int clientNum) {
 		System.out.println("create scaling test start");
-		final String dirname = "/foo" + clientNum;
 		final String dir = dirname + "/";
 		try { zk.create(dir, "AAA".getBytes(), null, CreateMode.PERSISTENT); }
 		catch(KeeperException | InterruptedException e) { throw new RuntimeException(e); }
@@ -299,6 +333,55 @@ public class FLZKTester
 		// 	total_completed += cb.take();
 		// 	Thread.yield();
 		// }
+	}
+
+	private final static void do_assert(boolean condition) {
+		if(!condition) {
+			throw new RuntimeException();
+		}
+	}
+
+	private final static void runRegressionTest(final FLZK zk, final String dirname, int clientNum) {
+		try {
+			for(int i = 0; i < 100; i++) {
+				String path = zk.create("/abcd/" + i, "AAA".getBytes(), null, CreateMode.PERSISTENT);
+				do_assert(path.equals("/abcd/" + i));
+				do_assert(zk.exists("/abcd/" + i, false) != null);
+				byte[] data = zk.getData("/abcd/" + i, false, null);
+				assert(Arrays.equals(data, "AAA".getBytes()));
+				if(i % 2 == 0) {
+					zk.setData("/abcd/" + i, ("BBB" + i).getBytes(), -1);
+					byte[] data2 = zk.getData("/abcd/" + i, false, null);
+					do_assert(Arrays.equals(data2, ("BBB" + i).getBytes()));
+				}
+				if(i % 10 == 0) {
+					zk.rename("/abcd/" + i, "/abcd/" + (1000 + i));
+					//TODO this don't sync
+					// Stat s = zk.exists("/abcd/" + i, false);
+					// if(s != null) {
+					// 	throw new RuntimeException("" + s);
+					// }
+					// do_assert(zk.exists("/abcd/" + i, false) == null);
+				}
+			}
+			for(int i = 0; i < 100; i++) {
+				if(i % 10 != 0)  {
+					do_assert(zk.exists("/abcd/" + i, false) != null);
+					byte[] data = zk.getData("/abcd/" + i, false, null);
+					if(i % 2 == 0) {
+						do_assert(Arrays.equals(data, ("BBB" + i).getBytes()));
+					} else {
+						do_assert(Arrays.equals(data, "AAA".getBytes()));
+					}
+				} else {
+					do_assert(zk.exists("/abcd/" + i, false) == null);
+					do_assert(zk.exists("/abcd/" + (1000 + i), false) != null);
+				}
+			}
+			System.out.println("test done.");
+		} catch(KeeperException | InterruptedException e) {
+			throw new RuntimeException(e);
+		}
 	}
 }
 
