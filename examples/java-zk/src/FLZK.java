@@ -391,6 +391,17 @@ final class RenamePart1 extends FLZKOp implements Rename
 	Object ctxt;
 	AsyncCallback.StringCallback cb;
 
+	@Override
+	public final boolean equals(Object cop) {
+		if(cop == null) return false;
+		if(this == cop) return true;
+		if(cop instanceof RenamePart1) {
+			RenamePart1 rop = (RenamePart1)cop;
+			return rop.oldPath.equals(this.oldPath) && rop.newPath.equals(this.newPath);
+		}
+		return false;
+	}
+
 	public RenamePart1(String oldPath, String newPath,  AsyncCallback.StringCallback cb, Object ctxt)
 	{
 		this.oldPath = oldPath;
@@ -459,6 +470,21 @@ final class RenameOldExists extends FLZKOp implements Rename
 	CreateMode cm;
 	byte[] data;
 	List<ACL> acl;
+
+	@Override
+	public final boolean equals(Object cop) {
+		if(cop == null) return false;
+		if(this == cop) return true;
+		if(cop instanceof RenameOldExists) {
+			RenameOldExists rop = (RenameOldExists)cop;
+			return rop.oldPath.equals(this.oldPath) &&
+				rop.newPath.equals(this.newPath) &&
+				rop.cm.equals(this.cm) &&
+				Arrays.equals(rop.data, this.data) &&
+				rop.acl.equals(this.acl);
+		}
+		return false;
+	}
 
 	public RenameOldExists(String oldPath, String newPath, byte[] data, List<ACL> acl, CreateMode createMode)
 	{
@@ -562,6 +588,17 @@ final class RenameNewEmpty extends FLZKOp implements Rename
 	String oldPath;
 	String newPath;
 
+	@Override
+	public final boolean equals(Object cop) {
+		if(cop == null) return false;
+		if(this == cop) return true;
+		if(cop instanceof RenameNewEmpty) {
+			RenameNewEmpty rop = (RenameNewEmpty)cop;
+			return rop.oldPath.equals(this.oldPath) && rop.newPath.equals(this.newPath);
+		}
+		return false;
+	}
+
 	public RenameNewEmpty(String oldPath, String newPath)
 	{
 		this.oldPath = oldPath;
@@ -625,6 +662,17 @@ final class RenameNack extends FLZKOp implements Rename
 	String oldPath;
 	String newPath;
 
+	@Override
+	public final boolean equals(Object cop) {
+		if(cop == null) return false;
+		if(this == cop) return true;
+		if(cop instanceof RenameNack) {
+			RenameNack rop = (RenameNack)cop;
+			return rop.oldPath.equals(this.oldPath) && rop.newPath.equals(this.newPath);
+		}
+		return false;
+	}
+
 	public RenameNack(String oldPath, String newPath)
 	{
 		this.oldPath = oldPath;
@@ -652,6 +700,7 @@ final class RenameNack extends FLZKOp implements Rename
 
 	@Override
 	public final void writeData(DataOutputStream out) throws IOException {
+		super.writeData(out);
 		out.writeUTF(oldPath);
 		out.writeUTF(newPath);
 	}
@@ -740,7 +789,7 @@ final class OpData implements ProxyHandle.Data {
 				rn.readFields(in);
 				return new OpData(rn);
 
-			default: throw new IOException("unrecoginzed kind " + flop.kind);
+			default: throw new IOException("unrecoginzed kind " + flop.kind + " " + flop.id + " " + flop.idcounter.get());
 		}
 	}
 }
@@ -750,7 +799,7 @@ final class MarkerOp extends FLZKOp
 
 	public static final MarkerOp Instance = new MarkerOp();
 
-	public static final byte kind = 126;
+	public static final byte kind = 125;
 	public final byte kind() { return this.kind; }
 
 	public MarkerOp() {}
@@ -800,16 +849,6 @@ final class Sequenced<T> {
 	@Override
 	public final String toString() {
 		return "(" + sequenceNumber + ", " + t + ")";
-	}
-}
-
-final class PendingRename {
-	public final RenamePart1 part1;
-	public RenameOldExists oldExists;
-	public RenameNewEmpty newEmpty;
-
-	public PendingRename(RenamePart1 part1) {
-		this.part1 = part1;
 	}
 }
 
@@ -911,8 +950,18 @@ public final class FLZK implements IZooKeeper, Runnable
 			while(true) {
 				try {
 					FLZKOp zop = fromDe.take();
-					FLZKOp mycop = pendingOps.remove(zop.id);
-					if(mycop != null) zop = mycop;
+					if(!(zop instanceof Rename)) {
+						FLZKOp mycop = pendingOps.remove(zop.id);
+						if(mycop != null) {
+							zop = mycop;
+						}
+					} else {
+						FLZKOp mycop = pendingOps.get(zop.id);
+						if(mycop != null && mycop.equals(zop)) {
+							zop = mycop;
+							pendingOps.remove(zop.id);
+						}
+					}
 					Object ret = null;
 					try
 					{
@@ -969,7 +1018,11 @@ public final class FLZK implements IZooKeeper, Runnable
 					int root2End = flop.path2().indexOf('/', 1);
 					otherColor = colorForRoot.get(flop.path2().substring(0, root2End));
 				}
-				if (otherColor != mycolor) client.append(new int[]{mycolor, otherColor}, flop);
+				if (otherColor != mycolor) {
+					if(flop instanceof RenamePart1) client.append(new int[]{mycolor, otherColor}, flop);
+					else client.multiple_appends(new int[]{mycolor, otherColor}, flop);
+					// client.append(new int[]{mycolor, otherColor}, flop);
+				}
 				else client.append(mycolor, flop);
 			} else client.append(mycolor, flop);
 			passivelist.add(WakeOp.Instance);
@@ -1097,12 +1150,11 @@ public final class FLZK implements IZooKeeper, Runnable
 			File oldFile = new File(oldPath);
 			if (oldFile.toPath().startsWith(myRoot)) {
 				File F = oldFile;
-				if(!map.containsKey(F)) {
+				Node N = map.get(F);
+				if(N == null) {
 					send_rename_nack(oldPath, newPath);
 					return;
 				}
-
-				Node N = map.get(F);
 				//TODO
 				// if(rop.version!=-1 && N.stat.getVersion()!=rop.version)
 				// 	return send_rename_nack(oldPath, newPath);
@@ -1120,12 +1172,19 @@ public final class FLZK implements IZooKeeper, Runnable
 			File newFile = new File(newPath);
 			if (newFile.toPath().startsWith(myRoot)){ //the other path must start with my root
 				File f = newFile;
-				if(map.containsKey(f)) {
+
+				Node oldNode = map.get(f);
+				if(oldNode != null) {
 					send_rename_nack(oldPath, newPath);
+					oldNode.pendingRename = new PendingRename(rop);
 					return;
 				}
+
+				Node newnode = new Node(null, newPath);
+				newnode.pendingRename = new PendingRename(rop);
+
 				Node N = map.get(f.getParentFile());
-				if(!map.containsKey(f.getParentFile())) {
+				if(N == null) {
 					send_rename_nack(oldPath, newPath);
 					return;
 				}
@@ -1135,8 +1194,6 @@ public final class FLZK implements IZooKeeper, Runnable
 					return;
 				}
 				send_rename_new_empty(oldPath, newPath);
-				Node newnode = new Node(null, newPath);
-				newnode.pendingRename = new PendingRename(rop);
 				map.put(f, newnode);
 			}
 		}
@@ -1144,6 +1201,7 @@ public final class FLZK implements IZooKeeper, Runnable
 	}
 
 	public void send_rename_nack(String oldPath, String newPath) {
+		// throw new RuntimeException("NACK " + oldPath + " " + newPath);
 		RenameNack nack = new RenameNack(oldPath, newPath);
 		processAsync(nack, true);
 	}
@@ -1166,12 +1224,13 @@ public final class FLZK implements IZooKeeper, Runnable
 			//TODO just use tring prefix?
 			if (oldFile.toPath().startsWith(myRoot)) {
 				Node n = map.get(oldFile);
-				if(n.pendingRename == null) return;
+				if(n == null) return;
 				if(!n.pendingRename.part1.newPath.equals(rop.newPath)) {
 					n.pendingOps.addLast(rop);
 					return;
 				}
 				n.pendingRename.newEmpty = rop;
+				if(n.pendingRename.nack) abortRename(n);
 				if(n.pendingRename.oldExists != null) finishRenameRemove(oldFile, n);
 			}
 		}
@@ -1180,13 +1239,17 @@ public final class FLZK implements IZooKeeper, Runnable
 			File newFile = new File(newPath);
 			if (newFile.toPath().startsWith(myRoot)) {
 				Node n = map.get(newFile);
-				if(n.pendingRename == null) return;
+				if(n == null) return;
 				if(!n.pendingRename.part1.oldPath.equals(rop.oldPath)) {
 					n.pendingOps.addLast(rop);
 					return;
 				}
 				n.pendingRename.newEmpty = rop;
-				if(n.pendingRename.oldExists != null) finishRenameCreate(newFile, n);
+				if(n.pendingRename.nack) abortRename(n);
+				if(n.pendingRename.oldExists != null) {
+					byte[] data = n.pendingRename.oldExists.data;
+					finishRenameCreate(newFile, n, data);
+				}
 			}
 		}
 	}
@@ -1198,12 +1261,12 @@ public final class FLZK implements IZooKeeper, Runnable
 			File oldFile = new File(oldPath);
 			if (oldFile.toPath().startsWith(myRoot)) {
 				Node n = map.get(oldFile);
-				if(n.pendingRename == null) return;
 				if(!n.pendingRename.part1.newPath.equals(rop.newPath)) {
 					n.pendingOps.addLast(rop);
 					return;
 				}
 				n.pendingRename.oldExists = rop;
+				if(n.pendingRename.nack) abortRename(n);
 				if(n.pendingRename.newEmpty != null) finishRenameRemove(oldFile, n);
 			}
 		}
@@ -1212,14 +1275,17 @@ public final class FLZK implements IZooKeeper, Runnable
 			File newFile = new File(newPath);
 			if (newFile.toPath().startsWith(myRoot)) {
 				Node n = map.get(newFile);
-				if(n.pendingRename == null) return;
+				if(n == null) return;
 				if(!n.pendingRename.part1.oldPath.equals(rop.oldPath)) {
 					n.pendingOps.addLast(rop);
 					return;
 				}
-				n.data = rop.data;
 				n.pendingRename.oldExists = rop;
-				if(n.pendingRename.newEmpty != null) finishRenameCreate(newFile, n);
+				if(n.pendingRename.nack) {
+					map.remove(newFile);
+					abortRename(n);
+				};
+				if(n.pendingRename.newEmpty != null) finishRenameCreate(newFile, n, rop.data);
 			}
 		}
 	}
@@ -1230,12 +1296,13 @@ public final class FLZK implements IZooKeeper, Runnable
 			File oldFile = new File(oldPath);
 			if (oldFile.toPath().startsWith(myRoot)) {
 				Node n = map.get(oldFile);
-				if(n.pendingRename == null) return;
+				if(n == null) return;
 				if(!n.pendingRename.part1.newPath.equals(rop.newPath)) {
 					n.pendingOps.addLast(rop);
 					return;
 				}
-				abortRename(n);
+				else if(n.pendingRename.nack) abortRename(n);
+				else n.pendingRename.nack = true;
 			}
 		}
 		{
@@ -1243,12 +1310,13 @@ public final class FLZK implements IZooKeeper, Runnable
 			File newFile = new File(newPath);
 			if (newFile.toPath().startsWith(myRoot)) {
 				Node n = map.get(newFile);
-				if(n.pendingRename == null) return;
+				if(n == null) return;
 				if(!n.pendingRename.part1.oldPath.equals(rop.oldPath)) {
 					n.pendingOps.addLast(rop);
 					return;
 				}
-				abortRename(n);
+				else if(n.pendingRename.nack) abortRename(n);
+				else n.pendingRename.nack = true;
 			}
 		}
 	}
@@ -1266,7 +1334,7 @@ public final class FLZK implements IZooKeeper, Runnable
 		flushPendingOps(n);
 	}
 
-	public void finishRenameCreate(File f, Node newnode) throws KeeperException {
+	public void finishRenameCreate(File f, Node newnode, byte[] data) throws KeeperException {
 		//TODO
 		// if(newnode.cm.isSequential())
 		// {
@@ -1282,6 +1350,7 @@ public final class FLZK implements IZooKeeper, Runnable
 		// 	f = new File(path);
 		// }
 
+		newnode.data = data;
 		newnode.stat.setCzxid(numentries); //copy stat either here or on read
 		//TODO: is it okay to use numentries here? will this be problematic if different clients see nodes in different orders?
 		Node N = map.get(f.getParentFile());
@@ -1308,10 +1377,9 @@ public final class FLZK implements IZooKeeper, Runnable
 		if(map.containsKey(f))
 			throw new KeeperException.NodeExistsException();
 
-		if(!map.containsKey(f.getParentFile()))
-			throw new KeeperException.NoNodeException();
-
 		Node N = map.get(f.getParentFile());
+		if(N == null)
+			throw new KeeperException.NoNodeException();
 
 		if(cop.cm.isEphemeral()) throw new RuntimeException("not yet supported!");
 		if(N.isEphemeral())
@@ -1785,6 +1853,18 @@ class AsyncToSync implements AsyncCallback.StringCallback, AsyncCallback.StatCal
 			results[1] = children;
 			results.notify();
 		}
+	}
+}
+
+final class PendingRename {
+	public final RenamePart1 part1;
+	public RenameOldExists oldExists;
+	public RenameNewEmpty newEmpty;
+	public boolean nack;
+
+	public PendingRename(RenamePart1 part1) {
+		this.part1 = part1;
+		nack = false;
 	}
 }
 

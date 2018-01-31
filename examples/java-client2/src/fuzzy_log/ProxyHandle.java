@@ -128,6 +128,25 @@ public final class ProxyHandle implements AutoCloseable {
         }
     }
 
+    public <V extends ProxyHandle.Data> void multiple_appends(int[] chains, V data) {
+        try {
+            ByteBufferOutputStream bbos = this.bbos.get();
+            DataOutputStream dos = new DataOutputStream(bbos);
+            data.writeData(dos);
+            bbos.flip();
+            synchronized(append) {
+                for(int i = 0; i < chains.length; i++) {
+                    append.writeInt(chains[i]);
+                    bbos.writeContents(append);
+                }
+                append.flush();
+            }
+            bbos.clear();
+        } catch(IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public void append(int[] chain, byte[] data) {
         //append(chain, data, data.length);
         append(chain, new ByteArrayData(data));
@@ -357,6 +376,20 @@ public final class ProxyHandle implements AutoCloseable {
             int len = this.buffer.remaining();
             os.writeInt(len);
             os.write(this.buffer.array(), 0, len);
+            this.buffer.clear();
+        }
+
+        public final void flip() {
+            this.buffer.flip();
+        }
+
+        public final void writeContents(DataOutputStream os) throws IOException {
+            int len = this.buffer.remaining();
+            os.writeInt(len);
+            os.write(this.buffer.array(), 0, len);
+        }
+
+        public final void clear() {
             this.buffer.clear();
         }
 	}
