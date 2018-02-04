@@ -16,10 +16,35 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
-public final class ProxyHandle implements AutoCloseable {
+public final class ProxyHandle<V extends ProxyHandle.Data> implements AutoCloseable {
+
+    private static final class AppendData<V> {
+        private final int chain;
+        private final int[] chains;
+        private final V data;
+        private final boolean atomic;
+
+        private AppendData(int chain, V data) {
+            this.chain = chain;
+            this.data = data;
+            this.chains = null;
+            this.atomic = false;
+        }
+
+        private AppendData(int[] chains, V data, boolean atomic) {
+            this.chain = 0;
+            this.data = data;
+            this.chains = chains;
+            this.atomic = atomic;
+        }
+
+    }
+
+    private final LinkedBlockingQueue<AppendData<V>> to_append;
 
     private final Process proxy;
 
@@ -31,12 +56,14 @@ public final class ProxyHandle implements AutoCloseable {
     private final DataOutputStream snapshot;
     private final DataInputStream recv;
 
-    private final ThreadLocal<ByteBufferOutputStream> bbos =
-        new ThreadLocal<ByteBufferOutputStream>(){
-            @Override protected ByteBufferOutputStream initialValue() {
-                    return new ByteBufferOutputStream();
-            }
-        };
+    // private final ThreadLocal<ByteBufferOutputStream> bbos =
+    //     new ThreadLocal<ByteBufferOutputStream>(){
+    //         @Override protected ByteBufferOutputStream initialValue() {
+    //                 return new ByteBufferOutputStream();
+    //         }
+    //     };
+
+    ByteBufferOutputStream bbos = new ByteBufferOutputStream();
 
     public ProxyHandle(String serverAddr, int port, int... chains) {
         this(serverAddr, port, 0, chains);
@@ -65,8 +92,9 @@ public final class ProxyHandle implements AutoCloseable {
                 args.add("" + total_clients);
             }
             final ProcessBuilder pb = new ProcessBuilder(args);
-            // pb.inheritIO();
-            // pb.environment().put("RUST_BACKTRACE", "short");
+            pb.inheritIO();
+            pb.environment().put("RUST_BACKTRACE", "1");
+            // pb.environment().put("RUST_LOG", "fuzzy_log_client");
 
             pb.directory(proxDir);
             proxy = pb.start();
@@ -103,76 +131,113 @@ public final class ProxyHandle implements AutoCloseable {
         } catch(IOException e) {
             throw new RuntimeException(e);
         }
-    }
 
-    public void append(int chain, byte[] data) {
-        append(chain, new ByteArrayData(data));
-    }
+        this.to_append = new LinkedBlockingQueue<>();
 
-    public void append(int chain, byte[] data, int length) {
-        append(chain, new ByteArrayData(data, 0, length));
-    }
-
-    public <V extends ProxyHandle.Data> void append(int chain, V data) {
-        try {
-            ByteBufferOutputStream bbos = this.bbos.get();
-            DataOutputStream dos = new DataOutputStream(bbos);
-            data.writeData(dos);
-            synchronized(append) {
-                append.writeInt(chain);
-                bbos.writeTo(append);
-                append.flush();
-            }
-        } catch(IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public <V extends ProxyHandle.Data> void multiple_appends(int[] chains, V data) {
-        try {
-            ByteBufferOutputStream bbos = this.bbos.get();
-            DataOutputStream dos = new DataOutputStream(bbos);
-            data.writeData(dos);
-            bbos.flip();
-            synchronized(append) {
-                for(int i = 0; i < chains.length; i++) {
-                    append.writeInt(chains[i]);
-                    bbos.writeContents(append);
+        new Thread(() -> {
+            try {
+                while(true) {
+                    for(AppendData<V> app = to_append.take(); app != null; app = to_append.poll()) {
+                        DataOutputStream dos = new DataOutputStream(bbos);
+                        app.data.writeData(dos);
+                        dos.flush();
+                        if(app.chains == null) {
+                            append.writeInt(app.chain);
+                            bbos.writeTo(append);
+                        } else if(app.atomic) {
+                            append.writeInt(-app.chains.length);
+                            for(int i: app.chains) {
+                                append.writeInt(i);
+                            }
+                            bbos.writeTo(append);
+                        } else {
+                            bbos.flip();
+                            for(int i = 0; i < app.chains.length; i++) {
+                                append.writeInt(app.chains[i]);
+                                bbos.writeContents(append);
+                            }
+                            bbos.clear();
+                        }
+                    }
+                    append.flush();
                 }
-                append.flush();
+            } catch(IOException | InterruptedException e) {
+                throw new RuntimeException(e);
             }
-            bbos.clear();
-        } catch(IOException e) {
-            throw new RuntimeException(e);
-        }
+		}).start();
     }
 
-    public void append(int[] chain, byte[] data) {
-        //append(chain, data, data.length);
-        append(chain, new ByteArrayData(data));
+    // public void append(int chain, byte[] data) {
+    //     append(chain, new ByteArrayData(data));
+    // }
+
+    // public void append(int chain, byte[] data, int length) {
+    //     append(chain, new ByteArrayData(data, 0, length));
+    // }
+
+    public void append(int chain, V data) {
+        this.to_append.add(new AppendData(chain, data));
+        // try {
+        //     ByteBufferOutputStream bbos = this.bbos.get();
+        //     DataOutputStream dos = new DataOutputStream(bbos);
+        //     data.writeData(dos);
+        //     synchronized(append) {
+        //         append.writeInt(chain);
+        //         bbos.writeTo(append);
+        //         append.flush();
+        //     }
+        // } catch(IOException e) {
+        //     throw new RuntimeException(e);
+        // }
     }
 
-    public void append(int[] chain, byte[] data, int length) {
-        append(chain, new ByteArrayData(data, 0, length));
+    public void multiple_appends(int[] chains, V data) {
+        this.to_append.add(new AppendData(chains, data, false));
+        // try {
+        //     ByteBufferOutputStream bbos = this.bbos.get();
+        //     DataOutputStream dos = new DataOutputStream(bbos);
+        //     data.writeData(dos);
+        //     bbos.flip();
+        //     synchronized(append) {
+        //         for(int i = 0; i < chains.length; i++) {
+        //             append.writeInt(chains[i]);
+        //             bbos.writeContents(append);
+        //         }
+        //         append.flush();
+        //     }
+        //     bbos.clear();
+        // } catch(IOException e) {
+        //     throw new RuntimeException(e);
+        // }
     }
 
-    public <V extends ProxyHandle.Data> void append(int[] chain, V data) {
-        try {
-            ByteBufferOutputStream bbos = this.bbos.get();
-            DataOutputStream dos = new DataOutputStream(bbos);
-            data.writeData(dos);
-            synchronized(append) {
-                append.writeInt(-chain.length);
-                for(int i: chain) {
-                    append.writeInt(i);
-                }
-                bbos.writeTo(append);
-                append.flush();
-            }
-        } catch(IOException e) {
-            throw new RuntimeException(e);
-        }
+    public void append(int[] chains, V data) {
+        this.to_append.add(new AppendData(chains, data, true));
+        // try {
+        //     ByteBufferOutputStream bbos = this.bbos.get();
+        //     DataOutputStream dos = new DataOutputStream(bbos);
+        //     data.writeData(dos);
+        //     synchronized(append) {
+        //         append.writeInt(-chain.length);
+        //         for(int i: chain) {
+        //             append.writeInt(i);
+        //         }
+        //         bbos.writeTo(append);
+        //         append.flush();
+        //     }
+        // } catch(IOException e) {
+        //     throw new RuntimeException(e);
+        // }
     }
+
+    // public void append(int[] chain, byte[] data) {
+    //     //append(chain, data, data.length);
+    //     append(chain, new ByteArrayData(data));
+    // }
+
+    // public void append(int[] chain, byte[] data, int length) {
+    //     append(chain, new ByteArrayData(data, 0, length));
+    // }
 
     public final ProxyHandle.Bytes snapshot_and_get() {
         try {
@@ -227,7 +292,7 @@ public final class ProxyHandle implements AutoCloseable {
         }
     }
 
-    public final <E extends Data> ProxyHandle.DataStream<E> snapshot_and_get_data(E reader) {
+    public final <E extends Data> ProxyHandle<V>.DataStream<E> snapshot_and_get_data(E reader) {
         try {
             snapshot.write(0);
             snapshot.flush();

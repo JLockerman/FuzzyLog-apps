@@ -355,7 +355,7 @@ public class Test {
 
                 long start = System.nanoTime();
                 Thread writer = new Thread(() -> {
-                    byte[] data = new byte[461];
+                    ProxyHandle.ByteArrayData data = new ProxyHandle.ByteArrayData(new byte[461]);
                     for(int i = 0; i < numAppends; i ++) {
                         h.append(7, data);
                     }
@@ -365,8 +365,9 @@ public class Test {
 
                 int gotten = 0;
                 while(gotten < numAppends) {
-                    ProxyHandle.Bytes events = h.snapshot_and_get();
-                    for(byte[] event: events) gotten += 1;
+                    throw new RuntimeException("FIXME");
+                    // ProxyHandle.Bytes events = h.snapshot_and_get();
+                    // for(byte[] event: events) gotten += 1;
                 }
 
                 try {

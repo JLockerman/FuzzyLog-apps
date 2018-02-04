@@ -35,6 +35,7 @@ public class FLZKTester
 		int client_num = Integer.parseInt(args[2]);
 		long num_clients = Integer.parseInt(args[3]);
 		int color = client_num+1;
+		FLZKOp.client = client_num;
 		//FuzzyLog appendclient = new FuzzyLog(new String[]{args[0]}, new int[]{color});
 //		ProxyClient client2 = new ProxyClient(args[0], Integer.parseInt(args[1])+1);
 		//FuzzyLog playbackclient = appendclient;
@@ -43,7 +44,7 @@ public class FLZKTester
 		System.out.println("make handle: server addrs " + serverAddrs +  ", color " + color + ", wait for " + num_clients);
 		final HashMap<String,Integer> partitions = new HashMap<>();
 		final String myRoot;
-		final ProxyHandle client;
+		final ProxyHandle<FLZKOp> client;
 		String renameRoot = "";
 		// if(testtype == 0) {
 		// 	partitions.put("/abcd", color);
@@ -88,8 +89,7 @@ public class FLZKTester
 		switch (testtype) {
 			case 0: break;
 			case 1:
-
-				runCreateTest(zk, myRoot, renameRoot, client_num);
+				runCreateTest(zk, myRoot, renameRoot, client_num, (int)num_clients);
 				System.exit(0);
 			case 2:
 				runRegressionTest(zk, myRoot, client_num);
@@ -277,7 +277,7 @@ public class FLZKTester
 			long starttime = System.nanoTime();
 			for(int i=0;i<numtests;i++)
 			{
-				zk.rename("/abcd/" + i, "/abcd/r" + i);
+				zk.rename("/abcd/" + i, "/abcd/r" + i, null);
 			}
 			while(zk.exists("/abcd/r" + (numtests - 1), false) == null);
 			long stoptime = System.nanoTime();
@@ -297,10 +297,10 @@ public class FLZKTester
 		System.exit(0);
 	}
 
-	private final static void runCreateTest(final FLZK zk, final String dirname, final String renameDirname, int clientNum) {
+	private final static void runCreateTest(final FLZK zk, final String dirname, final String renameDirname, int clientNum, int numClients) {
 		System.out.println("create scaling test start");
 		final String dir = dirname + "/";
-		final String renameDir = renameDirname + "/";
+		// final String renameDir = renameDirname + "/";
 		// try { zk.create(dir, "AAA".getBytes(), null, CreateMode.PERSISTENT); }
 		// catch(KeeperException | InterruptedException e) {
 		// 	System.out.println("could not create " + dirname);
@@ -311,35 +311,49 @@ public class FLZKTester
 		AtomicBoolean stopped_send = new AtomicBoolean(false);
 		AtomicInteger numSent = new AtomicInteger(0);
 
-		CountingCB cb = new CountingCB();
+		CountingCB2 cb = new CountingCB2();
 
 		Thread createThread = new Thread(() -> {
 			Random rand = new Random(clientNum + 1111);
 			int fileNum = 0;
 			int renameNum = 0;
+			int window = 0;
 			while(!done.get()) {
-				for(int i = 0; i < 500; i++) {
-					if(rand.nextInt(100) < 1 && renameNum + 10000 < fileNum) {
-						zk.rename(dir + renameNum, renameDir + "r" + clientNum + "_"  + renameNum + "@" + fileNum);
+				//most efficent @ 1000: 12kHz, 2000: 29kHz, 5000: 30kHz!?
+				//freezes @ 500, 750, 1000!?
+				//slow, no freeze @ 100
+				while(window - cb.localCount() > 5000) { Thread.yield(); }
+				// for(int i = 0; i < 500; i++) {
+					if(rand.nextInt(100) < 1 && renameNum < cb.localCount()) {
+						int renameDir = rand.nextInt(numClients);
+						zk.rename(dir + renameNum, "/foo" + renameDir + "/r" + clientNum + "_"  + renameNum, cb);
 						renameNum++;
 					} else {
 						zk.create(dir + fileNum, "AAA".getBytes(), null, CreateMode.PERSISTENT, cb, null);
 						fileNum++;
 					}
-				}
+					window++;
+					numSent.getAndIncrement();
+				// }
 			}
-			numSent.set(fileNum + renameNum);
+			// numSent.set(fileNum + renameNum);
 			stopped_send.set(true);
 		});
 		createThread.start();
 		final int numRounds = 10;
 		int total_completed = 0;
+		int total_sent = 0;
 		final int[] complete = new int[numRounds];
+		final int[] sent = new int[numRounds];
+		final int[] outstanding = new int[numRounds];
 		for(int round = 0; round < numRounds; round++) {
 			try { Thread.sleep(3000); }
 			catch(InterruptedException e) { throw new RuntimeException(e); }
 			complete[round] = cb.take();
+			sent[round] = numSent.getAndSet(0);
 			total_completed += complete[round];
+			total_sent += sent[round];
+			outstanding[round] = total_sent - total_completed;
 		}
 		try { Thread.sleep(3000); }
 		catch(InterruptedException e) { }
@@ -352,7 +366,11 @@ public class FLZKTester
 		for(int i = 0; i < complete.length; i++) total += (complete[i] / 3);
 		long avg = total / complete.length;
 		System.out.printf("> %d: %6d Hz\n", clientNum, avg);
-		System.out.println("" + clientNum + ": " + Arrays.toString(complete));
+		System.out.println(
+			"" + clientNum + ": " + Arrays.toString(complete) + "\n" +
+			clientNum + ": " + Arrays.toString(sent) + "\n" +
+			clientNum + ": " + Arrays.toString(outstanding)
+		);
 		while(!stopped_send.get()) { Thread.yield(); }
 		try { Thread.sleep(30); }
 		catch(InterruptedException e) { }
@@ -378,6 +396,7 @@ public class FLZKTester
 	}
 
 	private final static void runRegressionTest(final FLZK zk, final String dirname, int clientNum) {
+		System.out.println("Start regression test.");
 		try {
 			for(int i = 0; i < 100; i++) {
 				String path = zk.create("/abcd/" + i, ("AAA" + i).getBytes(), null, CreateMode.PERSISTENT);
@@ -391,7 +410,7 @@ public class FLZKTester
 					do_assert(Arrays.equals(data2, ("BBB" + i).getBytes()));
 				}
 				if(i % 10 == 0) {
-					zk.rename("/abcd/" + i, "/abcd/" + i + "_" + i);
+					zk.rename("/abcd/" + i, "/abcd/" + i + "_" + i, null);
 					//TODO this don't sync
 					// Stat s = zk.exists("/abcd/" + i, false);
 					// if(s != null) {
@@ -399,8 +418,8 @@ public class FLZKTester
 					// }
 					// do_assert(zk.exists("/abcd/" + i, false) == null);
 				}
-				if(i > 11 && i % 11 == 0) zk.rename("/abcd/" + i, "/abcd/" + (i - 11));
-				if(i > 0 && i % 11 == 0) zk.rename("/abcd/Q" + i, "/abcd/" + (i + 100));
+				if(i > 11 && i % 11 == 0) zk.rename("/abcd/" + i, "/abcd/" + (i - 11), null);
+				if(i > 0 && i % 11 == 0) zk.rename("/abcd/Q" + i, "/abcd/P" + i, null);
 			}
 			for(int i = 0; i < 100; i++) {
 				if(i % 10 != 0)  {
@@ -430,7 +449,7 @@ public class FLZKTester
 				}
 				if(i > 1 && i % 11 == 0) {
 					do_assert(zk.exists("/abcd/Q" + i, false) == null, i);
-					do_assert(zk.exists("/abcd/" + (i + 100), false) == null, i);
+					do_assert(zk.exists("/abcd/P" + i, false) == null, i);
 				}
 			}
 			System.out.println("test done.");
@@ -490,6 +509,67 @@ class CountingCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCall
 	private final void bump()
 	{
 		int done = numDone.incrementAndGet();
+	}
+}
+
+
+class CountingCB2 implements AsyncCallback.StringCallback, AsyncCallback.VoidCallback, AsyncCallback.StatCallback, AsyncCallback.DataCallback, AsyncCallback.ChildrenCallback {
+	private final AtomicInteger numDone;
+	private int localNumDone;
+
+	public CountingCB2()
+	{
+		numDone = new AtomicInteger();
+		localNumDone = 0;
+	}
+
+	public final int take() {
+		return numDone.getAndSet(0);
+	}
+
+	@Override
+	public final void processResult(int rc, String path, Object ctx, String name)
+	{
+		bump();
+	}
+
+
+	@Override
+	public final void processResult(int rc, String path, Object ctx)
+	{
+		bump();
+	}
+
+
+	@Override
+	public final void processResult(int rc, String path, Object ctx, Stat stat)
+	{
+		bump();
+	}
+
+
+	@Override
+	public final void processResult(int rc, String path, Object ctx, byte[] data,
+			Stat stat)
+	{
+		bump();
+	}
+
+
+	@Override
+	public final void processResult(int rc, String path, Object ctx, List<String> children)
+	{
+		bump();
+	}
+
+	private final void bump()
+	{
+		numDone.incrementAndGet();
+		localNumDone += 1;
+	}
+
+	public final int localCount() {
+		return this.localNumDone;
 	}
 }
 
