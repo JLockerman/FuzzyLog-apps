@@ -34,4 +34,4 @@ $(DEPSDIR)/stamp:
 .PHONY: clean
 
 clean:
-	rm -rf build $(DEPSDIR) 
+	rm -rf build $(DEPSDIR)
