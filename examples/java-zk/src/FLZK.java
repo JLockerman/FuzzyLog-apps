@@ -7,6 +7,7 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
+
 import org.apache.zookeeper.AsyncCallback;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.zookeeper.KeeperException.Code;
@@ -14,6 +15,7 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -865,7 +867,6 @@ public final class FLZK implements IZooKeeper, Runnable
 	protected final ProxyHandle<FLZKOp> client;
 	private final HashMap<File, Node> map;
 
-	private final ConcurrentHashMap<FLZKOp.Id, FLZKOp> pendingMuts;  //mutating operations, must sunchronize on appendclient
 	private final LinkedBlockingQueue<FLZKOp> passivelist; //non-mutating operations
 
 	private final LinkedBlockingQueue<Object> callbacklist;
@@ -889,7 +890,6 @@ public final class FLZK implements IZooKeeper, Runnable
 		this.client = client;
 
 		defaultwatcher = W;
-		pendingMuts = new ConcurrentHashMap<FLZKOp.Id, FLZKOp>();
 		passivelist = new LinkedBlockingQueue<FLZKOp>();
 		callbacklist = new LinkedBlockingQueue<Object>();
 		map = new HashMap<File, Node>();
@@ -955,48 +955,11 @@ public final class FLZK implements IZooKeeper, Runnable
 
 		new Thread(() -> {
 			// int objectsApplied = 0;
-			ArrayDeque<FLZKOp> earlyOps = new ArrayDeque<>();
-			int boredLoops = 0;
 			while(true) {
+				//FIXME
 				boolean noWork = true;
 				try {
-					int earlyLen = earlyOps.size();
-					for(int i = 0; i < earlyLen; i++) {
-						FLZKOp zop = earlyOps.removeFirst();
-						FLZKOp mycop = pendingMuts.remove(zop.id);
-						if(mycop != null) zop = mycop;
-						// else if(zop.id.client == FLZKOp.client) {
-						// 	earlyOps.addLast(zop);
-						// 	continue;
-						// }
-						noWork = false;
-						Object ret = null;
-						try
-						{
-							ret = this.apply(zop);
-							if(zop.hasCallback()) {
-								schedulecallback(zop, null, ret);
-							}
-
-						}
-						catch(KeeperException ke)
-						{
-							if(zop.hasCallback()) schedulecallback(zop, ke, ret);
-						}
-					}
-					FLZKOp zop;
-					if(earlyOps.isEmpty()) {
-						zop = fromDe.take();
-					} else {
-						zop = fromDe.poll();
-					}
-					FLZKOp mycop = pendingMuts.remove(zop.id);
-					if(mycop != null) zop = mycop;
-					else if(zop.id.client == FLZKOp.client) {
-						earlyOps.addLast(zop);
-						continue;
-					}
-					noWork = false;
+					FLZKOp zop = fromDe.take();
 					Object ret = null;
 					try
 					{
@@ -1014,12 +977,6 @@ public final class FLZK implements IZooKeeper, Runnable
 					{
 						if(zop.hasCallback()) schedulecallback(zop, ke, ret);
 							//mycop.callback(ke, ret);
-					}
-					if(noWork) boredLoops += 1;
-					else boredLoops = 0;
-					if(boredLoops > 5) {
-						boredLoops = 0;
-						Thread.yield();
 					}
 				} catch(InterruptedException e) { }
 			}
@@ -1039,8 +996,8 @@ public final class FLZK implements IZooKeeper, Runnable
 	{
 		//signal to learning thread
 		// if(debugprints) System.out.println("process");
-		if(mutate)
-		{
+		passivelist.add(flop);
+		if(mutate) {
 			// client.append(mycolor, ObjectToBytes(flop));
 			// CacheArrayOutputStream out = ObjectToBytes(flop, this.writeBuffer);
 			// pendingMuts.put(flop.id, flop);
@@ -1050,7 +1007,6 @@ public final class FLZK implements IZooKeeper, Runnable
 			//we don't have to wait for the append to finish;
 			//we just wait for it to appear in the learner thread
 			// if(debugprints) System.out.println("process " + flop);
-			pendingMuts.put(flop.id, flop);
 			if(flop instanceof Rename) {
 				int root1End = flop.path().indexOf('/', 1);
 				int otherColor = colorForRoot.get(flop.path().substring(0, root1End));
@@ -1069,11 +1025,7 @@ public final class FLZK implements IZooKeeper, Runnable
 				}
 				else client.append(mycolor, flop);
 			} else client.append(mycolor, flop);
-			passivelist.add(WakeOp.Instance);
-		}
-		else
-		{
-			passivelist.add(flop);
+
 		}
 
 	}
@@ -1101,29 +1053,61 @@ public final class FLZK implements IZooKeeper, Runnable
 
 	private void sync() throws IOException, InterruptedException
 	{
+		ArrayDeque<FLZKOp> waitingMuts = new ArrayDeque();
+		ArrayDeque<FLZKOp> waitingObs = new ArrayDeque();
+		HashMap<FLZKOp.Id, FLZKOp> waitingRenames = new HashMap<>();
 		while(true) {
-			FLZKOp pop;
-			if(pendingMuts.isEmpty()) {
-				pop = passivelist.take();
-			} else {
-				pop = passivelist.poll();
-			}
-			if(pendingMuts.isEmpty() && pop == MarkerOp.Instance) {
-				pop = passivelist.take();
-			}
-
-			// if(debugprints) System.out.println("sync");
-			// int objectsFound = 0;
-			// long startTime = System.nanoTime();
-			// new passive events must wait for the next snapshot
+			FLZKOp pop = passivelist.poll(1000, TimeUnit.MICROSECONDS);
 			passivelist.offer(MarkerOp.Instance);
 			// snapshot mycolor
 			ProxyHandle<FLZKOp>.DataStream<OpData> events = client.snapshot_and_get_data(OpData.BUILDER);
+
+			drain_passive: for(; pop != MarkerOp.Instance; pop = passivelist.poll()) {
+				if (pop == null || pop == WakeOp.Instance) continue drain_passive;
+				if (pop == MarkerOp.Instance) break drain_passive;
+				if ((pop instanceof GetOp) || (pop instanceof GetChildrenOp)  || (pop instanceof ExistsOp))
+					waitingObs.offerLast(pop);
+				else if(pop instanceof Rename) waitingRenames.put(pop.id, pop);
+				else waitingMuts.offerLast(pop);
+			}
+
 			for(OpData event: events) {
 				// objectsFound += 1;
 				numentries++;
 				// if(debugprints) System.out.println("Tail not reached");
-				fromDe.offer(event.op);
+				FLZKOp op = event.op;
+				if(op.id.client == FLZKOp.client) {
+					FLZKOp my_op;
+					if(op instanceof Rename) {
+						my_op = waitingRenames.get(op.id);
+						while(my_op == null) {
+							FLZKOp nop = passivelist.take();
+							if((nop instanceof GetOp) || (nop instanceof GetChildrenOp)  || (nop instanceof ExistsOp))
+								waitingObs.offerLast(nop);
+							else if(op.id.equals(nop.id)) my_op = nop;
+							else if(nop instanceof Rename) waitingRenames.put(nop.id, nop);
+							else waitingMuts.offerLast(nop);
+						}
+					} else if(waitingMuts.isEmpty()) {
+						my_op = null;
+						while(my_op == null) {
+							FLZKOp nop = passivelist.take();
+							if((nop instanceof GetOp) || (nop instanceof GetChildrenOp)  || (nop instanceof ExistsOp))
+								waitingObs.offerLast(nop);
+							else if(nop instanceof Rename) waitingRenames.put(nop.id, nop);
+							else my_op = nop;
+						}
+
+					} else {
+						my_op = waitingMuts.pollFirst();
+					}
+					if(!my_op.id.equals(op.id)) throw new RuntimeException(
+						"bad mut order: " +
+						op.getClass().getName() + " " + op.id + " " + op.path() +  " " +
+						my_op.getClass().getName() + " " + my_op.id + " " + my_op.path());
+					op = my_op;
+				}
+				fromDe.offer(op);
 				// long fetchTime = System.nanoTime() - startTime;
 				// System.out.println("loop time: " + fetchTime + "ns ");
 				// startTime = System.nanoTime();
@@ -1132,14 +1116,8 @@ public final class FLZK implements IZooKeeper, Runnable
 			// double hz = 1_000_000_000.0 * (double)objectsFound / (double)fetchTime;
 			// if(objectsFound != 0) System.out.println("fetch time: " + fetchTime + "ns " + objectsFound + " events " + hz + "hz");
 
-			handle_passive: for(; pop != MarkerOp.Instance; pop = passivelist.poll()) {
-				if (pop == null || pop == WakeOp.Instance) continue handle_passive;
-				if (pop == MarkerOp.Instance) break handle_passive;
-				//TODO we don't need passive ops to be totally ordered
-				fromDe.offer(pop);
-			}
-			// if(debugprints && objectsFound != 0) System.out.println("finished sync: " + numentries);
-			// if(debugprints) System.out.println("finished sync: " + passivelist.size() + ", " + pendingMuts.size());
+			for(FLZKOp passive: waitingObs) fromDe.offer(pop);
+			waitingObs.clear();
 		}
 	}
 
@@ -1258,11 +1236,13 @@ public final class FLZK implements IZooKeeper, Runnable
 
 	public void send_rename_old_exists(FLZKOp.Id id, String oldPath, String newPath, byte[] data, List<ACL> acl, CreateMode cm) {
 		RenameOldExists roe = new RenameOldExists(id, oldPath, newPath, data, acl, cm);
+		//FIXME ordering
 		processAsync(roe, true);
 	}
 
 	public void send_rename_new_empty(FLZKOp.Id id, String oldPath, String newPath) {
 		RenameNewEmpty rne = new RenameNewEmpty(id, oldPath, newPath);
+		//FIXME ordering
 		processAsync(rne, true);
 	}
 

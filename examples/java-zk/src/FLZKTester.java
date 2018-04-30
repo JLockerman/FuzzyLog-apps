@@ -1,8 +1,11 @@
 
 import java.util.List;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -17,7 +20,11 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.Code;
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.ZooKeeper.States;
 
 import fuzzy_log.ProxyHandle;
 
@@ -78,6 +85,11 @@ public class FLZKTester
 				client = new ProxyHandle(serverAddrs, 13337, num_clients, color);
 				break;
 			}
+			case 3:
+				serverAddrs = serverAddrs.replace('^', ',').replace('#', ':');
+				runZooKeeperCreateTest(serverAddrs, client_num);
+				System.exit(0);
+				return;
 			default:
 				throw new RuntimeException("Unknown test type " + testtype);
 		}
@@ -322,17 +334,18 @@ public class FLZKTester
 				//most efficent @ 1000: 12kHz, 2000: 29kHz, 5000: 30kHz!?
 				//freezes @ 500, 750, 1000!?
 				//slow, no freeze @ 100
-				while(window - cb.localCount() > 5000) { Thread.yield(); }
+				while(window - cb.localCount() > 2500) { Thread.yield(); }
 				// for(int i = 0; i < 500; i++) {
 					if(rand.nextInt(100) < 1 && renameNum < cb.localCount()) {
 						int renameDir = rand.nextInt(numClients);
 						zk.rename(dir + renameNum, "/foo" + renameDir + "/r" + clientNum + "_"  + renameNum, cb);
 						renameNum++;
+						window += 5;
 					} else {
 						zk.create(dir + fileNum, "AAA".getBytes(), null, CreateMode.PERSISTENT, cb, null);
 						fileNum++;
+						window++;
 					}
-					window++;
 					numSent.getAndIncrement();
 				// }
 			}
@@ -365,6 +378,132 @@ public class FLZKTester
 		// System.out.println(Arrays.toString(complete));
 		for(int i = 0; i < complete.length; i++) total += (complete[i] / 3);
 		long avg = total / complete.length;
+		System.out.printf("> %d: %6d Hz\n", clientNum, avg);
+		System.out.println(
+			"" + clientNum + ": " + Arrays.toString(complete) + "\n" +
+			clientNum + ": " + Arrays.toString(sent) + "\n" +
+			clientNum + ": " + Arrays.toString(outstanding)
+		);
+		while(!stopped_send.get()) { Thread.yield(); }
+		try { Thread.sleep(30); }
+		catch(InterruptedException e) { }
+		//System.out.println(clientNum + ": " + avg + " Hz");
+		// while(!stopped_send.get()) { Thread.yield(); }
+		// int fileNum = numSent.get();
+		// while(total_completed < fileNum) {
+		// 	total_completed += cb.take();
+		// 	Thread.yield();
+		// }
+	}
+
+	private final static void runZooKeeperCreateTest(final String serverAddrs, int clientNum) {
+		final TrivialWatcher trivialWatcher = new TrivialWatcher();
+		System.out.println("zk create scaling test start");
+
+		final ZooKeeper client;
+		try {
+			client = new ZooKeeper(serverAddrs, 3000, trivialWatcher);
+		} catch(IOException e) {
+			System.out.println("could not connect " + clientNum);
+			throw new RuntimeException(e);
+		}
+
+		boolean connected = false;
+		while(!connected) {
+			ZooKeeper.States state = client.getState();
+			switch (state) {
+				case CONNECTED:
+				case CONNECTEDREADONLY:
+					connected = true;
+					break;
+				case CONNECTING:
+				case ASSOCIATING:
+					Thread.yield();
+					break;
+				default:
+					try {
+						client.close();
+					} catch (InterruptedException e) {}
+					throw new RuntimeException("state " + state);
+			}
+		}
+
+		final String dirname = "/dir_" + clientNum;
+		final String dir = dirname + "/";
+		final ArrayList<String> dirs = new ArrayList<>(10);
+		for(int i = 0; i < 10; i++) dirs.add(dirname + "/" + i);
+		try {
+			client.create(dirname, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+			for(String d: dirs) client.create(d, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+		}
+		catch(KeeperException | InterruptedException e) {
+			System.out.println("could not create " + dirname);
+			throw new RuntimeException(e);
+		}
+
+		AtomicBoolean done = new AtomicBoolean(false);
+		AtomicBoolean stopped_send = new AtomicBoolean(false);
+		AtomicInteger numSent = new AtomicInteger(0);
+
+		CountingCB2 cb = new CountingCB2();
+
+		Thread createThread = new Thread(() -> {
+			Random rand = new Random(clientNum + 1111);
+			int fileNum = 0;
+			int renameNum = 0;
+			int window = 0;
+			while(!done.get()) {
+				//most efficent @ 1000: 12kHz, 2000: 29kHz, 5000: 30kHz!?
+				//freezes @ 500, 750, 1000!?
+				//slow, no freeze @ 100
+				while(window - cb.localCount() > 10) { Thread.yield(); }
+				// for(int i = 0; i < 500; i++) {
+					// if(rand.nextInt(100) < 1 && renameNum < cb.localCount()) {
+					// 	int renameDir = rand.nextInt(numClients);
+					// 	zk.rename(dir + renameNum, "/foo" + renameDir + "/r" + clientNum + "_"  + renameNum, cb);
+					// 	renameNum++;
+					// 	window += 5;
+					// } else {
+					int dirNum = fileNum % dirs.size();
+					client.create(dirs.get(dirNum) + "/" + fileNum, "AAA".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, cb, null);
+					fileNum++;
+					window++;
+					// }
+					numSent.getAndIncrement();
+				// }
+			}
+			// numSent.set(fileNum + renameNum);
+			try {
+				client.close();
+			} catch (InterruptedException i) {}
+			stopped_send.set(true);
+		});
+		createThread.start();
+		final int numRounds = 10;
+		int total_completed = 0;
+		int total_sent = 0;
+		final int[] complete = new int[numRounds];
+		final int[] sent = new int[numRounds];
+		final int[] outstanding = new int[numRounds];
+		for(int round = 0; round < numRounds; round++) {
+			try { Thread.sleep(3000); }
+			catch(InterruptedException e) { throw new RuntimeException(e); }
+			complete[round] = cb.take();
+			sent[round] = numSent.getAndSet(0);
+			total_completed += complete[round];
+			total_sent += sent[round];
+			outstanding[round] = total_sent - total_completed;
+		}
+		try { Thread.sleep(3000); }
+		catch(InterruptedException e) { }
+		done.set(true);
+		try { Thread.sleep(3000); }
+		catch(InterruptedException e) { }
+
+		long total = 0;
+		// System.out.println(Arrays.toString(complete));
+		for(int i = 1; i < complete.length; i++) total += (complete[i] / 3);
+		long avg = total / (complete.length - 1);
 		System.out.printf("> %d: %6d Hz\n", clientNum, avg);
 		System.out.println(
 			"" + clientNum + ": " + Arrays.toString(complete) + "\n" +
@@ -537,7 +676,8 @@ class CountingCB2 implements AsyncCallback.StringCallback, AsyncCallback.VoidCal
 	@Override
 	public final void processResult(int rc, String path, Object ctx)
 	{
-		bump();
+		numDone.getAndAdd(1);
+		localNumDone += 5;
 	}
 
 
@@ -671,6 +811,11 @@ class TesterCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCallba
 			}
 		}
 	}
+}
 
+final class TrivialWatcher implements Watcher {
 
+	public TrivialWatcher() {}
+
+	public void process(WatchedEvent event) {}
 }

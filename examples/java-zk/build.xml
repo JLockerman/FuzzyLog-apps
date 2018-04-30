@@ -39,17 +39,18 @@
 
 	<target name="compile">
 		<mkdir dir="${classes.dir}"/>
+		<!-- <javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="build.classpath" debug="true" debuglevel="lines,vars,source"/> -->
 		<javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="build.classpath"/>
 	</target>
 
 	<target name="run" depends="compile">
 		<java classname="FLZKTester" fork="true" classpathref="run.classpath">
-			<sysproperty key="jna.library.path" value="${env.DELOS_RUST_LOC}/examples/c_linking/target/release/:${env.PATH}"/>
+			<!-- <sysproperty key="jna.library.path" value="${env.DELOS_RUST_LOC}/examples/c_linking/target/release/:${env.PATH}"/> -->
 			<!-- <jvmarg value="-Xverify:none"/> -->
 			<arg value="${hostname}"/>
 			<arg value="${testtype}"/>
-			<arg value="${color}"/>
-			<arg value="${othercolor}"/>
+			<arg value="${client_num}"/>
+			<arg value="${num_clients}"/>
 		</java>
 	</target>
 
