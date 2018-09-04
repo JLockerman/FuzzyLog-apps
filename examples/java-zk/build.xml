@@ -51,6 +51,7 @@
 			<arg value="${testtype}"/>
 			<arg value="${client_num}"/>
 			<arg value="${num_clients}"/>
+			<arg value="${transaction_in}"/>
 		</java>
 	</target>
 

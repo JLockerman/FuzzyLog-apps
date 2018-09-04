@@ -22,6 +22,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
+import org.apache.zookeeper.OpResult;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooKeeper.States;
@@ -41,6 +42,7 @@ public class FLZKTester
 		int testtype = Integer.parseInt(args[1]);
 		int client_num = Integer.parseInt(args[2]);
 		long num_clients = Integer.parseInt(args[3]);
+		int transaction_in = Integer.parseInt(args[4]);
 		int color = client_num+1;
 		FLZKOp.client = client_num;
 		//FuzzyLog appendclient = new FuzzyLog(new String[]{args[0]}, new int[]{color});
@@ -87,7 +89,7 @@ public class FLZKTester
 			}
 			case 3:
 				serverAddrs = serverAddrs.replace('^', ',').replace('#', ':');
-				runZooKeeperCreateTest(serverAddrs, client_num);
+				runZooKeeperCreateTest(serverAddrs, client_num, (int)num_clients, transaction_in);
 				System.exit(0);
 				return;
 			default:
@@ -396,7 +398,7 @@ public class FLZKTester
 		// }
 	}
 
-	private final static void runZooKeeperCreateTest(final String serverAddrs, int clientNum) {
+	private final static void runZooKeeperCreateTest(final String serverAddrs, int clientNum, int numClients, int transaction_in) {
 		final TrivialWatcher trivialWatcher = new TrivialWatcher();
 		System.out.println("zk create scaling test start");
 
@@ -453,24 +455,22 @@ public class FLZKTester
 			int renameNum = 0;
 			int window = 0;
 			while(!done.get()) {
-				//most efficent @ 1000: 12kHz, 2000: 29kHz, 5000: 30kHz!?
-				//freezes @ 500, 750, 1000!?
-				//slow, no freeze @ 100
 				while(window - cb.localCount() > 10) { Thread.yield(); }
-				// for(int i = 0; i < 500; i++) {
-					// if(rand.nextInt(100) < 1 && renameNum < cb.localCount()) {
-					// 	int renameDir = rand.nextInt(numClients);
-					// 	zk.rename(dir + renameNum, "/foo" + renameDir + "/r" + clientNum + "_"  + renameNum, cb);
-					// 	renameNum++;
-					// 	window += 5;
-					// } else {
+				if(rand.nextInt(transaction_in) < 1 /*&& renameNum < cb.localCount()*/) {
+					int renameDir = rand.nextInt(numClients);
+					client.transaction()
+						.delete(dir + renameNum, -1)
+						.create("/foo" + renameDir + "/r" + clientNum + "_"  + renameNum, "AAA".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
+						.commit(cb.multi(), null);
+					renameNum++;
+					window += 1;
+				} else {
 					int dirNum = fileNum % dirs.size();
 					client.create(dirs.get(dirNum) + "/" + fileNum, "AAA".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, cb, null);
 					fileNum++;
 					window++;
-					// }
-					numSent.getAndIncrement();
-				// }
+				}
+				numSent.getAndIncrement();
 			}
 			// numSent.set(fileNum + renameNum);
 			try {
@@ -652,7 +652,8 @@ class CountingCB implements AsyncCallback.StringCallback, AsyncCallback.VoidCall
 }
 
 
-class CountingCB2 implements AsyncCallback.StringCallback, AsyncCallback.VoidCallback, AsyncCallback.StatCallback, AsyncCallback.DataCallback, AsyncCallback.ChildrenCallback {
+class CountingCB2 implements AsyncCallback.StringCallback, AsyncCallback.VoidCallback, AsyncCallback.StatCallback, AsyncCallback.DataCallback, AsyncCallback.ChildrenCallback
+ {
 	private final AtomicInteger numDone;
 	private int localNumDone;
 
@@ -677,7 +678,7 @@ class CountingCB2 implements AsyncCallback.StringCallback, AsyncCallback.VoidCal
 	public final void processResult(int rc, String path, Object ctx)
 	{
 		numDone.getAndAdd(1);
-		localNumDone += 5;
+		localNumDone += 1;
 	}
 
 
@@ -710,6 +711,18 @@ class CountingCB2 implements AsyncCallback.StringCallback, AsyncCallback.VoidCal
 
 	public final int localCount() {
 		return this.localNumDone;
+	}
+
+	public Multi multi() {
+		return new Multi();
+	}
+
+	public final class Multi implements AsyncCallback.MultiCallback {
+		@Override
+		public final void processResult(int rc, String path, Object ctx, List<OpResult> children)
+		{
+			bump();
+		}
 	}
 }
 
