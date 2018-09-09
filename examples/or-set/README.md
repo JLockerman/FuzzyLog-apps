@@ -1,13 +1,12 @@
 # OR-Set 
 
 ### Prerequisites
-Download delos repository and set `DELOS_RUST_LOC` to its root directory.
+Download the FuzzyLog repository and set `FUZZYLOG_SRC_LOC` to its root directory.
 
 Make sure that you compiled the fuzzy log client library as following.
 ```sh
-cd $DELOS_RUST_LOC/examples/c_linking
-make clean
-make
+cd $FUZZYLOG_SRC_LOC
+cargo build --release
 ```
 
 ### Installation and run

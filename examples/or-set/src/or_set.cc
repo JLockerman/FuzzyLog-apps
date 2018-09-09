@@ -3,18 +3,16 @@
 #include <iostream>
 #include <vector>
 
-or_set::or_set(DAGHandle *handle, struct colors *color, struct colors *remote_colors, uint8_t proc_id,
-	       uint64_t sync_duration)
+or_set::or_set(FLPtr handle, ColorSpec colors, uint8_t proc_id, uint64_t sync_duration)
 {
 	_log_client = handle;
-	_color = color;
-	_remote_colors = remote_colors;
+	_color = colors;
 	_proc_id = proc_id;
 	_guid_counter = 0;
 	_state.clear();
 	_sync_duration = std::chrono::microseconds(sync_duration);
 
-	snapshot(_log_client);
+	// snapshot(_log_client);
 	/* Turn off anti-entropy for the time being */
 	//	_sync_thread = 	std::thread(&or_set::check_remotes, this);
 }
@@ -34,39 +32,40 @@ uint8_t or_set::get_proc_id(uint64_t code)
 	return static_cast<uint8_t>(0xFF & code);
 }
 
-bool or_set::get_single_remote()
+uint64_t or_set::get_remote()
 {
-	size_t buf_sz;
-	struct colors c;
-	uint64_t *uint_buf;
+	uint64_t gotten = 0;
 
-	get_next(_log_client, _buf, &buf_sz, &c);
+	std::tuple<or_set *, uint64_t *> args = std::make_tuple(this, &gotten);
 
-	if (c.numcolors == 0) {
-		snapshot(_log_client);
-		return false;
-	}
+	fuzzylog_sync(_log_client, [](void *args, const char *data, uintptr_t data_size) {
+		uint64_t *gotten;
+		or_set *self;
+		auto a = reinterpret_cast<const std::tuple<or_set *, uint64_t *>*>(args);
+		std::tie(self, gotten) = *a;
+		*gotten += 1;
+		auto uint_buf = reinterpret_cast<const uint64_t*>(data);
+		auto opcode = uint_buf[0];
 
-	uint_buf = reinterpret_cast<uint64_t*>(_buf);
-	auto opcode = uint_buf[0];
+		switch (self->get_opcode(opcode)) {
+		case ADD:
+			self->remote_add((uint8_t*)data, data_size);
+			break;
+		case REMOVE:
+			self->remote_remove((uint8_t*)data, data_size);
+			break;
+		case TRANSACTION:
+			self->remote_transaction((uint8_t*)data, data_size);
+			break;
+		default:
+			/* XXX Debugging log playback issue. */
+			std::cerr << std::showbase << std::hex;
+			std::cerr << opcode << "\n";
+			assert(false);
+		}
+	}, (void *)&args);
 
-	switch (get_opcode(opcode)) {
-	case ADD:
-		remote_add((uint8_t*)_buf, buf_sz);
-		break;
-	case REMOVE:
-		remote_remove((uint8_t*)_buf, buf_sz);
-		break;
-	case TRANSACTION:
-		remote_transaction((uint8_t*)_buf, buf_sz);
-		break;
-	default:
-		/* XXX Debugging log playback issue. */
-		std::cerr << std::showbase << std::hex;
-		std::cerr << opcode << "\n";
-		assert(false);
-	}
-	return true;
+	return gotten;
 
 	/*
 	size_t data_sz, locs_read;
@@ -100,9 +99,9 @@ bool or_set::get_single_remote()
 
 void or_set::get_remote_updates()
 {
-	size_t buf_sz;
-	struct colors c;
-	uint64_t *uint_buf;
+	// size_t buf_sz;
+	// struct colors c;
+	// uint64_t *uint_buf;
 
 	/* XXX Shouldn't get here! */
 	assert(false);
@@ -152,16 +151,16 @@ void or_set::send_add(uint64_t e, uint64_t guid)
 
 	buf = NULL;
 	serialize_add(e, guid, &buf, &sz);
-	append(_log_client, buf, sz, _color, NULL);
+	fuzzylog_append(_log_client, buf, sz, &_color, 1);
 }
 
-write_id or_set::send_add_async(uint64_t e, uint64_t guid, char *buf)
+WriteId or_set::send_add_async(uint64_t e, uint64_t guid, char *buf)
 {
 	size_t sz;
 	serialize_add(e, guid, &buf, &sz);
 //	std::cerr << "Serialized request!\n";
 //	std::cerr << "Request size: " << sz << "\n";
-	return async_append(_log_client, buf, sz, _color, NULL);
+	return fuzzylog_async_append(_log_client, buf, sz, &_color, 1);
 }
 
 
@@ -197,16 +196,16 @@ void or_set::send_remove(uint64_t e, const std::set<uint64_t> &guid_set)
 
 	buf = NULL;
 	serialize_remove(e, guid_set, &buf, &sz);
-	append(_log_client, buf, sz, _color, NULL);
+	fuzzylog_append(_log_client, buf, sz, &_color, 1);
 }
 
-write_id or_set::send_remove_async(uint64_t e, const std::set<uint64_t> &guid_set, char *buf)
+WriteId or_set::send_remove_async(uint64_t e, const std::set<uint64_t> &guid_set, char *buf)
 {
 	assert(buf != NULL);
 	size_t sz;
 
 	serialize_remove(e, guid_set, &buf, &sz);
-	return async_append(_log_client, buf, sz, _color, NULL);
+	return fuzzylog_async_append(_log_client, buf, sz, &_color, 1);
 }
 
 void or_set::do_add(uint64_t e, uint64_t guid)
@@ -328,7 +327,7 @@ void or_set::remove(uint64_t e)
 	}
 }
 
-write_id or_set::async_add(uint64_t e, char *buf)
+WriteId or_set::async_add(uint64_t e, char *buf)
 {
 	{
 		std::lock_guard<std::mutex> lck(_instance_mutex);
@@ -338,7 +337,7 @@ write_id or_set::async_add(uint64_t e, char *buf)
 	}
 }
 
-write_id or_set::async_remove(uint64_t e, char *buf)
+WriteId or_set::async_remove(uint64_t e, char *buf)
 {
 	{
 		std::lock_guard<std::mutex> lck(_instance_mutex);
@@ -351,7 +350,7 @@ write_id or_set::async_remove(uint64_t e, char *buf)
 	}
 }
 
-write_id or_set::async_transaction(uint64_t* es, bool *remove, size_t elems) {
+WriteId or_set::async_transaction(uint64_t* es, bool *remove, size_t elems) {
 
 	std::vector<uint64_t> buf;
 	buf.push_back(make_opcode(TRANSACTION));
@@ -383,12 +382,12 @@ write_id or_set::async_transaction(uint64_t* es, bool *remove, size_t elems) {
 		}
 		if (buf.size() == 1) return WRITE_ID_NIL;
 
-		return async_append(
+		return fuzzylog_async_append(
 			_log_client,
 			reinterpret_cast<char*>(buf.data()),
 			buf.size() * sizeof(uint64_t),
-			_color, //FIXME
-			NULL
+			&_color, //FIXME
+			1
 		);
 	}
 }

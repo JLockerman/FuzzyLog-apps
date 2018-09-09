@@ -8,7 +8,9 @@
 #include <mutex>
 
 extern "C" {
-	#include <fuzzy_log.h>
+	#include <fuzzylog_async_ext.h>
+
+	static WriteId WRITE_ID_NIL = {};
 }
 
 class or_set {
@@ -24,13 +26,11 @@ public:
 
 private:
 
-	struct colors 						*_color;
-	struct colors 						*_remote_colors;
-	DAGHandle 						*_log_client;
+	ColorSpec 							_color;
+	FLPtr								_log_client;
 	std::unordered_map<uint64_t, std::set<uint64_t> > 	_state;
  	uint64_t 						_guid_counter;
 	uint8_t							_proc_id;
-	char 							_buf[DELOS_MAX_DATA_SIZE];
 	std::chrono::microseconds				_sync_duration;
 	std::mutex						_instance_mutex;
 	std::thread 						_sync_thread;
@@ -52,8 +52,8 @@ private:
 	/* Send local add/remove info to the fuzzy log. */
 	void send_add(uint64_t e, uint64_t guid);
 	void send_remove(uint64_t e, const std::set<uint64_t> &guid_set);
-	write_id send_add_async(uint64_t e, uint64_t guid, char *buf);
-	write_id send_remove_async(uint64_t e, const std::set<uint64_t> &guid_set, char *buf);
+	WriteId send_add_async(uint64_t e, uint64_t guid, char *buf);
+	WriteId send_remove_async(uint64_t e, const std::set<uint64_t> &guid_set, char *buf);
 
 	/* Receive and process remote add/remove info from the fuzzy log. */
 	void remote_remove(const uint8_t *buf, size_t sz);
@@ -83,7 +83,7 @@ public:
 	 * instances' updates.
 	 *
 	 */
-  	or_set(DAGHandle *handle, struct colors *local_color, struct colors *remote_colors, uint8_t proc_id, uint64_t sync_duration);
+  	or_set(FLPtr handle, ColorSpec colors, uint8_t proc_id, uint64_t sync_duration);
 
 	/* Returns true if e exists in the local set */
 	bool lookup(uint64_t e);
@@ -94,8 +94,8 @@ public:
 	/* Remove e from the or-set */
 	void remove(uint64_t e);
 
-	bool get_single_remote();
-	write_id async_add(uint64_t e, char *buf);
-	write_id async_remove(uint64_t e, char *buf);
-	write_id async_transaction(uint64_t* es, bool *remove, size_t elems);
+	uint64_t get_remote();
+	WriteId async_add(uint64_t e, char *buf);
+	WriteId async_remove(uint64_t e, char *buf);
+	WriteId async_transaction(uint64_t* es, bool *remove, size_t elems);
 };

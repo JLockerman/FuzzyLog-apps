@@ -9,7 +9,7 @@
 #include <condition_variable>
 #include <sstream>
 #include <iostream>
-#include <fstream> 
+#include <fstream>
 #include <or_set_getter.h>
 
 
@@ -27,7 +27,7 @@ void write_gets_per_snapshot(config cfg, const std::vector<uint64_t> &results)
 {
 	std::ofstream result_file;
 	result_file.open("gets_per_snapshot.txt", std::ios::trunc | std::ios::out);
-	for (auto v : results) 
+	for (auto v : results)
 		result_file << v << "\n";
 	result_file.close();
 }
@@ -40,7 +40,7 @@ void write_latency(config cfg, const std::vector<tester_request*> &latencies)
 		if (rq->_executed == false)
 			break;
 		std::chrono::duration<double, std::milli> rq_duration = rq->_end_time - rq->_start_time;
-		latency_file << rq_duration.count() << "\n"; 
+		latency_file << rq_duration.count() << "\n";
 	}
 	latency_file.close();
 }
@@ -53,7 +53,7 @@ void write_put_output(config cfg, const std::vector<double> &results, const std:
 
 void write_get_output(config cfg, const std::vector<double> &throughput, const std::vector<uint64_t> &gets_snapshot)
 {
-	write_throughput(cfg, throughput);	
+	write_throughput(cfg, throughput);
 	write_gets_per_snapshot(cfg, gets_snapshot);
 }
 
@@ -61,10 +61,10 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*>
 {
 	workload_generator gen(range);
 	uint64_t i;
-	
-	std::vector<uint64_t> seen_keys; 	
+
+	std::vector<uint64_t> seen_keys;
 	for (i = 0; i < num_inputs; ++i) {
-		auto rq = static_cast<or_set_rq*>(malloc(sizeof(or_set_rq))); 
+		auto rq = static_cast<or_set_rq*>(malloc(sizeof(or_set_rq)));
 		rq->_key = gen.gen_next();
 		if (i == 0 || rand() % 2 == 0) {
 			rq->_opcode = or_set::log_opcode::ADD;
@@ -74,159 +74,155 @@ void gen_input(uint64_t range, uint64_t num_inputs, std::vector<tester_request*>
 			rq->_opcode = or_set::log_opcode::REMOVE;
 			auto idx = rand() % seen_keys.size();
 			rq->_key = seen_keys[idx];
-		}	
+		}
 		auto temp = reinterpret_cast<tester_request*>(rq);
 		temp->_executed = false;
 		output.push_back(temp);
-	} 
+	}
 }
 
 void wait_signal(config cfg)
 {
-	char buffer[DELOS_MAX_DATA_SIZE];
 	size_t buf_sz;
-	struct colors c, depends, interested;	
+	ColorSpec c;
 	auto num_received = 0;
 
-	ColorID sig_color[1];	
+	uint64_t sig_color[1];
 	sig_color[0] = cfg.num_clients + 1;
-	c.mycolors = sig_color;
-	c.numcolors = 1;
+	c.local_chain = sig_color[0];
+	c.remote_chains = sig_color;
+	c.num_remote_chains = 1;
 	buf_sz = 1;
-	
-	interested = c;
 
 	/* Server ips for handle. */
+	ServerSpec servers;
 	size_t num_servers = cfg.log_addr.size();
 	assert(num_servers > 0);
 	const char *server_ips[num_servers];
 	for (auto i = 0; i < num_servers; ++i) {
 		server_ips[i] = cfg.log_addr[i].c_str();
 	}
+	servers.head_ips = (char **)&*server_ips;
+	servers.tail_ips = NULL;
+	servers.num_ips = num_servers;
 
-	depends.mycolors = NULL;
-	depends.numcolors = 0;
-
-	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
-	append(handle, buffer, buf_sz, &c, &depends);
+	auto handle = new_fuzzylog_instance(servers, c, NULL);
+	fuzzylog_append(handle, NULL, 0, &c, 1);
 	while (num_received < cfg.num_clients) {
-		snapshot(handle);
-		while (true) {
-			get_next(handle, buffer, &buf_sz, &c);
-			assert(c.numcolors == 0 || c.numcolors == 1);	
-			if (c.numcolors == 1) {
-				//assert(c.mycolors[0] == 1);
-				num_received += 1;
-				free(c.mycolors);
-			} else {
-				break;
-			}
-		}
-	}	
-	close_dag_handle(handle);
+		fuzzylog_sync(handle, [](void *num_received, const char *, size_t) {
+			*(int *)num_received += 1;
+		}, &num_received);
+	}
+	fuzzylog_close(handle);
 }
 
 void run_putter(config cfg, std::vector<tester_request*> &inputs, std::vector<double> &throughput_samples)
 {
 	/* Colors for DAG Handle */
-	struct colors c;
-	c.numcolors = cfg.num_clients;
-	c.mycolors = new ColorID[cfg.num_clients];
-	for (auto i = 0; i < cfg.num_clients; ++i) 
-		c.mycolors[i] = (uint8_t)(i+1);	
-	
-	/* Local appends */
-	struct colors local_c;
-	local_c.numcolors = 1;
-	local_c.mycolors = new ColorID[1];
-	local_c.mycolors[0] = (uint8_t)(cfg.server_id + 1);
-	
-	
-	/* For playing back remote appends */
-	std::set<uint8_t> remote_color_set;
+	ColorSpec c;
+	c.num_remote_chains = cfg.num_clients;
+	c.remote_chains = new uint64_t[cfg.num_clients];
 	for (auto i = 0; i < cfg.num_clients; ++i)
-		if (i != cfg.server_id)
-			remote_color_set.insert(i+1); 
-	
-	struct colors remote_colors;
-	remote_colors.numcolors = cfg.num_clients-1;
-	remote_colors.mycolors = new ColorID[cfg.num_clients-1];
-	auto i = 0; 
-	std::cerr << "Remote colors:\n";
-	for (auto c : remote_color_set) {
-		remote_colors.mycolors[i] = c;
-		std::cerr << (uint64_t)c << "\n";
-		i += 1;
-	}
+		c.remote_chains[i] = (uint8_t)(i+1);
+	c.local_chain = (uint8_t)(cfg.server_id + 1);
+
+	/* Local appends */
+	// struct colors local_c;
+	// local_c.numcolors = 1;
+	// local_c.mycolors = new ColorID[1];
+	// local_c.mycolors[0] = (uint8_t)(cfg.server_id + 1);
+
+
+	/* For playing back remote appends */
+	// std::set<uint8_t> remote_color_set;
+	// for (auto i = 0; i < cfg.num_clients; ++i)
+	// 	if (i != cfg.server_id)
+	// 		remote_color_set.insert(i+1);
+
+	// struct colors remote_colors;
+	// remote_colors.numcolors = cfg.num_clients-1;
+	// remote_colors.mycolors = new ColorID[cfg.num_clients-1];
+	// auto i = 0;
+	// std::cerr << "Remote colors:\n";
+	// for (auto c : remote_color_set) {
+	// 	remote_colors.mycolors[i] = c;
+	// 	std::cerr << (uint64_t)c << "\n";
+	// 	i += 1;
+	// }
 
 	/* Server ips for handle. */
-	size_t num_servers = cfg.log_addr.size();
-	assert(num_servers > 0);
-	const char *server_ips[num_servers];
-	std::cerr << "Num servers: " << num_servers << "\n";
+	ServerSpec servers;
+	servers.num_ips = cfg.log_addr.size();
+	assert(servers.num_ips > 0);
+	char *server_ips[servers.num_ips];
+	std::cerr << "Num servers: " << servers.num_ips << "\n";
 	std::cerr << "Server list:\n";
-	for (auto i = 0; i < num_servers; ++i) {
-		server_ips[i] = cfg.log_addr[i].c_str();
-		std::cerr << server_ips[i] << "\n";	
+	for (auto i = 0; i < servers.num_ips; ++i) {
+		server_ips[i] = (char *)cfg.log_addr[i].c_str();
+		std::cerr << server_ips[i] << "\n";
 	}
+	servers.head_ips = server_ips;
+	servers.tail_ips = NULL;
 
-	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
-	gen_input(cfg.expt_range, cfg.num_rqs, inputs); 
-	wait_signal(cfg);	
+	auto handle = new_fuzzylog_instance(servers, c, NULL);
+	gen_input(cfg.expt_range, cfg.num_rqs, inputs);
+	wait_signal(cfg);
 
-	auto orset = new or_set(handle, &local_c, &remote_colors, cfg.server_id, cfg.sync_duration);	
+	auto orset = new or_set(handle, c, cfg.server_id, cfg.sync_duration);
 	auto tester = new or_set_tester(cfg.window_sz, orset, handle);
 
 	std::cerr << "Worker " << (uint64_t)cfg.server_id << " initialized!\n";
 
 	void do_run_fix_throughput(const std::vector<tester_request*> &requests, std::vector<double> &samples,
-				 int interval, 	
-				 int duration, 		
-				 double low_throughput, 
-				 double high_throughput, 
-				 double spike_start, 
+				 int interval,
+				 int duration,
+				 double low_throughput,
+				 double high_throughput,
+				 double spike_start,
 	 			 	double spike_duration);
 
-	tester->do_run_fix_throughput(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration, cfg.low_throughput, cfg.high_throughput, cfg.spike_start, cfg.spike_duration); 
-	close_dag_handle(handle);
+	tester->do_run_fix_throughput(inputs, throughput_samples, cfg.sample_interval, cfg.expt_duration, cfg.low_throughput, cfg.high_throughput, cfg.spike_start, cfg.spike_duration);
+	fuzzylog_close(handle);
 }
 
 void run_getter(config cfg, std::vector<double> &throughput_samples, std::vector<uint64_t> &gets_per_snapshot)
 {
 	assert(cfg.writer == false);
-	
+
 	/* Colors for DAG Handle */
-	struct colors c;
-	c.numcolors = cfg.num_clients;
-	c.mycolors = new ColorID[cfg.num_clients];
+	ColorSpec c;
+	c.num_remote_chains = cfg.num_clients;
+	c.remote_chains = new uint64_t[cfg.num_clients];
 	std::cerr << "Num colors: " << cfg.num_clients << "\n";
-	for (auto i = 0; i < cfg.num_clients; ++i) { 
-		c.mycolors[i] = (uint8_t)(i+1);	
-		std::cerr << "Color " << (uint64_t)(c.mycolors[i]) << "\n";
-		
-	}
-	
-	/* Server ips for handle. */
-	size_t num_servers = cfg.log_addr.size();
-	assert(num_servers > 0);
-	const char *server_ips[num_servers];
-	std::cerr << "Num servers: " << num_servers << "\n";
-	std::cerr << "Server list:\n";
-	for (auto i = 0; i < num_servers; ++i) {
-		server_ips[i] = cfg.log_addr[i].c_str();
-		std::cerr << server_ips[i] << "\n";	
+	for (auto i = 0; i < cfg.num_clients; ++i) {
+		c.remote_chains[i] = (uint8_t)(i+1);
+		std::cerr << "Color " << c.remote_chains[i] << "\n";
 	}
 
-	auto handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
+	/* Server ips for handle. */
+	ServerSpec servers;
+	servers.num_ips = cfg.log_addr.size();
+	assert(servers.num_ips > 0);
+	char *server_ips[servers.num_ips];
+	std::cerr << "Num servers: " << servers.num_ips << "\n";
+	std::cerr << "Server list:\n";
+	for (auto i = 0; i < servers.num_ips; ++i) {
+		server_ips[i] = (char *)cfg.log_addr[i].c_str();
+		std::cerr << server_ips[i] << "\n";
+	}
+	servers.head_ips = server_ips;
+	servers.tail_ips = NULL;
+
+	auto handle = new_fuzzylog_instance(servers, c, NULL);
 
 	//wait_signal(cfg);
 
-	auto orset = new or_set(handle, NULL, &c, cfg.server_id, cfg.sync_duration);	
+	auto orset = new or_set(handle, c, cfg.server_id, cfg.sync_duration);
 	auto getter = new or_set_getter(orset);
-	
+
 	std::cerr << "Getter initialized!\n";
-	getter->run(throughput_samples, gets_per_snapshot, cfg.sample_interval, cfg.expt_duration); 
-	close_dag_handle(handle);
+	getter->run(throughput_samples, gets_per_snapshot, cfg.sample_interval, cfg.expt_duration);
+	fuzzylog_close(handle);
 
 }
 
@@ -236,14 +232,14 @@ void validate_puts(config cfg, const std::vector<tester_request*> &inputs, const
 	for (auto t : inputs) {
 		if (t->_executed == false)
 			break;
-		input_count += 1;	
+		input_count += 1;
 	}
-	
+
 	auto throughput_count = 0.0;
 	for (auto sample : throughput_samples) {
 		throughput_count += sample;
-	}	
-	
+	}
+
 	std::cerr << "Input count: " << input_count << "\n";
 	std::cerr << "Throughput count: " << throughput_count << "\n";
 }
@@ -262,19 +258,19 @@ void do_get_experiment(config cfg)
 {
 	std::vector<double> throughput_samples;
 	std::vector<uint64_t> gets_per_snapshot;
-	run_getter(cfg, throughput_samples, gets_per_snapshot);	
+	run_getter(cfg, throughput_samples, gets_per_snapshot);
 	write_get_output(cfg, throughput_samples, gets_per_snapshot);
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
 	std::vector<uint64_t> results;
-	config_parser cfg_prser;			
+	config_parser cfg_prser;
 	config cfg = cfg_prser.get_config(argc, argv);
-	
-	if (cfg.writer == true) 
+
+	if (cfg.writer == true)
 		do_put_experiment(cfg);
-	else 
+	else
 		do_get_experiment(cfg);
 	return 0;
 }
