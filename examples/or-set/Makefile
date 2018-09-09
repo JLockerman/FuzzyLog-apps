@@ -5,7 +5,7 @@ FUZZY_LIB=$(FUZZYLOG_SRC_LOC)/target/release
 FUZZY_INC=$(FUZZYLOG_SRC_LOC)
 LIB_DIRS=./libs/lib/ $(FUZZY_LIB)
 LIBPATH=$(foreach d, $(LIB_DIRS), -L$d)
-LIBS=-pthread -lc_link -ldl -lrt
+LIBS=-pthread -lfuzzy_log
 INC_DIRS=include $(FUZZY_APPS_LOC)/common $(FUZZY_INC)
 INCLUDE=$(foreach d, $(INC_DIRS), -I$d)
 SRC=src
@@ -15,12 +15,20 @@ OBJECTS=$(patsubst $(SRC)/%.cc,build/%.o,$(SOURCES))
 DEPSDIR:=.deps
 DEPCFLAGS=-MD -MF $(DEPSDIR)/$*.d -MP
 
+OS_NAME := $(shell uname)
+
+ifeq ($(OS_NAME), Linux)
+	LIBS += -lm -ldl -lrt -pthread -Wl,--gc-sections
+else ifeq ($(UNAME_S),Darwin)
+    LIBS += -lsystem -lc -lm -pthread
+endif
+
 all:build/or-set
 
 -include $(wildcard $(DEPSDIR)/*.d)
 
 build/or-set:$(OBJECTS)
-	$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)
+	@$(CC) $(CFLAGS) $(INCLUDE) $^ -o $@ $(LIBPATH) $(LIBS)
 
 build/%.o: src/%.cc $(DEPSDIR)/stamp Makefile
 	@mkdir -p build
