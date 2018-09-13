@@ -12,15 +12,19 @@
 
 class wid_hasher {
 public:
-        std::size_t operator() (write_id const &wid) const {
-                        return (std::hash<uint64_t>{}(wid.p1)*71) ^ std::hash<uint64_t>{}(wid.p2);              
+        std::size_t operator() (WriteId const &wid) const {
+                        return (std::hash<uint64_t>{}(*(uint64_t*)&wid.bytes[0])*71) ^ std::hash<uint64_t>{}(*(uint64_t*)&wid.bytes[8]);
         }
 };
 
 class wid_equality {
 public:
-        bool operator() (write_id const &wid1, write_id const &wid2) const {
-                return (wid1.p1 == wid2.p1) && (wid1.p2 == wid2.p2);
+        bool operator() (WriteId const &wid1, WriteId const &wid2) const {
+                uint64_t const *wid1_1 = (uint64_t const *)&wid1.bytes[0];
+                uint64_t const *wid1_2 = (uint64_t const *)&wid1.bytes[8];
+                uint64_t const *wid2_1 = (uint64_t const *)&wid2.bytes[0];
+                uint64_t const *wid2_2 = (uint64_t const *)&wid2.bytes[8];
+                return (wid1_1 == wid2_1) && (wid1_2 == wid2_2);
         }
 };
 
@@ -33,8 +37,7 @@ public:
 
 protected:
         // Fuzzylog connection
-        DAGHandle*                                      m_fuzzylog_client;
-        char                                            m_buf[DELOS_MAX_DATA_SIZE];
+        FLPtr                                           m_fuzzylog_client;
         bool                                            m_replication;
 
 
@@ -46,12 +49,12 @@ public:
         //MapType get_map_type() { return m_map_type; }
         void init_fuzzylog_client(std::vector<std::string>* log_addr);
         // Synchronous operations
-        void put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);
-        void remove(uint64_t key, struct colors* op_color);
+        void put(uint64_t key, uint64_t value, ColorSpec op_color);
+        void remove(uint64_t key, ColorSpec op_color);
         // Asynchronous operations
-        write_id async_put(uint64_t key, uint64_t value, struct colors* op_color);
+        WriteId async_put(uint64_t key, uint64_t value, ColorSpec op_color);
         void flush_completed_puts();
-        write_id try_wait_for_any_put();
-        write_id wait_for_any_put();
+        WriteId try_wait_for_any_put();
+        WriteId wait_for_any_put();
         void wait_for_all_puts();
 };

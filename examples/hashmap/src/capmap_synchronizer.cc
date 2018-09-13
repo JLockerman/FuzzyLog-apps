@@ -5,37 +5,45 @@
 #include <thread>
 #include <capmap.h>
 
-CAPMapSynchronizer::CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication): m_map(map), m_replication(replication) {
+CAPMapSynchronizer::CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<uint64_t>& interesting_colors, bool replication): m_map(map), m_replication(replication) {
         uint32_t i;
-        struct colors* c;
-        c = static_cast<struct colors*>(malloc(sizeof(struct colors)));
-        c->numcolors = interesting_colors.size();
-        c->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID) * c->numcolors));
-        for (i = 0; i < c->numcolors; i++) {
-                c->mycolors[i] = interesting_colors[i];
+        ColorSpec c;
+        c.num_remote_chains = interesting_colors.size();
+        c.remote_chains = static_cast<uint64_t*>(malloc(sizeof(uint64_t) * c.num_remote_chains));
+        for (i = 0; i < c.num_remote_chains; i++) {
+                c.remote_chains[i] = interesting_colors[i];
         }
         this->m_interesting_colors = c;
         // Initialize fuzzylog connection
         if (m_replication) {
                 assert (log_addr->size() > 0 && log_addr->size() % 2 == 0);
                 size_t num_chain_servers = log_addr->size() / 2;
-                const char *chain_server_head_ips[num_chain_servers]; 
+                const char *chain_server_head_ips[num_chain_servers];
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_head_ips[i] = log_addr->at(i).c_str();
                 }
-                const char *chain_server_tail_ips[num_chain_servers]; 
+                const char *chain_server_tail_ips[num_chain_servers];
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_tail_ips[i] = log_addr->at(num_chain_servers+i).c_str();
                 }
-                m_fuzzylog_client = new_dag_handle_with_replication(num_chain_servers, chain_server_head_ips, chain_server_tail_ips, c);
-
+                ServerSpec servers = {
+                        .num_ips = num_chain_servers,
+                        .head_ips = const_cast<char **>(&*chain_server_head_ips),
+                        .tail_ips = const_cast<char **>(&*chain_server_tail_ips),
+                };
+                m_fuzzylog_client = new_fuzzylog_instance(servers, c, NULL);
         } else {
                 size_t num_chain_servers = log_addr->size();
-                const char *chain_server_ips[num_chain_servers]; 
+                const char *chain_server_ips[num_chain_servers];
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_ips[i] = log_addr->at(i).c_str();
                 }
-                m_fuzzylog_client = new_dag_handle_with_skeens(num_chain_servers, chain_server_ips, m_interesting_colors);
+                ServerSpec servers = {
+                        .num_ips = num_chain_servers,
+                        .head_ips = const_cast<char **>(&*chain_server_ips),
+                        .tail_ips = NULL,
+                };
+                m_fuzzylog_client = new_fuzzylog_instance(servers, c, NULL);
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(3));
@@ -49,9 +57,9 @@ void CAPMapSynchronizer::run() {
 }
 
 void CAPMapSynchronizer::join() {
-        m_running = false; 
+        m_running = false;
         pthread_join(m_thread, NULL);
-        close_dag_handle(m_fuzzylog_client);
+        fuzzylog_close(m_fuzzylog_client);
 }
 
 void* CAPMapSynchronizer::bootstrap(void *arg) {
@@ -98,7 +106,7 @@ void CAPMapSynchronizer::ExecuteProtocol2Primary() {
                         *cv_spurious_wake_up = false;
                         cv->notify_one();
                         m_current_queue.pop();
-                } 
+                }
                 std::this_thread::sleep_for(std::chrono::nanoseconds(1));
         }
 }
@@ -126,153 +134,140 @@ void CAPMapSynchronizer::ExecuteProtocol2Secondary() {
                         *cv_spurious_wake_up = false;
                         cv->notify_one();
                         m_current_queue.pop();
-                } 
+                }
                 std::this_thread::sleep_for(std::chrono::nanoseconds(1));
         }
 }
 
+extern "C" {
+        SnapId fuzzylog_sync_chain(FLPtr handle,
+                           uint64_t chain,
+                           void (*callback)(void*, FuzzyLogEvent),
+                           void *callback_state);
+
+        bool fuzzylog_event_inhabits_chain(FuzzyLogEvent event, uint64_t chain);
+}
+
 uint64_t CAPMapSynchronizer::sync_with_log_ver2_primary() {
-        uint64_t key, val;
-        uint8_t flag;
-        size_t size = 0;
-        struct colors* snapshot_color = NULL;
-        struct colors* playback_color = NULL;
-        struct colors* mutable_playback_color = NULL;
+        uint64_t snapshot_chain = clone_local_chain();
+        uint64_t events_read = 0;
 
-        snapshot_color = clone_local_color();
-        playback_color = clone_all_colors();
-        snapshot_colors(m_fuzzylog_client, snapshot_color);
-        uint64_t read_count = 0;
+        std::tuple<CAPMapSynchronizer*, uint64_t*> args = std::make_tuple(this, &events_read);
 
-        while (true) {
-                mutable_playback_color = clone_color(playback_color);
-                get_next(m_fuzzylog_client, m_read_buf, &size, mutable_playback_color);
-                if (mutable_playback_color->numcolors == 0) break;
-                read_count++;
+        auto snap = fuzzylog_sync_chain(
+                m_fuzzylog_client,
+                snapshot_chain,
+                [](void *args, FuzzyLogEvent event) {
 
-                assert(mutable_playback_color->numcolors == 1);
-                assert(size == sizeof(struct Node));
+                uint64_t *read_count;
+                CAPMapSynchronizer *self;
+                auto a = reinterpret_cast<const std::tuple<CAPMapSynchronizer*, uint64_t*>*>(args);
+                std::tie(self, read_count) = *a;
 
-                struct Node* data = reinterpret_cast<struct Node*>(m_read_buf);
-                key = data->key;
-                val = data->value;
-                flag = data->flag;
-                
-                if (is_remote_color(mutable_playback_color)) {
+                *read_count += 1;
+                assert(event.inhabits_len == 1);
+                assert(event.data_size == sizeof(struct Node));
+
+                struct Node* data = (struct Node*)event.data;
+                uint64_t key = data->key;
+                uint64_t val = data->value;
+                uint8_t flag = data->flag;
+
+                if (self->is_remote(event)) {
                         switch (flag) {
                         case CAPMap::PartitioningNode:
                                 std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " Partitioning node found in primary" << std::endl;
                                 // XXX: no break
                         case CAPMap::NormalNode:
-                                buffer_nodes(data->clone());
+                                self->buffer_nodes(data->clone());
                                 break;
                         default:
                                 assert(false);
                         }
-                } else if (is_local_color(mutable_playback_color)) {
+                } else if (self->is_local(event)) {
                         switch (flag) {
                         case CAPMap::HealingNode:
                                 std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " Healing node found in primary" << std::endl;
-                                assert(m_map->get_network_partition_status() == CAPMap::PartitionStatus::NORMAL);
-                                m_map->set_network_partition_status(CAPMap::PartitionStatus::HEALING);
-                                apply_buffered_nodes(false);
-                                m_local_map[key] = val;
-                                m_map->set_network_partition_status(CAPMap::PartitionStatus::NORMAL);
+                                assert(self->m_map->get_network_partition_status() == CAPMap::PartitionStatus::NORMAL);
+                                self->m_map->set_network_partition_status(CAPMap::PartitionStatus::HEALING);
+                                self->apply_buffered_nodes(false);
+                                self->m_local_map[key] = val;
+                                self->m_map->set_network_partition_status(CAPMap::PartitionStatus::NORMAL);
                                 break;
                         case CAPMap::NormalNode:
-                                m_local_map[key] = val;
+                                self->m_local_map[key] = val;
                                 break;
                         default:
                                 assert(false);
                         }
                 }
-                delete mutable_playback_color;
-        }
-        delete snapshot_color;
-        delete playback_color;
-        delete mutable_playback_color;
-        return read_count;
+        }, &args);
+        delete_snap_id(snap);
+
+        return events_read;
 }
 
 uint64_t CAPMapSynchronizer::sync_with_log_ver2_secondary() {
-        uint64_t key, val;
-        uint8_t flag;
-        size_t size = 0;
-        struct colors* snapshot_color = NULL;
-        struct colors* playback_color = NULL;
-        struct colors* mutable_playback_color = NULL;
-        CAPMap::PartitionStatus previous_status, current_status;
-        previous_status = CAPMap::PartitionStatus::UNINITIALIZED;
-        uint64_t read_count = 0;
-        
-        while (true) {
-                current_status = m_map->get_network_partition_status();
+        SnapId snap;
 
-                if (previous_status != current_status) {
-                        // Deallocate memory
-                        if (snapshot_color != NULL) delete snapshot_color;
-                        if (playback_color != NULL) delete playback_color;
+        uint64_t events_read = 0;
 
-                        // Take new colors
-                        if (current_status == CAPMap::PartitionStatus::PARTITIONED) {
-                                snapshot_color = clone_local_color();
-                                snapshot_colors(m_fuzzylog_client, snapshot_color);
+        std::tuple<CAPMapSynchronizer*, uint64_t*> args = std::make_tuple(this, &events_read);
 
-                                playback_color = clone_local_color();
+        auto callback = [](void *args, FuzzyLogEvent event) {
+                uint64_t *read_count;
+                CAPMapSynchronizer *self;
+                auto a = reinterpret_cast<const std::tuple<CAPMapSynchronizer*, uint64_t*>*>(args);
+                std::tie(self, read_count) = *a;
 
-                        } else {
-                                snapshot_color = clone_remote_color();
-                                snapshot_colors(m_fuzzylog_client, snapshot_color);
+                *read_count += 1;
 
-                                playback_color = clone_all_colors();
-                        }
-                }
-                mutable_playback_color = clone_color(playback_color);
-                get_next(m_fuzzylog_client, m_read_buf, &size, mutable_playback_color);
-                if (mutable_playback_color->numcolors == 0) break;
-                read_count++;
+                assert(event.inhabits_len == 1);
+                assert(event.data_size == sizeof(struct Node));
 
-                assert(mutable_playback_color->numcolors == 1);
-                assert(size == sizeof(struct Node));
+                struct Node* data = (struct Node*)event.data;
+                uint64_t key = data->key;
+                uint64_t val = data->value;
+                uint8_t flag = data->flag;
 
-                struct Node* data = reinterpret_cast<struct Node*>(m_read_buf);
-                key = data->key;
-                val = data->value;
-                flag = data->flag;
-                
-                if (is_remote_color(mutable_playback_color)) {
+                if (self->is_remote(event)) {
                         switch (flag) {
                         case CAPMap::NormalNode:
-                                m_local_map[key] = val;
+                                self->m_local_map[key] = val;
                                 break;
                         case CAPMap::HealingNode:
                                 std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " Healing node found in secondary" << std::endl;
-                                apply_buffered_nodes(false);
-                                m_local_map[key] = val;
-                                m_map->set_network_partition_status(CAPMap::PartitionStatus::NORMAL);
+                                self->apply_buffered_nodes(false);
+                                self->m_local_map[key] = val;
+                                self->m_map->set_network_partition_status(CAPMap::PartitionStatus::NORMAL);
                                 break;
                         default:
                                 assert(false);
                         }
-                } else if (is_local_color(mutable_playback_color)) {
+                } else if (self->is_local(event)) {
                         switch (flag) {
                         case CAPMap::PartitioningNode:
                                 std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " Partitioning node found in secondary" << std::endl;
                                 // XXX: no break
                         case CAPMap::NormalNode:
-                                buffer_nodes(data->clone());
+                                self->buffer_nodes(data->clone());
                                 break;
                         default:
                                 assert(false);
                         }
                 }
-                previous_status = current_status;
-                delete mutable_playback_color;
+        };
+
+        if (m_map->get_network_partition_status() == CAPMap::PartitionStatus::PARTITIONED) {
+                snap = fuzzylog_sync_chain(
+                        m_fuzzylog_client, clone_local_chain(), callback, &args);
+        } else {
+                snap = fuzzylog_sync_events(m_fuzzylog_client, callback,&args);
         }
-        delete snapshot_color;
-        delete playback_color;
-        delete mutable_playback_color;
-        return read_count;
+
+        delete_snap_id(snap);
+
+        return events_read;
 }
 
 
@@ -294,42 +289,38 @@ uint64_t CAPMapSynchronizer::get(uint64_t key) {
         return m_local_map[key];
 }
 
-struct colors* CAPMapSynchronizer::clone_local_color() {
-        struct colors* local_color = static_cast<struct colors*>(malloc(sizeof(struct colors)));
-        local_color->numcolors = 1;
-        local_color->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
-        local_color->mycolors[0] = m_interesting_colors->mycolors[0];
-        return local_color;
+uint64_t CAPMapSynchronizer::clone_local_chain() {
+        return m_interesting_colors.remote_chains[0];
 }
 
-struct colors* CAPMapSynchronizer::clone_remote_color() {
-        struct colors* remote_color = static_cast<struct colors*>(malloc(sizeof(struct colors)));
-        remote_color->numcolors = 1;
-        remote_color->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID)));
-        remote_color->mycolors[0] = m_interesting_colors->mycolors[1];
-        return remote_color;
+uint64_t CAPMapSynchronizer::clone_remote_chain() {
+        return m_interesting_colors.remote_chains[1];
 }
 
-struct colors* CAPMapSynchronizer::clone_all_colors() {
+ColorSpec CAPMapSynchronizer::clone_all_colors() {
         return clone_color(m_interesting_colors);
 }
 
-struct colors* CAPMapSynchronizer::clone_color(struct colors* color) {
-        struct colors* cloned_color = static_cast<struct colors*>(malloc(sizeof(struct colors)));
-        cloned_color->numcolors = color->numcolors;
-        cloned_color->mycolors = static_cast<ColorID*>(malloc(sizeof(ColorID) * color->numcolors));
-        for (size_t i = 0; i < color->numcolors; i++) {
-                cloned_color->mycolors[i] = color->mycolors[i];
+ColorSpec CAPMapSynchronizer::clone_color(ColorSpec color) {
+        ColorSpec cloned_color = {
+                .local_chain = color.local_chain,
+                .num_remote_chains = color.num_remote_chains,
+                .remote_chains = static_cast<uint64_t*>(malloc(sizeof(uint64_t) * color.num_remote_chains)),
+        };
+        for (size_t i = 0; i < color.num_remote_chains; i++) {
+                cloned_color.remote_chains[i] = color.remote_chains[i];
         }
         return cloned_color;
 }
 
-bool CAPMapSynchronizer::is_local_color(struct colors* color) {
-        return color->mycolors[0] == m_interesting_colors->mycolors[0];
+bool CAPMapSynchronizer::is_local(FuzzyLogEvent event) {
+        return fuzzylog_event_inhabits_chain(
+                event, m_interesting_colors.remote_chains[0]);
 }
 
-bool CAPMapSynchronizer::is_remote_color(struct colors* color) {
-        return color->mycolors[0] == m_interesting_colors->mycolors[1];
+bool CAPMapSynchronizer::is_remote(FuzzyLogEvent event) {
+        return fuzzylog_event_inhabits_chain(
+                event, m_interesting_colors.remote_chains[1]);
 }
 
 bool compare_nodes(struct Node* i, struct Node* j) {
@@ -338,7 +329,7 @@ bool compare_nodes(struct Node* i, struct Node* j) {
 
 void CAPMapSynchronizer::apply_buffered_nodes(bool reorder) {
         if (reorder)
-                std::sort(m_buffered_nodes.begin(), m_buffered_nodes.end(), compare_nodes); 
+                std::sort(m_buffered_nodes.begin(), m_buffered_nodes.end(), compare_nodes);
 
         // After sorted, apply updates
         for (auto w : m_buffered_nodes) {

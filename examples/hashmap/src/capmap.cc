@@ -3,7 +3,7 @@
 
 CAPMap::CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, ProtocolVersion protocol, std::string& role, bool replication): BaseMap(log_addr, replication), m_protocol(protocol), m_role(role), m_network_partition_status(NORMAL), m_synchronizer(NULL) {
         // FIXME: m_map_type
-        std::vector<ColorID> interesting_colors;
+        std::vector<uint64_t> interesting_colors;
         if (get_interesting_colors(workload, interesting_colors))
                 init_synchronizer(log_addr, interesting_colors, replication);
 }
@@ -11,17 +11,16 @@ CAPMap::CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>*
 CAPMap::~CAPMap() {
         if (m_synchronizer != NULL)
                 m_synchronizer->join();
-        close_dag_handle(m_fuzzylog_client);
+        fuzzylog_close(m_fuzzylog_client);
 }
 
-bool CAPMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors) {
+bool CAPMap::get_interesting_colors(std::vector<workload_config>* workload, std::vector<uint64_t>& interesting_colors) {
         bool get_workload_found = false;
         for (auto w : *workload) {
                 if (w.op_type == "get") {
-                        assert(w.first_color.numcolors == 1);
-                        assert(w.second_color.numcolors == 1);
-                        interesting_colors.push_back(w.first_color.mycolors[0]);
-                        interesting_colors.push_back(w.second_color.mycolors[0]);
+                        assert(w.colors.num_remote_chains == 2);
+                        interesting_colors.push_back(w.colors.remote_chains[0]);
+                        interesting_colors.push_back(w.colors.remote_chains[1]);
                         get_workload_found = true;
                         break;
                 }
@@ -30,7 +29,7 @@ bool CAPMap::get_interesting_colors(std::vector<workload_config>* workload, std:
 
 }
 
-void CAPMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication) {
+void CAPMap::init_synchronizer(std::vector<std::string>* log_addr, std::vector<uint64_t>& interesting_colors, bool replication) {
         m_synchronizer = new CAPMapSynchronizer(this, log_addr, interesting_colors, replication);
         m_synchronizer->run();
 }
@@ -81,20 +80,24 @@ void CAPMap::get_payload_for_partitioning_node(uint64_t key, uint64_t value, cha
         get_payload(key, value, PartitioningNode, out, out_size);
 }
 
-write_id CAPMap::async_normal_put(uint64_t key, uint64_t value, struct colors* op_color) {
+WriteId CAPMap::async_normal_put(uint64_t key, uint64_t value, ColorSpec op_color) {
         size_t size;
-        get_payload_for_normal_node(key, value, m_buf, &size);
-        return async_append(m_fuzzylog_client, m_buf, size, op_color, NULL); 
+        char buf[sizeof(struct Node)];
+        get_payload_for_normal_node(key, value, &buf[0], &size);
+        return fuzzylog_async_append(m_fuzzylog_client, &buf[0], size, &op_color, 1);
 }
 
-write_id CAPMap::async_partitioning_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color) {
+WriteId CAPMap::async_partitioning_put(uint64_t key, uint64_t value, ColorSpec op_color) {
         size_t size;
-        get_payload_for_partitioning_node(key, value, m_buf, &size);
-        return async_simple_causal_append(m_fuzzylog_client, m_buf, size, op_color, dep_color);
+        char buf[sizeof(struct Node)];
+        get_payload_for_partitioning_node(key, value, &buf[0], &size);
+        return fuzzylog_async_append(m_fuzzylog_client, &buf[0], size, &op_color, 1);
 }
 
-write_id CAPMap::async_healing_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color) {
+WriteId CAPMap::async_healing_put(uint64_t key, uint64_t value, ColorSpec rev_colors) {
         size_t size;
-        get_payload_for_healing_node(key, value, m_buf, &size);
-        return async_simple_causal_append(m_fuzzylog_client, m_buf, size, op_color, dep_color);  // TODO: check if dep_color would depend on the latest node appended by the same machine
+        char buf[sizeof(struct Node)];
+        ColorSpec color = {.local_chain = rev_colors.remote_chains[0]};
+        get_payload_for_healing_node(key, value, &buf[0], &size);
+        return fuzzylog_async_append(m_fuzzylog_client, &buf[0], size, &color, 1);  // TODO: check if dep_color would depend on the latest node appended by the same machine
 }

@@ -12,7 +12,7 @@
 #include <capmap.h>
 
 extern "C" {
-        #include "fuzzy_log.h"
+        #include "fuzzylog_async_ext.h"
 }
 
 #define FAKE_NETWORK_PARTITION_STARTS_AT        6       // in seconds
@@ -20,30 +20,30 @@ extern "C" {
 #define MEASUREMENT_INTERVAL                    100     // in milliseconds
 
 void write_output(uint32_t client_id, std::vector<uint64_t>& results) {
-        std::ofstream result_file; 
+        std::ofstream result_file;
         result_file.open(std::to_string(client_id) + ".txt", std::ios::app | std::ios::out);
         for (auto r : results) {
-                result_file << r << "\n"; 
+                result_file << r << "\n";
         }
-        result_file.close();        
+        result_file.close();
 }
 
 void write_latency(uint32_t client_id, std::string& suffix, std::vector<latency_footprint>& latencies) {
-        std::ofstream result_file; 
+        std::ofstream result_file;
         result_file.open(std::to_string(client_id) + suffix, std::ios::app | std::ios::out);
         for (auto l : latencies) {
-                result_file << l.m_issue_time.time_since_epoch().count() << " " << l.m_latency << "\n"; 
+                result_file << l.m_issue_time.time_since_epoch().count() << " " << l.m_latency << "\n";
         }
-        result_file.close();        
+        result_file.close();
 }
 
 
 void measure_fn(CAPMap *m, CAPMapTester *w, uint64_t duration, std::vector<workload_config>& workload, std::vector<uint64_t> &results)
 {
         uint64_t start_iters, end_iters;
-        
-        bool needs_to_be_aware_of_partition = 
-                                m->get_protocol_version() == CAPMap::ProtocolVersion::VERSION_1 || 
+
+        bool needs_to_be_aware_of_partition =
+                                m->get_protocol_version() == CAPMap::ProtocolVersion::VERSION_1 ||
                                 (m->get_protocol_version() == CAPMap::ProtocolVersion::VERSION_2 && m->get_role() == "secondary");
 
         bool put_workload_found = false;
@@ -53,12 +53,12 @@ void measure_fn(CAPMap *m, CAPMapTester *w, uint64_t duration, std::vector<workl
                         break;
                 }
         }
-        
+
         end_iters = w->get_num_executed();
         for (auto i = 0; i < duration * 1000 / MEASUREMENT_INTERVAL; ++i) {
-                start_iters = end_iters; 
+                start_iters = end_iters;
                 std::this_thread::sleep_for(std::chrono::milliseconds(MEASUREMENT_INTERVAL));
-                end_iters = w->get_num_executed(); 
+                end_iters = w->get_num_executed();
                 if (put_workload_found) {
                         std::cout << i << " measured: " << end_iters << " - " << start_iters << " = " << end_iters - start_iters << std::endl;
                         results.push_back(end_iters - start_iters);
@@ -78,34 +78,28 @@ void measure_fn(CAPMap *m, CAPMapTester *w, uint64_t duration, std::vector<workl
 
 void wait_signal(capmap_config cfg)
 {
-        char buffer[DELOS_MAX_DATA_SIZE];
-        size_t buf_sz;
-        struct colors c, depends, interested;   
-        auto num_received = 0;
-
-        ColorID sig_color[1];   
-        sig_color[0] = cfg.num_clients + 1;
-        c.mycolors = sig_color;
-        c.numcolors = 1;
-        buf_sz = 1;
-        
-        interested = c;
+        ColorSpec c = {.local_chain = cfg.num_clients + 1ull};
+        uint64_t received = 0ull;
 
         /* Server ips for handle. */
-        DAGHandle *handle = NULL;
+        FLPtr handle = NULL;
         if (cfg.replication) {
                 assert (cfg.log_addr.size() > 0 && cfg.log_addr.size() % 2 == 0);
                 size_t num_chain_servers = cfg.log_addr.size() / 2;
-                const char *chain_server_head_ips[num_chain_servers]; 
+                const char *chain_server_head_ips[num_chain_servers];
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_head_ips[i] = cfg.log_addr[i].c_str();
                 }
-                const char *chain_server_tail_ips[num_chain_servers]; 
+                const char *chain_server_tail_ips[num_chain_servers];
                 for (auto i = 0; i < num_chain_servers; i++) {
                         chain_server_tail_ips[i] = cfg.log_addr[num_chain_servers+i].c_str();
                 }
-                handle = new_dag_handle_with_replication(num_chain_servers, chain_server_head_ips, chain_server_tail_ips, &c);
-
+                ServerSpec servers = {
+                        .num_ips = num_chain_servers,
+                        .head_ips = const_cast<char **>(&*chain_server_head_ips),
+                        .tail_ips = const_cast<char **>(&*chain_server_tail_ips),
+                };
+                handle = new_fuzzylog_instance(servers, c, NULL);
         } else {
                 size_t num_servers = cfg.log_addr.size();
                 assert(num_servers > 0);
@@ -113,28 +107,23 @@ void wait_signal(capmap_config cfg)
                 for (auto i = 0; i < num_servers; ++i) {
                         server_ips[i] = cfg.log_addr[i].c_str();
                 }
-                handle = new_dag_handle_with_skeens(num_servers, server_ips, &c);
+                ServerSpec servers = {
+                        .num_ips = num_servers,
+                        .head_ips = const_cast<char **>(&*server_ips),
+                        .tail_ips = NULL,
+                };
+                handle = new_fuzzylog_instance(servers, c, NULL);
         }
 
-        depends.mycolors = NULL;
-        depends.numcolors = 0;
-
-        append(handle, buffer, buf_sz, &c, &depends);
-        while (num_received < cfg.num_clients) {
-                snapshot(handle);
-                while (true) {
-                        get_next(handle, buffer, &buf_sz, &c);
-                        assert(c.numcolors == 0 || c.numcolors == 1);   
-                        if (c.numcolors == 1) {
-                                //assert(c.mycolors[0] == 1);
-                                num_received += 1;
-                                free(c.mycolors);
-                        } else {
-                                break;
-                        }
-                }
-        }       
-        close_dag_handle(handle);
+        fuzzylog_append(handle, NULL, 0, &c, 1);
+        while (received < cfg.num_clients) {
+                fuzzylog_sync_events(handle, [](void *args, FuzzyLogEvent event) {
+                        assert(event.inhabits_len == 1);
+                        uint64_t *num_received = (uint64_t *)args;
+                        *num_received += 1;
+                }, &received);
+        }
+        fuzzylog_close(handle);
 }
 
 void do_experiment(capmap_config cfg) {
@@ -150,7 +139,7 @@ void do_experiment(capmap_config cfg) {
 
         // Total operation count
         total_op_count = 0;
-        for (auto w : cfg.workload) { 
+        for (auto w : cfg.workload) {
                 total_op_count += w.op_count;
         }
         Context ctx;    // Can be used to share info between CAPMapTester and Txns
@@ -161,7 +150,7 @@ void do_experiment(capmap_config cfg) {
         // Generate append workloads: uniform distribution
         workload_gen = new capmap_workload_generator(&ctx, map, cfg.expt_range, &cfg.workload);
         txns = workload_gen->Gen();
-        
+
         // One worker thread
         flag = true;
         worker = new CAPMapTester(&ctx, map, &flag, txns, total_op_count, cfg.async, cfg.window_size, cfg.expt_duration, cfg.txn_rate);
@@ -171,7 +160,7 @@ void do_experiment(capmap_config cfg) {
 
         // Run workers
         worker->run();
-        
+
         // Measure
         //std::this_thread::sleep_for(std::chrono::seconds(5));
         measure_fn(map, worker, cfg.expt_duration, cfg.workload, results);
@@ -185,7 +174,7 @@ void do_experiment(capmap_config cfg) {
 
         // Wait until worker finishes
         worker->join();
- 
+
         // Write latency to output file
         worker->get_put_latencies(put_latencies);
         std::cout << "put latencies:" << put_latencies.size() << std::endl;
@@ -199,7 +188,7 @@ void do_experiment(capmap_config cfg) {
                 std::string get_latency_output_suffix = "_get_latency.txt";
                 write_latency(cfg.client_id, get_latency_output_suffix, get_latencies);
         }
-       
+
         // Free
         delete worker;
         delete map;

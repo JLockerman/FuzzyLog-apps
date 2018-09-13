@@ -8,24 +8,23 @@
 #include <unordered_map>
 
 extern "C" {
-        #include "fuzzy_log.h"
+        #include "fuzzylog_async_ext.h"
 }
 
 class CAPMap;
 
-// Synchronizer class which eagerly synchronize with fuzzylog 
+// Synchronizer class which eagerly synchronize with fuzzylog
 class CAPMapSynchronizer : public Runnable {
 private:
         std::queue<std::pair<std::condition_variable*, std::atomic_bool*>>      m_pending_queue;
         std::queue<std::pair<std::condition_variable*, std::atomic_bool*>>      m_current_queue;
         std::mutex                                                              m_queue_mtx;
 
-        DAGHandle*                                                              m_fuzzylog_client;
-        struct colors*                                                          m_interesting_colors;
-        char                                                                    m_read_buf[DELOS_MAX_DATA_SIZE];
+        FLPtr                                                              m_fuzzylog_client;
+        ColorSpec                                                          m_interesting_colors;
 
         std::atomic_bool                                                        m_running;
-        std::unordered_map<uint64_t, uint64_t>                                  m_local_map; 
+        std::unordered_map<uint64_t, uint64_t>                                  m_local_map;
         std::mutex                                                              m_local_map_mtx;
 
         CAPMap*                                                                 m_map;
@@ -34,13 +33,13 @@ private:
         bool                                                                    m_replication;
 
 public:
-        CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication);
+        CAPMapSynchronizer(CAPMap* map, std::vector<std::string>* log_addr, std::vector<uint64_t>& interesting_colors, bool replication);
         ~CAPMapSynchronizer() {}
         virtual void run();
         virtual void join();
         static void* bootstrap(void *arg);
-        void ExecuteProtocol2Primary(); 
-        void ExecuteProtocol2Secondary(); 
+        void ExecuteProtocol2Primary();
+        void ExecuteProtocol2Secondary();
         uint64_t sync_with_log_ver2_primary();
         uint64_t sync_with_log_ver2_secondary();
         //void sync_with_log_ver2_secondary(struct colors* snapshot_color, struct colors* playback_color);
@@ -51,13 +50,13 @@ public:
 
         uint64_t get(uint64_t key);
 
-        struct colors* clone_local_color();
-        struct colors* clone_remote_color();
-        struct colors* clone_all_colors();
-        struct colors* clone_color(struct colors* color);
+        uint64_t clone_local_chain();
+        uint64_t clone_remote_chain();
+        ColorSpec clone_all_colors();
+        ColorSpec clone_color(ColorSpec color);
 
-        bool is_local_color(struct colors* color);
-        bool is_remote_color(struct colors* color);
+        bool is_local(FuzzyLogEvent event);
+        bool is_remote(FuzzyLogEvent event);
 
         // For weak nodes
         void apply_buffered_nodes(bool reorder);

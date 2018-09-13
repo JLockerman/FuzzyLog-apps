@@ -7,7 +7,7 @@
 void ycsb_insert::Run() {
         uint64_t key, value;
         assert(m_map != NULL);
-       
+
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
@@ -21,7 +21,7 @@ write_id ycsb_insert::AsyncRun() {
         uint64_t key, value;
         assert(m_map != NULL);
         assert(m_dep_color == NULL);            // XXX: in AtomicMap, do not support cross-color put at the moment
-       
+
         // key = (start, end)
         key = rand() % (m_end - m_start);
         value = rand();
@@ -44,7 +44,7 @@ write_id ycsb_insert::AsyncWeaklyConsistentRun() {
 void ycsb_read::Run() {
         uint64_t key;
         assert(m_map != NULL);
-       
+
         // key = (start, end)
         key = rand() % (m_end - m_start);
 
@@ -54,7 +54,7 @@ void ycsb_read::Run() {
 write_id ycsb_read::AsyncRun() {
         uint64_t key;
         assert(m_map != NULL);
-       
+
         // key = (start, end)
         key = rand() % (m_end - m_start);
 
@@ -91,7 +91,7 @@ Txn** atomicmap_workload_generator::Gen() {
         vector<uint64_t> allocations;
         uint64_t n = 0;
         for (auto w : *m_workload) {
-                n += w.op_count; 
+                n += w.op_count;
                 double p = static_cast<double>(n) / total_op_count;
                 proportions.push_back(p);
                 allocations.push_back(w.op_count);
@@ -103,11 +103,11 @@ Txn** atomicmap_workload_generator::Gen() {
                 r = static_cast<double>(rand()) / (RAND_MAX);
 
                 for (auto j = 0; j < proportions.size(); j++) {
-                        if (proportions[j] > r && allocations[j] > 0) { 
-                                std::string op_type = (*m_workload)[j].op_type; 
-                                struct colors* color = &(*m_workload)[j].first_color; 
-                                uint64_t start = 0; 
-                                uint64_t end = m_range; 
+                        if (proportions[j] > r && allocations[j] > 0) {
+                                std::string op_type = (*m_workload)[j].op_type;
+                                struct colors* color = &(*m_workload)[j].first_color;
+                                uint64_t start = 0;
+                                uint64_t end = m_range;
 
                                 if (op_type == "get") {
                                         txns[i] = new ycsb_read(m_map, color, start, end, m_context, Txn::optype::GET);

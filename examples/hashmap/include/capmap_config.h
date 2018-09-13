@@ -33,13 +33,13 @@ struct capmap_config {
 	uint8_t 		        num_clients;
 	uint8_t 		        client_id;
         uint8_t                         protocol;
-        std::string                     role; 
+        std::string                     role;
 	std::vector<workload_config>    workload;
         uint32_t                        txn_rate;
         bool                            async;
         uint32_t                        window_size;
         bool                            replication;
-}; 
+};
 
 class capmap_config_parser {
 private:
@@ -79,18 +79,18 @@ private:
 		}
 		_init = true;
 	}
-	
+
 	capmap_config create_config()
 	{
 		assert(_init == true);
 		capmap_config ret;
 
-		if (_arg_map.count(LOG_ADDR) == 0 || 
+		if (_arg_map.count(LOG_ADDR) == 0 ||
 		    _arg_map.count(EXPT_RANGE) == 0 ||
 		    _arg_map.count(EXPT_DURATION) == 0 ||
-		    _arg_map.count(NUM_CLIENTS) == 0 || 
-		    _arg_map.count(CLIENT_ID) == 0 || 
-		    _arg_map.count(PROTOCOL) == 0 || 
+		    _arg_map.count(NUM_CLIENTS) == 0 ||
+		    _arg_map.count(CLIENT_ID) == 0 ||
+		    _arg_map.count(PROTOCOL) == 0 ||
 		    _arg_map.count(WORKLOAD) == 0) {
 		        std::cerr << "Missing one or more params\n";
 		        std::cerr << "--" << long_options[LOG_ADDR].name << "\n";
@@ -119,11 +119,11 @@ private:
 		ret.expt_range = static_cast<uint64_t>(atoi(_arg_map[EXPT_RANGE]));
                 // expt_duration
 		ret.expt_duration = static_cast<uint32_t>(atoi(_arg_map[EXPT_DURATION]));
-                // num_clients 
+                // num_clients
 		ret.num_clients = static_cast<uint8_t>(atoi(_arg_map[NUM_CLIENTS]));
                 // client_id
 		ret.client_id = static_cast<uint8_t>(atoi(_arg_map[CLIENT_ID]));
-                // protocol 
+                // protocol
 		ret.protocol = static_cast<uint8_t>(atoi(_arg_map[PROTOCOL]));
                 if (ret.protocol == 2 && _arg_map.count(ROLE) == 0) {
                         std::cerr << "Error. --" << long_options[ROLE].name << " should be set with protocol 2\n";
@@ -133,27 +133,26 @@ private:
                 if (_arg_map.count(ROLE) > 0) {
                         ret.role = std::string(_arg_map[ROLE]);
                 }
-                  
+
                 // workload
                 std::vector<std::string> workloads = split(std::string(_arg_map[WORKLOAD]), ',');
                 for (auto w : workloads) {
                         // parse: {get|put}@color_name[{-|~}color_name]=op_count
                         // color_name = color_value[:color_value]...
-                        std::vector<std::string> pair = split(w, '='); 
-                        assert(pair.size() == 2); 
+                        std::vector<std::string> pair = split(w, '=');
+                        assert(pair.size() == 2);
 
                         // operation type = {get|put}
                         std::vector<std::string> op_type_and_color = split(pair[0], '@');
-                        assert(op_type_and_color.size() == 2); 
-                        std::string op_type = op_type_and_color[0]; 
+                        assert(op_type_and_color.size() == 2);
+                        std::string op_type = op_type_and_color[0];
                         if (op_type != "get" && op_type != "put") {
                                 std::cerr << "Error. --" << long_options[WORKLOAD].name << " only allows get|put\n";
                                 exit(-1);
                         }
 
                         // color scheme = color_name[{-|~}color_name]
-                        struct colors local_color;
-                        struct colors remote_color;
+                        ColorSpec color = {};
                         bool is_strong = false;
                         std::string& color_scheme = op_type_and_color[1];
 
@@ -167,18 +166,22 @@ private:
                                 is_strong = color_scheme.find("-") != std::string::npos;
                                 if (!is_strong)
                                         assert(color_scheme.find("~") != std::string::npos);
-                                        
+
                                 std::vector<std::string> color_dep = split(color_scheme, is_strong ? '-' : '~');
                                 assert(color_dep.size() <= 2);
 
                                 // depedency color
-                                string_to_colors(color_dep[0], &local_color);
-                                string_to_colors(color_dep[1], &remote_color);
+                                string_to_colors(color_dep[0], &color.local_chain);
+                                uint64_t *remote_color = new uint64_t[1];
+                                color.remote_chains = remote_color;
+                                color.num_remote_chains = 1;
+                                string_to_colors(color_dep[1], color.remote_chains);
+
 
                         } else {
                                 // no depedency color
-                                string_to_colors(color_scheme, &local_color);
-                        }        
+                                string_to_colors(color_scheme, &color.local_chain);
+                        }
 
                         // op_count
                         uint64_t op_count = static_cast<uint64_t>(stoi(pair[1]));
@@ -186,11 +189,10 @@ private:
                         // workload
                         workload_config wc;
                         wc.op_type = op_type;
-                        wc.first_color = local_color;
-                        wc.second_color = remote_color;
-                        wc.has_dependency = has_dependency; 
+                        wc.colors = color;
+                        wc.has_dependency = has_dependency;
                         wc.is_strong = is_strong;
-                        wc.op_count = op_count; 
+                        wc.op_count = op_count;
                         ret.workload.push_back(wc);
                 }
                 // txn_rate
@@ -215,20 +217,22 @@ private:
 		return ret;
 	}
 
-        void string_to_colors(std::string& str, struct colors* out)
+        void string_to_colors(std::string& str, uint64_t* out)
         {
                 std::vector<std::string> color_list = split(str, ':');
-                out->numcolors = color_list.size();
-                out->mycolors = new ColorID[color_list.size()];
+                assert(color_list.size() == 1);
+                // out->numcolors = color_list.size();
+                // out->mycolors = new ColorID[color_list.size()];
                 for (auto i = 0; i < color_list.size(); ++i) {
-                        out->mycolors[i] = (ColorID)stoi(color_list[i]);
+                        // out->mycolors[i] = (ColorID)stoi(color_list[i]);
+                    *out = (uint64_t)stoull(color_list[i]);
                 }
         }
 
 
 
 public:
-	capmap_config_parser() 
+	capmap_config_parser()
 	{
 		_init = false;
 		_arg_map.clear();

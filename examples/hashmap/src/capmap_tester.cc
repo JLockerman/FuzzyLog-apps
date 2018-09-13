@@ -27,7 +27,7 @@ void* CAPMapTester::bootstrap(void *arg) {
         if (protocol == CAPMap::ProtocolVersion::VERSION_1) {
                 assert(false);
 
-        } else if (protocol == CAPMap::ProtocolVersion::VERSION_2) { 
+        } else if (protocol == CAPMap::ProtocolVersion::VERSION_2) {
                 std::string role = worker->m_capmap->get_role();
                 worker->ExecuteProtocol2(role);
 
@@ -41,7 +41,7 @@ void CAPMapTester::ExecuteProtocol2(std::string& role) {
         assert(role == "primary" || role == "secondary");
 
         uint32_t i;
-        uint32_t num_pending = 0; 
+        uint32_t num_pending = 0;
         bool partitioning_node_appended = false;
         bool healing_node_appended = false;
 
@@ -51,18 +51,19 @@ void CAPMapTester::ExecuteProtocol2(std::string& role) {
                 for (i = 0; *m_flag; i++, i = i % m_num_txns) {
                         // try get completed
                         num_pending -= try_get_completed();
-                                                
+
                         // issue
                         if (num_pending == m_window_size) {
-                                write_id wid = m_map->wait_for_any_put();
+                                WriteId wid = m_map->wait_for_any_put();
+                                WriteId WRITE_ID_NIL = {};
                                 if (wid_equality{}(wid, WRITE_ID_NIL)) {
-                                        std::cout << "no pending writes. terminate" << std::endl; 
+                                        std::cout << "no pending writes. terminate" << std::endl;
                                         break;
                                 }
                                 num_pending -= 1;
                                 m_context->inc_num_executed();
                                 // Add latency stat
-                                auto start_time = m_context->mark_ended(wid); 
+                                auto start_time = m_context->mark_ended(wid);
                                 add_put_latency(start_time);
                         }
 
@@ -128,7 +129,7 @@ void CAPMapTester::ExecuteProtocol2(std::string& role) {
                                 }
                         } else if (m_txns[i]->op_type() == Txn::optype::GET) {
                                 auto start_time = std::chrono::system_clock::now();
-                                dynamic_cast<ycsb_cross_read*>(m_txns[i])->Run(); 
+                                dynamic_cast<ycsb_cross_read*>(m_txns[i])->Run();
                                 add_get_latency(start_time);
                         }
                 }

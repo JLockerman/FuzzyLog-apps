@@ -8,13 +8,14 @@ uint64_t Tester::get_num_executed() {
 uint32_t Tester::try_get_completed() {
         uint32_t num_completed = 0;
         while (true) {
-                write_id wid = m_map->try_wait_for_any_put();
-                if (wid_equality{}(wid, WRITE_ID_NIL)) 
-                        break; 
+                WriteId wid = m_map->try_wait_for_any_put();
+                WriteId WRITE_ID_NIL = {};
+                if (wid_equality{}(wid, WRITE_ID_NIL))
+                        break;
                 m_context->inc_num_executed();
                 num_completed += 1;
                 // Add latency stat
-                auto start_time = m_context->mark_ended(wid); 
+                auto start_time = m_context->mark_ended(wid);
                 add_put_latency(start_time);
         }
         return num_completed;
@@ -38,8 +39,8 @@ bool Tester::is_throttled() {
                 return true;
         auto now = std::chrono::system_clock::now();
         std::chrono::duration<uint64_t, std::nano> elapsed = now - m_started_at;
-        // rate 
-        double txn_rate = m_num_issued * 1000000000L / elapsed.count(); 
+        // rate
+        double txn_rate = m_num_issued * 1000000000L / elapsed.count();
         return m_txn_rate <= txn_rate;
 }
 

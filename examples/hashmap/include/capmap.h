@@ -6,7 +6,7 @@
 struct Node {
         uint64_t        key;
         uint64_t        value;
-        long            ts; 
+        long            ts;
         uint8_t        flag;
         struct Node* clone() {
                 struct Node* new_node = (struct Node*)malloc(sizeof(struct Node));
@@ -41,7 +41,7 @@ private:
         ProtocolVersion                         m_protocol;
         std::string                             m_role;
         std::atomic<PartitionStatus>            m_network_partition_status;
-        CAPMapSynchronizer*                     m_synchronizer; 
+        CAPMapSynchronizer*                     m_synchronizer;
 
 public:
         CAPMap(std::vector<std::string>* log_addr, std::vector<workload_config>* workload, ProtocolVersion protocol, std::string& role, bool replication);
@@ -54,8 +54,8 @@ public:
                 return m_role;
         }
 
-        bool get_interesting_colors(std::vector<workload_config>* workload, std::vector<ColorID>& interesting_colors);
-        void init_synchronizer(std::vector<std::string>* log_addr, std::vector<ColorID>& interesting_colors, bool replication);
+        bool get_interesting_colors(std::vector<workload_config>* workload, std::vector<uint64_t>& interesting_colors);
+        void init_synchronizer(std::vector<std::string>* log_addr, std::vector<uint64_t>& interesting_colors, bool replication);
 
         void set_network_partition_status(PartitionStatus status) {
                 switch (status) {
@@ -78,9 +78,9 @@ public:
         void get_payload_for_normal_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
         void get_payload_for_healing_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
         void get_payload_for_partitioning_node(uint64_t key, uint64_t value, char* out, size_t* out_size);
-        
+
         // Operations for protocol 2
-        write_id async_normal_put(uint64_t key, uint64_t value, struct colors* op_color);
-        write_id async_partitioning_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);        // XXX: should be called only from secondary machine
-        write_id async_healing_put(uint64_t key, uint64_t value, struct colors* op_color, struct colors* dep_color);        // XXX: should be called only from secondary machine
+        WriteId async_normal_put(uint64_t key, uint64_t value, ColorSpec op_color);
+        WriteId async_partitioning_put(uint64_t key, uint64_t value, ColorSpec op_color);        // XXX: should be called only from secondary machine
+        WriteId async_healing_put(uint64_t key, uint64_t value, ColorSpec op_color);        // XXX: should be called only from secondary machine
 };

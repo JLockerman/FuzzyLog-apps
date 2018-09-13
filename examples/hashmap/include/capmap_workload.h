@@ -9,15 +9,13 @@ private:
         CAPMap*                                 m_map;
         uint64_t                                m_start;
         uint64_t                                m_end;
-        struct colors*                          m_color;
-        struct colors*                          m_dep_color;
+        ColorSpec                               m_color;
         Context*                                m_context;
         optype                                  m_op_type;
 public:
-        ycsb_cross_insert(CAPMap* map, struct colors* color, struct colors* dep_color, uint64_t start, uint64_t end, Context* context, optype op_type) {
+        ycsb_cross_insert(CAPMap* map, ColorSpec color, uint64_t start, uint64_t end, Context* context, optype op_type) {
                 this->m_map = map;
                 this->m_color = color;
-                this->m_dep_color = dep_color;
                 this->m_start = start;
                 this->m_end = end;
                 this->m_context = context;
@@ -25,12 +23,12 @@ public:
         }
         ~ycsb_cross_insert(){}
         virtual void Run();
-        virtual write_id AsyncRun();
-        virtual write_id AsyncRemoteRun();
-        virtual write_id AsyncStronglyConsistentRun();
-        virtual write_id AsyncWeaklyConsistentRun();
-        write_id AsyncPartitioningAppend();
-        write_id AsyncHealingAppend();
+        virtual WriteId AsyncRun();
+        virtual WriteId AsyncRemoteRun();
+        virtual WriteId AsyncStronglyConsistentRun();
+        virtual WriteId AsyncWeaklyConsistentRun();
+        WriteId AsyncPartitioningAppend();
+        WriteId AsyncHealingAppend();
         virtual optype op_type() {
                 return m_op_type;
         }
@@ -41,15 +39,13 @@ private:
         CAPMap*                                 m_map;
         uint64_t                                m_start;
         uint64_t                                m_end;
-        struct colors*                          m_primary_color;
-        struct colors*                          m_secondary_color;
+        ColorSpec                               m_primary_color;
         Context*                                m_context;
         optype                                  m_op_type;
 public:
-        ycsb_cross_read(CAPMap* map, struct colors* primary_color, struct colors* secondary_color, uint64_t start, uint64_t end, Context* context, optype op_type) {
+        ycsb_cross_read(CAPMap* map, ColorSpec primary_color, uint64_t start, uint64_t end, Context* context, optype op_type) {
                 this->m_map = map;
                 this->m_primary_color = primary_color;
-                this->m_secondary_color = secondary_color;
                 this->m_start = start;
                 this->m_end = end;
                 this->m_context = context;
@@ -57,10 +53,10 @@ public:
         }
         ~ycsb_cross_read(){}
         virtual void Run();
-        virtual write_id AsyncRun();
-        virtual write_id AsyncRemoteRun();
-        virtual write_id AsyncStronglyConsistentRun();
-        virtual write_id AsyncWeaklyConsistentRun();
+        virtual WriteId AsyncRun();
+        virtual WriteId AsyncRemoteRun();
+        virtual WriteId AsyncStronglyConsistentRun();
+        virtual WriteId AsyncWeaklyConsistentRun();
         virtual optype op_type() {
                 return m_op_type;
         }
